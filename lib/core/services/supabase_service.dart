@@ -213,6 +213,98 @@ class SupabaseService {
     }
   }
 
+  // Fetch all organizations (for super-admin)
+  Future<List<MavioOrganization>> fetchOrganizations() async {
+    if (_useMockMode) {
+      return _mockOrgs.values.toList();
+    } else {
+      try {
+        final response = await Supabase.instance.client
+            .from('organizations')
+            .select()
+            .order('name', ascending: true);
+        final List<dynamic> data = response as List<dynamic>;
+        return data.map((json) => MavioOrganization.fromJson(json as Map<String, dynamic>)).toList();
+      } catch (e) {
+        print("Error fetching organizations: $e");
+        return [];
+      }
+    }
+  }
+
+  // Create a new organization
+  Future<MavioOrganization?> createOrganization(String name, String code) async {
+    final cleanCode = code.trim().toUpperCase();
+    if (_useMockMode) {
+      final id = 'org-${DateTime.now().millisecondsSinceEpoch}';
+      final newOrg = MavioOrganization(id: id, code: cleanCode, name: name);
+      _mockOrgs[cleanCode] = newOrg;
+      return newOrg;
+    } else {
+      try {
+        final response = await Supabase.instance.client
+            .from('organizations')
+            .insert({
+              'name': name,
+              'code': cleanCode,
+            })
+            .select()
+            .single();
+        return MavioOrganization.fromJson(response);
+      } catch (e) {
+        print("Error creating organization: $e");
+        return null;
+      }
+    }
+  }
+
+  // Update an organization
+  Future<MavioOrganization?> updateOrganization(String id, String name, String code) async {
+    final cleanCode = code.trim().toUpperCase();
+    if (_useMockMode) {
+      final updatedOrg = MavioOrganization(id: id, code: cleanCode, name: name);
+      // Clean up old key if code changed
+      _mockOrgs.removeWhere((k, v) => v.id == id);
+      _mockOrgs[cleanCode] = updatedOrg;
+      return updatedOrg;
+    } else {
+      try {
+        final response = await Supabase.instance.client
+            .from('organizations')
+            .update({
+              'name': name,
+              'code': cleanCode,
+            })
+            .eq('id', id)
+            .select()
+            .single();
+        return MavioOrganization.fromJson(response);
+      } catch (e) {
+        print("Error updating organization: $e");
+        return null;
+      }
+    }
+  }
+
+  // Delete an organization
+  Future<bool> deleteOrganization(String id) async {
+    if (_useMockMode) {
+      _mockOrgs.removeWhere((k, v) => v.id == id);
+      return true;
+    } else {
+      try {
+        await Supabase.instance.client
+            .from('organizations')
+            .delete()
+            .eq('id', id);
+        return true;
+      } catch (e) {
+        print("Error deleting organization: $e");
+        return false;
+      }
+    }
+  }
+
   Future<MavioProfile?> register(String email, String password, String role) async {
     if (_useMockMode) {
       final id = 'user-${DateTime.now().millisecondsSinceEpoch}';

@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/theme.dart';
@@ -30,6 +31,17 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     _scrollController.addListener(() {
       _scrollOffset.value = _scrollController.offset;
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Pre-cache all visual assets so they render instantly without flicker
+    precacheImage(const AssetImage('logo.png'), context);
+    precacheImage(const AssetImage('company-logo.png'), context);
+    precacheImage(const AssetImage('assets/home.png'), context);
+    precacheImage(const AssetImage('assets/driver.png'), context);
+    precacheImage(const AssetImage('assets/3.png'), context);
   }
 
   @override
@@ -83,7 +95,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
       backgroundColor: const Color(0xFFFAFAFA),
       body: Stack(
         children: [
-          // Background Decorative Gradients
+          // Background Decorative Mesh Orbs
           Positioned(
             top: -150,
             left: -150,
@@ -126,22 +138,22 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                   // Space to account for fixed/sticky navbar
                   SizedBox(height: isDesktop ? 90 : 76),
 
-                  // 1. Hero Section
+                  // 1. Hero Section (Overhauled centered/split layout)
                   _buildHero(isDesktop, screenWidth),
 
                   // 2. Metrics Section
                   _buildMetricsSection(isDesktop),
 
-                  // 3. Main Pillars Showcase (Alternate Rows)
+                  // 3. Main Pillars Showcase (Alternate Rows with Scroll Reveal)
                   Container(
                     key: _featuresKey,
                     child: _buildShowcaseSection(isDesktop, screenWidth),
                   ),
 
-                  // 4. Highlight Highlights (Core features grid)
+                  // 4. Highlight Highlights (Core features grid with Scroll Reveal)
                   _buildCoreHighlights(isDesktop),
 
-                  // 5. Technology Architecture Section
+                  // 5. Technology Architecture Section (Scroll Reveal)
                   Container(
                     key: _techKey,
                     child: _buildTechSection(isDesktop, screenWidth),
@@ -171,6 +183,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     );
   }
 
+  // Navigation Bar Widget (Glassmorphic)
   Widget _buildNavBar(bool isDesktop, double offset) {
     final bool isScrolled = offset > 20;
 
@@ -288,74 +301,74 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isDesktop ? 64 : 24,
-        vertical: isDesktop ? 96 : 48,
+        vertical: isDesktop ? 80 : 40,
       ),
       child: isDesktop
           ? Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Text Description
+                // Left Column: Core description & Actions
                 Expanded(
                   flex: 12,
-                  child: _EntranceAnimator(
+                  child: ScrollReveal(
+                    animateOnLoad: true,
                     child: _buildHeroTextContent(isDesktop),
                   ),
                 ),
                 const Spacer(flex: 1),
 
-                // Floating Mockups Showcase
+                // Right Column: Gorgeous overlapping high-fidelity phone frame stack
                 Expanded(
-                  flex: 14,
-                  child: _EntranceAnimator(
-                    delay: const Duration(milliseconds: 200),
+                  flex: 13,
+                  child: ScrollReveal(
+                    animateOnLoad: true,
                     child: SizedBox(
-                      height: 520,
+                      height: 540,
                       child: Stack(
                         alignment: Alignment.centerRight,
                         children: [
-                          // Background design bubble
+                          // Soft Ambient Glow Background Orbs behind mockups
                           Positioned(
-                            right: 40,
-                            top: 40,
+                            right: 60,
+                            top: 60,
                             child: Container(
-                              width: 320,
-                              height: 320,
+                              width: 300,
+                              height: 300,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                gradient: RadialGradient(
-                                  colors: [
-                                    AppColors.primary.withOpacity(0.2),
-                                    AppColors.primary.withOpacity(0.0),
-                                  ],
-                                ),
+                                color: AppColors.primary.withOpacity(0.18),
+                              ),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
+                                child: Container(color: Colors.transparent),
                               ),
                             ),
                           ),
 
-                          // Driver App mockup (Floats left/back)
+                          // Driver Portal mockup (Floating background mockup)
                           Positioned(
-                            left: 0,
-                            bottom: 20,
+                            left: 10,
+                            bottom: 30,
                             child: _FloatingWidget(
-                              duration: const Duration(milliseconds: 2800),
-                              offset: 15.0,
+                              duration: const Duration(milliseconds: 2600),
+                              offset: 14.0,
                               child: _PhoneFrame(
                                 assetPath: 'assets/driver.png',
-                                height: 410,
+                                height: 420,
                               ),
                             ),
                           ),
 
-                          // Student App mockup (Floats right/foreground)
+                          // Student Dashboard mockup (Floating foreground mockup)
                           Positioned(
-                            right: 30,
+                            right: 20,
                             top: 20,
                             child: _FloatingWidget(
-                              duration: const Duration(milliseconds: 2400),
+                              duration: const Duration(milliseconds: 2200),
                               offset: -12.0,
                               child: _PhoneFrame(
                                 assetPath: 'assets/home.png',
-                                height: 440,
+                                height: 450,
                               ),
                             ),
                           ),
@@ -368,12 +381,15 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
             )
           : Column(
               children: [
-                _EntranceAnimator(child: _buildHeroTextContent(isDesktop)),
+                ScrollReveal(
+                  animateOnLoad: true,
+                  child: _buildHeroTextContent(isDesktop),
+                ),
                 const SizedBox(height: 56),
 
                 // Staggered stack for mobile layouts
-                _EntranceAnimator(
-                  delay: const Duration(milliseconds: 150),
+                ScrollReveal(
+                  animateOnLoad: true,
                   child: SizedBox(
                     height: 380,
                     width: screenWidth,
@@ -440,11 +456,11 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           'Smart Campus Transit\nReimagined.',
           textAlign: isDesktop ? TextAlign.left : TextAlign.center,
           style: TextStyle(
-            fontSize: isDesktop ? 54 : 36,
+            fontSize: isDesktop ? 58 : 36,
             fontWeight: FontWeight.w900,
             color: AppColors.textPrimary,
             height: 1.15,
-            letterSpacing: -1.5,
+            letterSpacing: -1.8,
           ),
         ),
         const SizedBox(height: 24),
@@ -452,12 +468,12 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           'Mavio orchestrates live telemetry, background location streams, and secure route tracking onto interactive student and driver dashboards. Built for speed, precision, and privacy.',
           textAlign: isDesktop ? TextAlign.left : TextAlign.center,
           style: const TextStyle(
-            fontSize: 16,
+            fontSize: 16.5,
             color: AppColors.textSecondary,
             height: 1.6,
           ),
         ),
-        const SizedBox(height: 36),
+        const SizedBox(height: 40),
         Row(
           mainAxisAlignment: isDesktop ? MainAxisAlignment.start : MainAxisAlignment.center,
           children: [
@@ -467,7 +483,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 minimumSize: const Size(0, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 22),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
@@ -475,7 +491,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
               ),
               child: const Text(
                 'Enter Portal',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
             const SizedBox(width: 16),
@@ -483,15 +499,15 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
               onPressed: () => _scrollToSection(_featuresKey),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.textPrimary,
-                side: const BorderSide(color: AppColors.border),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                side: const BorderSide(color: AppColors.border, width: 1.2),
+                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 22),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
               ),
               child: const Text(
                 'Explore Features',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
           ],
@@ -564,7 +580,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     );
   }
 
-  // Alternating Pillars Showcase
+  // Alternating Pillars Showcase (Scroll Reveal)
   Widget _buildShowcaseSection(bool isDesktop, double screenWidth) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 80),
@@ -572,71 +588,79 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
         children: [
           // Section Header
           Center(
-            child: Column(
-              children: [
-                Text(
-                  'SYSTEM PILLARS',
-                  style: TextStyle(
-                    color: AppColors.primary.withOpacity(0.8),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    letterSpacing: 1.5,
+            child: ScrollReveal(
+              child: Column(
+                children: [
+                  Text(
+                    'SYSTEM PILLARS',
+                    style: TextStyle(
+                      color: AppColors.primary.withOpacity(0.8),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      letterSpacing: 1.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'End-to-End Transit Orchestration',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.5,
+                  const SizedBox(height: 8),
+                  const Text(
+                    'End-to-End Transit Orchestration',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                const SizedBox(
-                  width: 600,
-                  child: Text(
-                    'Mavio splits operations into targeted components optimized for drivers, students, and administration administrators.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+                  const SizedBox(height: 16),
+                  const SizedBox(
+                    width: 600,
+                    child: Text(
+                      'Mavio splits operations into targeted components optimized for drivers, students, and administration administrators.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 80),
 
           // Row 1: Student App (Mockup on Right)
-          _buildShowcaseRow(
-            isDesktop,
-            '01',
-            'Student Real-Time Tracking',
-            'Plan commute routes precisely. Students check active map pins, view details on bus speed, and see vehicle registrations in custom split details modules.',
-            'assets/home.png',
-            true,
+          ScrollReveal(
+            child: _buildShowcaseRow(
+              isDesktop,
+              '01',
+              'Student Real-Time Tracking',
+              'Plan commute routes precisely. Students check active map pins, view details on bus speed, and see vehicle registrations in custom split details modules.',
+              'assets/home.png',
+              true,
+            ),
           ),
           const SizedBox(height: 100),
 
           // Row 2: Driver App (Mockup on Left)
-          _buildShowcaseRow(
-            isDesktop,
-            '02',
-            'Driver Background Telemetry',
-            'Start live coordinates tracking with a single tap. The battery-optimized location isolate tracks positions in the background even if the app gets cleared from recents.',
-            'assets/driver.png',
-            false,
+          ScrollReveal(
+            child: _buildShowcaseRow(
+              isDesktop,
+              '02',
+              'Driver Background Telemetry',
+              'Start live coordinates tracking with a single tap. The battery-optimized location isolate tracks positions in the background even if the app gets cleared from recents.',
+              'assets/driver.png',
+              false,
+            ),
           ),
           const SizedBox(height: 100),
 
           // Row 3: Admin Console (Mockup on Right)
-          _buildShowcaseRow(
-            isDesktop,
-            '03',
-            'Administrative Orchestration',
-            'Full management console: register fleets, audit driver assignments, inspect tracked stop schedules, and cascade deletion requests instantly.',
-            'assets/3.png',
-            true,
+          ScrollReveal(
+            child: _buildShowcaseRow(
+              isDesktop,
+              '03',
+              'Administrative Orchestration',
+              'Full management console: register fleets, audit driver assignments, inspect tracked stop schedules, and cascade deletion requests instantly.',
+              'assets/3.png',
+              true,
+            ),
           ),
         ],
       ),
@@ -725,29 +749,35 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     );
   }
 
-  // Core Highlights (Feature Grid)
+  // Core Highlights (Feature Grid with Scroll Reveal)
   Widget _buildCoreHighlights(bool isDesktop) {
     return Container(
       color: Colors.white,
       padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 80),
       child: Column(
         children: [
-          const Text(
-            'KEY ADVANTAGES',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
-              fontSize: 14,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Engineered for High Performance',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textPrimary,
+          ScrollReveal(
+            child: Column(
+              children: [
+                const Text(
+                  'KEY ADVANTAGES',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Engineered for High Performance',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 56),
@@ -755,20 +785,32 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           isDesktop
               ? Row(
                   children: [
-                    Expanded(child: _buildHighlightCard(Icons.offline_bolt_rounded, 'Speedy Data Sync', 'Supabase streaming keeps map pins moving live with latency under 100ms.')),
+                    Expanded(
+                      child: ScrollReveal(
+                        child: _buildHighlightCard(Icons.offline_bolt_rounded, 'Speedy Data Sync', 'Supabase streaming keeps map pins moving live with latency under 100ms.'),
+                      ),
+                    ),
                     const SizedBox(width: 24),
-                    Expanded(child: _buildHighlightCard(Icons.shield_rounded, 'Secure Credentials', 'Logins authenticated via encrypted client schemas keeping user profiles protected.')),
+                    Expanded(
+                      child: ScrollReveal(
+                        child: _buildHighlightCard(Icons.shield_rounded, 'Secure Credentials', 'Logins authenticated via encrypted client schemas keeping user profiles protected.'),
+                      ),
+                    ),
                     const SizedBox(width: 24),
-                    Expanded(child: _buildHighlightCard(Icons.battery_saver_rounded, 'Isolate Telemetry', 'Separate dart task processing allows background GPS tracking without power drain.')),
+                    Expanded(
+                      child: ScrollReveal(
+                        child: _buildHighlightCard(Icons.battery_saver_rounded, 'Isolate Telemetry', 'Separate dart task processing allows background GPS tracking without power drain.'),
+                      ),
+                    ),
                   ],
                 )
               : Column(
                   children: [
-                    _buildHighlightCard(Icons.offline_bolt_rounded, 'Speedy Data Sync', 'Supabase streaming keeps map pins moving live with latency under 100ms.'),
+                    ScrollReveal(child: _buildHighlightCard(Icons.offline_bolt_rounded, 'Speedy Data Sync', 'Supabase streaming keeps map pins moving live with latency under 100ms.')),
                     const SizedBox(height: 24),
-                    _buildHighlightCard(Icons.shield_rounded, 'Secure Credentials', 'Logins authenticated via encrypted client schemas.'),
+                    ScrollReveal(child: _buildHighlightCard(Icons.shield_rounded, 'Secure Credentials', 'Logins authenticated via encrypted client schemas.')),
                     const SizedBox(height: 24),
-                    _buildHighlightCard(Icons.battery_saver_rounded, 'Isolate Telemetry', 'Separate dart task processing allows background GPS tracking.'),
+                    ScrollReveal(child: _buildHighlightCard(Icons.battery_saver_rounded, 'Isolate Telemetry', 'Separate dart task processing allows background GPS tracking.')),
                   ],
                 ),
         ],
@@ -818,7 +860,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     );
   }
 
-  // Technology Architecture Section
+  // Technology Architecture Section (Scroll Reveal)
   Widget _buildTechSection(bool isDesktop, double screenWidth) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 80),
@@ -827,20 +869,20 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
               children: [
                 Expanded(
                   flex: 5,
-                  child: _buildTechText(),
+                  child: ScrollReveal(child: _buildTechText()),
                 ),
                 const Spacer(flex: 1),
                 Expanded(
                   flex: 5,
-                  child: _buildTechVisuals(),
+                  child: ScrollReveal(child: _buildTechVisuals()),
                 ),
               ],
             )
           : Column(
               children: [
-                _buildTechText(),
+                ScrollReveal(child: _buildTechText()),
                 const SizedBox(height: 48),
-                _buildTechVisuals(),
+                ScrollReveal(child: _buildTechVisuals()),
               ],
             ),
     );
@@ -1092,45 +1134,89 @@ class _FloatingWidgetState extends State<_FloatingWidget> with SingleTickerProvi
   }
 }
 
-// Load-In Entrance Animator
-class _EntranceAnimator extends StatefulWidget {
+// Custom Viewport-based Scroll Reveal Animator
+class ScrollReveal extends StatefulWidget {
   final Widget child;
-  final Duration delay;
+  final Duration duration;
+  final bool animateOnLoad;
 
-  const _EntranceAnimator({
+  const ScrollReveal({
+    super.key,
     required this.child,
-    this.delay = Duration.zero,
+    this.duration = const Duration(milliseconds: 700),
+    this.animateOnLoad = false,
   });
 
   @override
-  State<_EntranceAnimator> createState() => _EntranceAnimatorState();
+  State<ScrollReveal> createState() => _ScrollRevealState();
 }
 
-class _EntranceAnimatorState extends State<_EntranceAnimator> with SingleTickerProviderStateMixin {
+class _ScrollRevealState extends State<ScrollReveal> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _fadeAnimation;
+  late final Animation<double> _opacityAnimation;
   late final Animation<double> _slideAnimation;
+  bool _hasRevealed = false;
+  ScrollPosition? _scrollPosition;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    _controller = AnimationController(vsync: this, duration: widget.duration);
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
     );
-    _slideAnimation = Tween<double>(begin: 30.0, end: 0.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    _slideAnimation = Tween<double>(begin: 40.0, end: 0.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
     );
 
-    Future.delayed(widget.delay, () {
-      if (mounted) _controller.forward();
-    });
+    if (widget.animateOnLoad) {
+      _hasRevealed = true;
+      _controller.forward();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Safely retrieve the ancestor scrollable position
+    final newPosition = Scrollable.maybeOf(context)?.position;
+    if (newPosition != _scrollPosition) {
+      _scrollPosition?.removeListener(_checkVisibility);
+      _scrollPosition = newPosition;
+      _scrollPosition?.addListener(_checkVisibility);
+    }
+    // Check initial visibility after layout
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkVisibility());
   }
 
   @override
   void dispose() {
+    _scrollPosition?.removeListener(_checkVisibility);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _checkVisibility() {
+    if (widget.animateOnLoad) return;
+    if (_hasRevealed || !mounted) return;
+
+    try {
+      final renderBox = context.findRenderObject() as RenderBox?;
+      if (renderBox == null || !renderBox.hasSize) return;
+
+      final position = renderBox.localToGlobal(Offset.zero);
+      final viewportHeight = MediaQuery.of(context).size.height;
+
+      // Reveal when the element enters the viewport with a small buffer margin
+      if (position.dy < viewportHeight - 80) {
+        setState(() {
+          _hasRevealed = true;
+        });
+        _controller.forward();
+      }
+    } catch (_) {
+      // Catch layout safety checks if render object is not ready
+    }
   }
 
   @override
@@ -1139,7 +1225,7 @@ class _EntranceAnimatorState extends State<_EntranceAnimator> with SingleTickerP
       animation: _controller,
       builder: (context, child) {
         return Opacity(
-          opacity: _fadeAnimation.value,
+          opacity: _opacityAnimation.value,
           child: Transform.translate(
             offset: Offset(0, _slideAnimation.value),
             child: child,
