@@ -1,8 +1,13 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/theme.dart';
+import '../../providers/auth_provider.dart';
 import 'auth/org_code_screen.dart';
+import 'student/student_dashboard.dart';
+import 'driver/driver_dashboard.dart';
+import 'management/admin_dashboard.dart';
 
 class MavioLandingPage extends StatefulWidget {
   const MavioLandingPage({super.key});
@@ -27,9 +32,27 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
   }
 
   void _navigateToLogin() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const OrgCodeScreen()),
-    );
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (auth.isAuthenticated) {
+      final role = auth.currentProfile?.role;
+      if (role == 'student') {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const StudentDashboard()),
+        );
+      } else if (role == 'driver') {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const DriverDashboard()),
+        );
+      } else if (role == 'management') {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+        );
+      }
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const OrgCodeScreen()),
+      );
+    }
   }
 
   @override

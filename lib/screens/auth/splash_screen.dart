@@ -43,27 +43,28 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     
     if (!mounted) return;
 
-    if (auth.isAuthenticated) {
-      // Auto routing if logged in
-      final role = auth.currentProfile?.role;
-      if (role == 'student') {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const StudentDashboard()),
-        );
-      } else if (role == 'driver') {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const DriverDashboard()),
-        );
-      } else if (role == 'management') {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const AdminDashboard()),
-        );
-      }
+    if (kIsWeb) {
+      // Web always lands on the Landing Page first, even if already logged in.
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MavioLandingPage()),
+      );
     } else {
-      if (kIsWeb) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MavioLandingPage()),
-        );
+      // Mobile automatically logs in and routes to dashboard if session exists.
+      if (auth.isAuthenticated) {
+        final role = auth.currentProfile?.role;
+        if (role == 'student') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const StudentDashboard()),
+          );
+        } else if (role == 'driver') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const DriverDashboard()),
+          );
+        } else if (role == 'management') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          );
+        }
       } else {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const OrgCodeScreen()),
