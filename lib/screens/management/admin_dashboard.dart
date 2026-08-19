@@ -579,53 +579,54 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           );
                         },
                       ),
+                      const SizedBox(height: 24),
+                      const Divider(),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton.icon(
+                            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                            icon: const Icon(Icons.delete_forever),
+                            label: const Text('Delete'),
+                            onPressed: () => _confirmDeleteProfile(dialogContext, d),
+                          ),
+                          Row(
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dialogContext),
+                                child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () async {
+                                  try {
+                                    await _db.updateDriverDetails(
+                                      id: d.id,
+                                      name: nameController.text.trim(),
+                                      email: emailController.text.trim(),
+                                      phone: phoneController.text.trim(),
+                                      assignedVehicleId: selectedVehicleId,
+                                    );
+                                    _loadAdminData();
+                                    if (mounted) Navigator.pop(dialogContext);
+                                  } catch (e) {
+                                    _showSnackbar('Error updating driver: $e', AppColors.error);
+                                  }
+                                },
+                                child: const Text('Save'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ),
-              actions: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    TextButton.icon(
-                      style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                      icon: const Icon(Icons.delete_forever),
-                      label: const Text('Delete'),
-                      onPressed: () => _confirmDeleteProfile(dialogContext, d),
-                    ),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext),
-                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () async {
-                            try {
-                              await _db.updateDriverDetails(
-                                id: d.id,
-                                name: nameController.text.trim(),
-                                email: emailController.text.trim(),
-                                phone: phoneController.text.trim(),
-                                assignedVehicleId: selectedVehicleId,
-                              );
-                              _loadAdminData();
-                              if (mounted) Navigator.pop(dialogContext);
-                            } catch (e) {
-                              _showSnackbar('Error updating driver: $e', AppColors.error);
-                            }
-                          },
-                          child: const Text('Save'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
             );
           },
         );
@@ -807,98 +808,99 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           });
                         },
                       ),
+                      const SizedBox(height: 24),
+                      const Divider(),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton.icon(
+                            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                            icon: const Icon(Icons.delete_forever),
+                            label: const Text('Delete'),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) {
+                                  return AlertDialog(
+                                    title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    content: Text('Are you sure you want to delete ${student.name}? This will remove all their data and permanently block their login access.'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                                      ),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+                                        onPressed: () async {
+                                          try {
+                                            Navigator.pop(context);
+                                            Navigator.pop(dialogContext);
+                                            
+                                            await _db.deleteProfile(student.id);
+                                            _loadAdminData();
+                                            _showSnackbar('${student.name} deleted successfully.', AppColors.success);
+                                          } catch (e) {
+                                            _showSnackbar('Error deleting: $e', AppColors.error);
+                                          }
+                                        },
+                                        child: const Text('Delete'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                          Row(
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dialogContext),
+                                child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: dialogLoading
+                                    ? null
+                                    : () async {
+                                        setDialogState(() {
+                                          dialogLoading = true;
+                                        });
+                                        try {
+                                          await _db.updateStudentDetails(
+                                            id: student.id,
+                                            name: nameController.text.trim(),
+                                            email: emailController.text.trim(),
+                                            phone: phoneController.text.trim(),
+                                            rollNumber: rollController.text.trim(),
+                                            dob: dobController.text.trim(),
+                                            assignedVehicleId: selectedVehicleId,
+                                          );
+                                          _loadAdminData();
+                                          if (mounted) {
+                                            Navigator.pop(dialogContext);
+                                          }
+                                        } catch (e) {
+                                          _showSnackbar('Error updating student: $e', AppColors.error);
+                                        } finally {
+                                          setDialogState(() {
+                                            dialogLoading = false;
+                                          });
+                                        }
+                                      },
+                                child: const Text('Save'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ),
-              actions: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    TextButton.icon(
-                      style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                      icon: const Icon(Icons.delete_forever),
-                      label: const Text('Delete'),
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) {
-                            return AlertDialog(
-                              title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.bold)),
-                              content: Text('Are you sure you want to delete ${student.name}? This will remove all their data and permanently block their login access.'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
-                                  onPressed: () async {
-                                    try {
-                                      Navigator.pop(context);
-                                      Navigator.pop(dialogContext);
-                                      
-                                      await _db.deleteProfile(student.id);
-                                      _loadAdminData();
-                                      _showSnackbar('${student.name} deleted successfully.', AppColors.success);
-                                    } catch (e) {
-                                      _showSnackbar('Error deleting: $e', AppColors.error);
-                                    }
-                                  },
-                                  child: const Text('Delete'),
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                    ),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext),
-                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: dialogLoading
-                              ? null
-                              : () async {
-                                  setDialogState(() {
-                                    dialogLoading = true;
-                                  });
-                                  try {
-                                    await _db.updateStudentDetails(
-                                      id: student.id,
-                                      name: nameController.text.trim(),
-                                      email: emailController.text.trim(),
-                                      phone: phoneController.text.trim(),
-                                      rollNumber: rollController.text.trim(),
-                                      dob: dobController.text.trim(),
-                                      assignedVehicleId: selectedVehicleId,
-                                    );
-                                    _loadAdminData();
-                                    if (mounted) {
-                                      Navigator.pop(dialogContext);
-                                    }
-                                  } catch (e) {
-                                    _showSnackbar('Error updating student: $e', AppColors.error);
-                                  } finally {
-                                    setDialogState(() {
-                                      dialogLoading = false;
-                                    });
-                                  }
-                                },
-                          child: const Text('Save'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
             );
           },
         );
