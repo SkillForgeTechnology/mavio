@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/theme/theme.dart';
+import '../landing_page.dart';
 import 'org_code_screen.dart';
 import '../student/student_dashboard.dart';
 import '../driver/driver_dashboard.dart';
@@ -58,10 +60,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         );
       }
     } else {
-      // Go to Org Code Screen
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const OrgCodeScreen()),
-      );
+      if (kIsWeb) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MavioLandingPage()),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const OrgCodeScreen()),
+        );
+      }
     }
   }
 
