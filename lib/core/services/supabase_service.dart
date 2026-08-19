@@ -1155,7 +1155,11 @@ class SupabaseService {
     if (_useMockMode) {
       _mockProfiles.remove(id);
     } else {
-      await Supabase.instance.client.from('profiles').delete().eq('id', id);
+      // Deleting from auth.users cascades to public.profiles
+      await Supabase.instance.client.rpc(
+        'delete_auth_user',
+        params: {'target_user_id': id},
+      );
     }
   }
 }

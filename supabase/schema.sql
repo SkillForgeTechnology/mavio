@@ -50,7 +50,7 @@ CREATE TABLE public.vehicles (
 CREATE TABLE public.trips (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vehicle_id UUID NOT NULL REFERENCES public.vehicles(id) ON DELETE CASCADE,
-    driver_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+    driver_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
 
     status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'COMPLETED')),
     started_at TIMESTAMPTZ DEFAULT now(),
@@ -130,6 +130,26 @@ BEGIN
   END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Helper: Delete user authentication and profile (restricted to management)
+CREATE OR REPLACE FUNCTION public.delete_auth_user(target_user_id UUID)
+RETURNS VOID AS $$
+DECLARE
+  caller_role TEXT;
+BEGIN
+  -- Get the role of the caller
+  SELECT role INTO caller_role FROM public.profiles WHERE id = auth.uid();
+  
+  -- Only allow if caller is management
+  IF caller_role != 'management' THEN
+    RAISE EXCEPTION 'Access denied: Only management can delete authentication records.';
+  END IF;
+
+  -- Delete from auth.users (cascades to public.profiles)
+  DELETE FROM auth.users WHERE id = target_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 
 
 -- Organization Policies
