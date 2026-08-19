@@ -35,6 +35,11 @@ flutter:
     - dashboard_bg.png
     - mavio_bus.png
     - company-logo.png
+    - assets/home.png
+    - assets/driver.png
+    - assets/3.png
+    - assets/4.png
+    - assets/5.png
 
 flutter_launcher_icons:
   android: "launcher_icon"
