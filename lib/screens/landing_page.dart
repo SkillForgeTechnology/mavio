@@ -917,19 +917,44 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
             ],
           ),
           const SizedBox(height: 12),
-          InkWell(
-            onTap: () {
-              Navigator.of(context).pushNamed('/privacy');
-            },
-            child: const Text(
-              'Privacy Policy',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                decoration: TextDecoration.underline,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              InkWell(
+                onTap: () {
+                  Navigator.of(context).pushNamed('/privacy');
+                },
+                child: const Text(
+                  'Privacy Policy',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 16),
+              const Text(
+                '•',
+                style: TextStyle(color: Colors.white54, fontSize: 13),
+              ),
+              const SizedBox(width: 16),
+              InkWell(
+                onTap: () {
+                  Navigator.of(context).pushNamed('/delete-account');
+                },
+                child: const Text(
+                  'Delete Account',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
