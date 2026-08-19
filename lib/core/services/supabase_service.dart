@@ -497,7 +497,7 @@ class SupabaseService {
         // End any active trips for this driver or vehicle first
         await client
             .from('trips')
-            .update({'status': 'COMPLETED', 'ended_at': DateTime.now().toIso8601String()})
+            .update({'status': 'COMPLETED', 'ended_at': DateTime.now().toUtc().toIso8601String()})
             .or('driver_id.eq.$driverId,vehicle_id.eq.$vehicleId')
             .eq('status', 'ACTIVE');
 
@@ -569,7 +569,7 @@ class SupabaseService {
             .from('trips')
             .update({
               'status': 'COMPLETED',
-              'ended_at': DateTime.now().toIso8601String(),
+              'ended_at': DateTime.now().toUtc().toIso8601String(),
             })
             .eq('id', tripId);
 

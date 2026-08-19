@@ -128,8 +128,8 @@ class MavioTrip {
       driverId: json['driver_id'] as String,
 
       status: json['status'] as String,
-      startedAt: DateTime.parse(json['started_at'] as String),
-      endedAt: json['ended_at'] != null ? DateTime.parse(json['ended_at'] as String) : null,
+      startedAt: DateTime.parse(json['started_at'] as String).toLocal(),
+      endedAt: json['ended_at'] != null ? DateTime.parse(json['ended_at'] as String).toLocal() : null,
       orgId: json['org_id'] as String,
     );
   }
