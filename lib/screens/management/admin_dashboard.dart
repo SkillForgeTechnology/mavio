@@ -600,6 +600,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
+                              minimumSize: const Size(100, 40),
                             ),
                             onPressed: () async {
                               try {
@@ -858,6 +859,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
+                              minimumSize: const Size(100, 40),
                             ),
                             onPressed: dialogLoading
                                 ? null
