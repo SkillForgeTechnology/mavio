@@ -147,8 +147,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
         if (result != PermissionStatus.granted) {
           _showSnackbar(
             "Notification permission is required to run location updates in the background.",
-            AppColors.warning,
+            AppColors.error,
           );
+          return; // Block service initialization to prevent OS crash
         }
       }
     }
@@ -251,7 +252,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
       if (mounted) {
         setState(() {
           _isGpsOn = true;
-          _currentSpeed = event?['speed'] as double? ?? 0.0;
+          _currentSpeed = (event?['speed'] as num?)?.toDouble() ?? 0.0;
           _pingsSent = event?['uploads'] as int? ?? 0;
         });
       }

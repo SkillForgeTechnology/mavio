@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/keys.dart';
@@ -116,12 +117,28 @@ class BackgroundLocationService {
   static Future<void> initialize() async {
     final service = FlutterBackgroundService();
 
+    // Create Notification Channel for Android 13/14 compatibility
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+        FlutterLocalNotificationsPlugin();
+
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'mavio_location_channel', // id
+      'MAVIO Live GPS Tracking', // name
+      description: 'This channel is used for displaying live trip tracking details.',
+      importance: Importance.low,
+    );
+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+
     await service.configure(
       androidConfiguration: AndroidConfiguration(
         onStart: onStart,
         autoStart: false, // Explicitly start only when driver starts a trip
         isForegroundMode: true,
-        notificationChannelId: 'mavio_location_channel',
+        notificationChannelId: 'mavio_location_channel', // Use created channel ID
         initialNotificationTitle: 'MAVIO Smart Transit',
         initialNotificationContent: 'Initializing background tracking...',
       ),
