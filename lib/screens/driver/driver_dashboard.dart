@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/theme/theme.dart';
@@ -29,6 +30,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   // Tracking details
   bool _isTripActive = false;
   StreamSubscription<Position>? _gpsSubscription;
+  StreamSubscription? _backgroundSubscription;
   double _currentSpeed = 0.0;
   int _pingsSent = 0;
   int _tripSeconds = 0;
@@ -212,13 +214,20 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   // Core tracking router
-  void _startTracking(String tripId) {
+  void _startTracking(String tripId) async {
     _stopTracking(); // Ensure cleanup
+
+    // Calculate elapsed duration if resuming from an active session
+    int initialSeconds = 0;
+    if (_activeTrip != null) {
+      initialSeconds = DateTime.now().difference(_activeTrip!.startedAt).inSeconds;
+      if (initialSeconds < 0) initialSeconds = 0;
+    }
 
     setState(() {
       _currentSpeed = 0.0;
       _pingsSent = 0;
-      _tripSeconds = 0;
+      _tripSeconds = initialSeconds;
     });
 
     _tripDurationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -227,95 +236,36 @@ class _DriverDashboardState extends State<DriverDashboard> {
           _tripSeconds++;
         });
       }
-
-      // PERIODIC FALLBACK QUERY: If the GPS stream is silent, query position manually every 5 seconds
-      if (_tripSeconds % 5 == 0) {
-        Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high).then((position) {
-          _db.sendLocationUpdate(
-            tripId: tripId,
-            latitude: position.latitude,
-            longitude: position.longitude,
-            speed: position.speed * 3.6,
-            heading: position.heading,
-            accuracy: position.accuracy,
-          );
-          if (mounted) {
-            setState(() {
-              _isGpsOn = true;
-              _pingsSent++;
-              _currentSpeed = position.speed * 3.6;
-            });
-          }
-        }).catchError((err) {
-          print("Fallback GPS query error: $err");
-        });
-      }
     });
 
-    // Send one immediate coordinate update on start to avoid stationary filter delays
-    Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high).then((position) {
-      _db.sendLocationUpdate(
-        tripId: tripId,
-        latitude: position.latitude,
-        longitude: position.longitude,
-        speed: position.speed * 3.6,
-        heading: position.heading,
-        accuracy: position.accuracy,
-      );
+    // Start background location service and pass tracking info
+    final backgroundService = FlutterBackgroundService();
+    await backgroundService.startService();
+    backgroundService.invoke('startTracking', {
+      'tripId': tripId,
+      'vehicleName': _assignedVehicle?.name ?? 'Mavio Bus',
+    });
+
+    // Bind UI updates to background telemetry broadcaster
+    _backgroundSubscription = backgroundService.on('updateStats').listen((event) {
       if (mounted) {
         setState(() {
           _isGpsOn = true;
-          _pingsSent++;
-          _currentSpeed = position.speed * 3.6;
+          _currentSpeed = event?['speed'] as double? ?? 0.0;
+          _pingsSent = event?['uploads'] as int? ?? 0;
         });
       }
-    }).catchError((err) {
-      print("Driver GPS initial position fetch error: $err");
-    });
-
-    // Setup real GPS subscription with Android background/foreground notification settings
-    final locationSettings = AndroidSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 0, // Set to 0 to capture every update
-      intervalDuration: const Duration(seconds: 3), // 3s is highly stable and standard
-      forceLocationManager: true, // Force legacy LocationManager to bypass FusedLocationProvider silence bug
-      foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationTitle: "MAVIO Active Trip Tracking",
-        notificationText: "MAVIO is tracking your bus location in the background for active student routing.",
-        notificationIcon: AndroidResource(name: 'launcher_icon', defType: 'mipmap'),
-        enableWakeLock: true,
-        enableWifiLock: true,
-        setOngoing: true,
-      ),
-    );
-    _gpsSubscription = Geolocator.getPositionStream(locationSettings: locationSettings)
-        .listen((Position position) {
-      _db.sendLocationUpdate(
-        tripId: tripId,
-        latitude: position.latitude,
-        longitude: position.longitude,
-        speed: position.speed * 3.6, // convert m/s to km/h
-        heading: position.heading,
-        accuracy: position.accuracy,
-      );
-      setState(() {
-        _isGpsOn = true;
-        _pingsSent++;
-        _currentSpeed = position.speed * 3.6;
-      });
-    }, onError: (err) {
-      print("Driver GPS Error: $err");
-      setState(() {
-        _isGpsOn = false;
-      });
     });
   }
 
   void _stopTracking() {
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
+    _backgroundSubscription?.cancel();
+    _backgroundSubscription = null;
     _tripDurationTimer?.cancel();
     _tripDurationTimer = null;
+    FlutterBackgroundService().invoke('stopService');
   }
 
   String _formatDuration(int totalSeconds) {
