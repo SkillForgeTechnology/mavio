@@ -90,6 +90,48 @@ RETURNS UUID AS $$
   SELECT org_id FROM public.profiles WHERE id = auth.uid();
 $$ LANGUAGE sql SECURITY DEFINER SET row_security = off;
 
+-- Helper: Update authentication email and/or password (restricted to management)
+CREATE OR REPLACE FUNCTION public.update_auth_user(
+  target_user_id UUID,
+  new_email TEXT DEFAULT NULL,
+  new_password TEXT DEFAULT NULL
+)
+RETURNS VOID AS $$
+DECLARE
+  caller_role TEXT;
+BEGIN
+  -- Get the role of the caller
+  SELECT role INTO caller_role FROM public.profiles WHERE id = auth.uid();
+  
+  -- Only allow if caller is management
+  IF caller_role != 'management' THEN
+    RAISE EXCEPTION 'Access denied: Only management can update authentication records.';
+  END IF;
+
+  -- 1. Update email if provided
+  IF new_email IS NOT NULL AND new_email != '' THEN
+    UPDATE auth.users
+    SET email = new_email,
+        email_change = ''
+    WHERE id = target_user_id;
+
+    -- Also update the identity associated with this user to sync login email
+    UPDATE auth.identities
+    SET identity_data = jsonb_set(identity_data, '{email}', to_jsonb(new_email)),
+        provider_id = new_email
+    WHERE user_id = target_user_id;
+  END IF;
+
+  -- 2. Update password if provided
+  IF new_password IS NOT NULL AND new_password != '' THEN
+    UPDATE auth.users
+    SET encrypted_password = crypt(new_password, gen_salt('bf'))
+    WHERE id = target_user_id;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
 -- Organization Policies
 CREATE POLICY "Allow public read of organizations by code"
     ON public.organizations FOR SELECT TO public USING (true);

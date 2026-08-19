@@ -1086,6 +1086,19 @@ class SupabaseService {
         'phone': phone,
         'assigned_vehicle_id': assignedVehicleId,
       }).eq('id', id);
+
+      try {
+        await Supabase.instance.client.rpc(
+          'update_auth_user',
+          params: {
+            'target_user_id': id,
+            'new_email': email.trim(),
+            'new_password': null,
+          },
+        );
+      } catch (e) {
+        print("Warning: Could not sync driver auth email: $e");
+      }
     }
   }
 
@@ -1122,6 +1135,19 @@ class SupabaseService {
         'dob': dob,
         'assigned_vehicle_id': assignedVehicleId,
       }).eq('id', id);
+
+      try {
+        await Supabase.instance.client.rpc(
+          'update_auth_user',
+          params: {
+            'target_user_id': id,
+            'new_email': email.trim(),
+            'new_password': dob?.trim(),
+          },
+        );
+      } catch (e) {
+        print("Warning: Could not sync student auth details: $e");
+      }
     }
   }
 
