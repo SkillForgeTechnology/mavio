@@ -55,7 +55,10 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
               child: _buildFeaturesSection(isDesktop),
             ),
 
-            // 4. How It Works Section
+            // 4. Performance Metrics Section
+            _buildMetricsSection(isDesktop),
+
+            // 5. How It Works Section
             _buildHowItWorksSection(isDesktop),
 
             // 5. Technology Partner Section
@@ -436,48 +439,67 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
 
   Widget _buildFeatureCard(IconData icon, String title, String desc) {
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.borderLight, width: 0.8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.015),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            width: 4,
+            height: 110,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 28),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            desc,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-              height: 1.6,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(icon, color: AppColors.primary, size: 28),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  desc,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+              ],
             ),
           ),
+        ],
+      ),
+    );
         ],
       ),
     );
@@ -584,17 +606,105 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
             title,
             style: const TextStyle(
               fontSize: 18,
+  }
+
+  // Metrics Section
+  Widget _buildMetricsSection(bool isDesktop) {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 64 : 24,
+        vertical: 80,
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'PERFORMANCE METRICS',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Engineered for Scale and Latency',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 56),
+          isDesktop
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Expanded(child: _buildMetricCard('99.9%', 'System Uptime', 'Cloud orchestration ensures 24/7 route discovery.')),
+                    const SizedBox(width: 24),
+                    Expanded(child: _buildMetricCard('< 3s', 'Telemetry Latency', 'Real-time database updates for active tracking.')),
+                    const SizedBox(width: 24),
+                    Expanded(child: _buildMetricCard('10k+', 'Daily Synchronizations', 'Providing high-concurrency bus locations.')),
+                    const SizedBox(width: 24),
+                    Expanded(child: _buildMetricCard('Zero', 'Hardware Overhead', 'Track location via smartphones without GPS boxes.')),
+                  ],
+                )
+              : Column(
+                  children: [
+                    _buildMetricCard('99.9%', 'System Uptime', 'Cloud orchestration ensures 24/7 route discovery.'),
+                    const SizedBox(height: 20),
+                    _buildMetricCard('< 3s', 'Telemetry Latency', 'Real-time database updates for active tracking.'),
+                    const SizedBox(height: 20),
+                    _buildMetricCard('10k+', 'Daily Synchronizations', 'Providing high-concurrency bus locations.'),
+                    const SizedBox(height: 20),
+                    _buildMetricCard('Zero', 'Hardware Overhead', 'Track location via smartphones without GPS boxes.'),
+                  ],
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricCard(String value, String title, String desc) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFBFC),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.borderLight, width: 1.0),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
+              color: AppColors.primary,
+              letterSpacing: -1.0,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             desc,
             textAlign: TextAlign.center,
             style: const TextStyle(
+              fontSize: 13,
               color: AppColors.textSecondary,
-              fontSize: 14,
               height: 1.5,
             ),
           ),
@@ -768,6 +878,21 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                 fit: BoxFit.contain,
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () {
+              Navigator.of(context).pushNamed('/privacy');
+            },
+            child: const Text(
+              'Privacy Policy',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                decoration: TextDecoration.underline,
+              ),
+            ),
           ),
         ],
       ),

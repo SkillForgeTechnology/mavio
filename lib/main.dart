@@ -4,6 +4,7 @@ import 'core/services/background_location_service.dart';
 import 'core/theme/theme.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth/splash_screen.dart';
+import 'screens/privacy_policy_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +28,11 @@ class MainApp extends StatelessWidget {
       title: 'MAVIO',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const SplashScreen(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const SplashScreen(),
+        '/privacy': (context) => const PrivacyPolicyPage(),
+      },
     );
   }
 }
