@@ -616,7 +616,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const Text(
-            'OUR TECHNOLOGY PARTNER',
+            'A PRODUCT OF SKILLFORGE TECHNOLOGY',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,
@@ -626,7 +626,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Powering Campus Transit with SkillForge Technology',
+            'MAVIO is a Product of SkillForge Technology',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 28,
@@ -639,7 +639,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           Container(
             constraints: const BoxConstraints(maxWidth: 800),
             child: const Text(
-              'MAVIO is designed, engineered, and powered in partnership with SkillForge Technology. '
+              'MAVIO is designed, engineered, and built by SkillForge Technology. '
               'By leveraging SkillForge\'s advanced enterprise telemetry servers, real-time sync systems, '
               'and location intelligence mapping engines, we provide colleges and organizations with reliable, '
               'high-accuracy bus tracking services that scale seamlessly.',
@@ -759,7 +759,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text(
-                '© 2026 MAVIO Smart College Transit. All Rights Reserved. Powered by ',
+                '© 2026 MAVIO Smart College Transit. All Rights Reserved. A product of ',
                 style: TextStyle(color: Colors.white54, fontSize: 13),
               ),
               Image.asset(

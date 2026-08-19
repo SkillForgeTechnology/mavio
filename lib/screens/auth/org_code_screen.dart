@@ -257,7 +257,7 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       const Text(
-                                        'Powered by ',
+                                        'A product of ',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: AppColors.textSecondary,
