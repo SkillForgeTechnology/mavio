@@ -213,7 +213,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                     'MAVIO',
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.w955,
+                      fontWeight: FontWeight.w900,
                       color: AppColors.primary,
                       letterSpacing: 1.0,
                     ),
@@ -237,6 +237,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 0),
                   elevation: isScrolled ? 2 : 0,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
                   shape: RoundedRectangleBorder(
@@ -244,6 +245,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                   ),
                 ),
                 child: const Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       'Launch Portal',
@@ -436,7 +438,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           textAlign: isDesktop ? TextAlign.left : TextAlign.center,
           style: TextStyle(
             fontSize: isDesktop ? 54 : 36,
-            fontWeight: FontWeight.w950,
+            fontWeight: FontWeight.w900,
             color: AppColors.textPrimary,
             height: 1.15,
             letterSpacing: -1.5,
@@ -461,6 +463,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
+                minimumSize: const Size(0, 0),
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
@@ -527,7 +530,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           value,
           style: const TextStyle(
             fontSize: 48,
-            fontWeight: FontWeight.w950,
+            fontWeight: FontWeight.w900,
             color: AppColors.primary,
             letterSpacing: -1.0,
           ),
