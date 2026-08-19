@@ -22,21 +22,20 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
   final GlobalKey _featuresKey = GlobalKey();
   final GlobalKey _techKey = GlobalKey();
 
-  double _scrollOffset = 0.0;
+  final ValueNotifier<double> _scrollOffset = ValueNotifier<double>(0.0);
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(() {
-      setState(() {
-        _scrollOffset = _scrollController.offset;
-      });
+      _scrollOffset.value = _scrollController.offset;
     });
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _scrollOffset.dispose();
     super.dispose();
   }
 
@@ -160,16 +159,20 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
             top: 0,
             left: 0,
             right: 0,
-            child: _buildNavBar(isDesktop),
+            child: ValueListenableBuilder<double>(
+              valueListenable: _scrollOffset,
+              builder: (context, offset, child) {
+                return _buildNavBar(isDesktop, offset);
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  // Navigation Bar Widget (Glassmorphic)
-  Widget _buildNavBar(bool isDesktop) {
-    final bool isScrolled = _scrollOffset > 20;
+  Widget _buildNavBar(bool isDesktop, double offset) {
+    final bool isScrolled = offset > 20;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
