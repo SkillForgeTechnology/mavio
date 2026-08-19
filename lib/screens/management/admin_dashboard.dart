@@ -12,6 +12,7 @@ import '../../core/services/supabase_service.dart';
 import '../../core/theme/theme.dart';
 import '../../models/models.dart';
 import '../auth/splash_screen.dart';
+import 'package:intl/intl.dart' as intl;
 import 'bulk_import_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -46,6 +47,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Timer? _refreshTimer;
   StreamSubscription<MavioLocationUpdate>? _liveLocationSub;
   LatLng? _mockBusLocation;
+
+  void _showSnackbar(String message, Color backgroundColor) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -2368,7 +2379,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final filteredVehicles = vehicles.where((v) {
       if (_vehicleQuery.isEmpty) return true;
       return v.name.toLowerCase().contains(_vehicleQuery.toLowerCase()) ||
-             v.plateNumber.toLowerCase().contains(_vehicleQuery.toLowerCase());
+             v.regNumber.toLowerCase().contains(_vehicleQuery.toLowerCase());
     }).toList();
 
     final bool isWeb = MediaQuery.of(context).size.width > 900;
