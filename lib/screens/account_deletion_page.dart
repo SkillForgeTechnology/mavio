@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/theme.dart';
 
 class AccountDeletionPage extends StatelessWidget {
@@ -150,7 +151,18 @@ class AccountDeletionPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: () {},
+                      onPressed: () async {
+                        final Uri emailLaunchUri = Uri(
+                          scheme: 'mailto',
+                          path: 'support@skillforgetechnology.app',
+                          queryParameters: {
+                            'subject': 'Mavio Account Deletion Request',
+                          },
+                        );
+                        if (await canLaunchUrl(emailLaunchUri)) {
+                          await launchUrl(emailLaunchUri);
+                        }
+                      },
                       icon: const Icon(Icons.email_rounded, size: 18),
                       label: const Text('Email support@skillforgetechnology.app'),
                       style: ElevatedButton.styleFrom(
