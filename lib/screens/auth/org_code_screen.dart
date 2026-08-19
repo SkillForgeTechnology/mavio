@@ -69,6 +69,15 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
           // Slow technical matrix particles background
           const Positioned.fill(child: _TechnicalMatrixBg()),
 
+          // Premium corner waves background
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _WaveBackgroundPainter(
+                color: AppColors.primary.withOpacity(0.04),
+              ),
+            ),
+          ),
+
           SafeArea(
             child: Center(
               child: Container(
@@ -89,9 +98,9 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                             
                             // Form Card Content with Animations
                             Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                const SizedBox(height: 40),
+                                const SizedBox(height: 32),
                                 
                                 // App logo animation
                                 AnimatedBuilder(
@@ -110,10 +119,10 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                     );
                                   },
                                   child: Align(
-                                    alignment: Alignment.centerLeft,
+                                    alignment: Alignment.center,
                                     child: Image.asset(
                                       'logo.png',
-                                      height: 64,
+                                      height: 110,
                                       fit: BoxFit.contain,
                                     ),
                                   ),
@@ -137,10 +146,11 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                     );
                                   },
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
                                       Text(
                                         'Enter Organization Code',
+                                        textAlign: TextAlign.center,
                                         style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                                           fontSize: 30,
                                           color: AppColors.textPrimary,
@@ -149,6 +159,7 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                       const SizedBox(height: 8),
                                       Text(
                                         'Your organization. Our network.',
+                                        textAlign: TextAlign.center,
                                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                           fontSize: 16,
                                         ),
@@ -238,6 +249,27 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                   TextButton(
                                     onPressed: () {},
                                     child: const Text('Can\'t find your code? Contact your organization'),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  
+                                  // Company branding
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        'Powered by ',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      Image.asset(
+                                        'company-logo.png',
+                                        height: 18,
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(height: 20),
                                 ],
@@ -360,5 +392,62 @@ class _MatrixPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _WaveBackgroundPainter extends CustomPainter {
+  final Color color;
+  _WaveBackgroundPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    // Top-right soft corner wave
+    final path1 = Path();
+    path1.moveTo(size.width, 0);
+    path1.lineTo(size.width * 0.35, 0);
+    path1.quadraticBezierTo(
+      size.width * 0.65,
+      size.height * 0.16,
+      size.width,
+      size.height * 0.24,
+    );
+    path1.close();
+    canvas.drawPath(path1, paint);
+
+    // Lighter top-right accent curve
+    final paint2 = Paint()
+      ..color = color.withOpacity(0.02)
+      ..style = PaintingStyle.fill;
+    final path2 = Path();
+    path2.moveTo(size.width, 0);
+    path2.lineTo(size.width * 0.2, 0);
+    path2.quadraticBezierTo(
+      size.width * 0.55,
+      size.height * 0.24,
+      size.width,
+      size.height * 0.32,
+    );
+    path2.close();
+    canvas.drawPath(path2, paint2);
+
+    // Bottom-left soft corner wave
+    final path3 = Path();
+    path3.moveTo(0, size.height);
+    path3.lineTo(0, size.height * 0.8);
+    path3.quadraticBezierTo(
+      size.width * 0.24,
+      size.height * 0.84,
+      size.width * 0.45,
+      size.height,
+    );
+    path3.close();
+    canvas.drawPath(path3, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 

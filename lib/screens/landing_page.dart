@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/theme.dart';
 import 'auth/org_code_screen.dart';
 
@@ -57,7 +58,10 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
             // 4. How It Works Section
             _buildHowItWorksSection(isDesktop),
 
-            // 5. Footer Section
+            // 5. Technology Partner Section
+            _buildPartnerSection(isDesktop),
+
+            // 6. Footer Section
             _buildFooter(),
           ],
         ),
@@ -599,6 +603,133 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     );
   }
 
+  // Partner Branding Section
+  Widget _buildPartnerSection(bool isDesktop) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFFBFBFC),
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 64 : 24,
+        vertical: 64,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Text(
+            'OUR TECHNOLOGY PARTNER',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Powering Campus Transit with SkillForge Technology',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: const Text(
+              'MAVIO is designed, engineered, and powered in partnership with SkillForge Technology. '
+              'By leveraging SkillForge\'s advanced enterprise telemetry servers, real-time sync systems, '
+              'and location intelligence mapping engines, we provide colleges and organizations with reliable, '
+              'high-accuracy bus tracking services that scale seamlessly.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: AppColors.textSecondary,
+                height: 1.6,
+              ),
+            ),
+          ),
+          const SizedBox(height: 36),
+          Container(
+            constraints: const BoxConstraints(maxWidth: 500),
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.borderLight, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'company-logo.png',
+                  height: 36,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'SkillForge Technology',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Building Next-Generation Digital Experiences',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () async {
+                    final url = Uri.parse('https://skillforgetechnology.app/');
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    minimumSize: const Size(180, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 2,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        'Visit SkillForge site',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      SizedBox(width: 8),
+                      Icon(Icons.open_in_new_rounded, size: 16),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Footer
   Widget _buildFooter() {
     return Container(
@@ -624,9 +755,19 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
-            '© 2026 MAVIO Smart College Transit. All Rights Reserved.',
-            style: TextStyle(color: Colors.white54, fontSize: 13),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                '© 2026 MAVIO Smart College Transit. All Rights Reserved. Powered by ',
+                style: TextStyle(color: Colors.white54, fontSize: 13),
+              ),
+              Image.asset(
+                'company-logo.png',
+                height: 14,
+                fit: BoxFit.contain,
+              ),
+            ],
           ),
         ],
       ),
