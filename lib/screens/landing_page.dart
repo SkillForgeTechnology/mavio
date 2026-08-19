@@ -500,9 +500,6 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
         ],
       ),
     );
-        ],
-      ),
-    );
   }
 
   // How It Works
@@ -606,6 +603,23 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
             title,
             style: const TextStyle(
               fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            desc,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // Metrics Section
