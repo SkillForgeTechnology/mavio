@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:intl/intl.dart' as intl;
 import '../../providers/auth_provider.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/theme/theme.dart';
@@ -24,6 +25,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
   
   bool _isLoading = false;
   MavioVehicle? _assignedVehicle;
+  List<MavioTrip> _tripHistory = [];
+  String _thisMonthDuration = "0h 0m";
 
   MavioTrip? _activeTrip;
 
@@ -59,24 +62,50 @@ class _DriverDashboardState extends State<DriverDashboard> {
     });
 
     final profile = Provider.of<AuthProvider>(context, listen: false).currentProfile;
-    if (profile != null && profile.assignedVehicleId != null) {
-      // Mock / Fetch vehicle and route details
-      final data = await _db.getStudentDashboardData(); // driver shares similar metadata lookup
-      setState(() {
-        _assignedVehicle = data['vehicle'] as MavioVehicle?;
+    if (profile != null) {
+      if (profile.assignedVehicleId != null) {
+        // Mock / Fetch vehicle and route details
+        final data = await _db.getStudentDashboardData(); // driver shares similar metadata lookup
+        setState(() {
+          _assignedVehicle = data['vehicle'] as MavioVehicle?;
 
-        _activeTrip = data['activeTrip'] as MavioTrip?;
-        _isTripActive = _activeTrip != null;
-      });
+          _activeTrip = data['activeTrip'] as MavioTrip?;
+          _isTripActive = _activeTrip != null;
+        });
 
-      // Resume tracking if trip was left active
-      if (_isTripActive) {
-        _startTracking(_activeTrip!.id);
+        // Resume tracking if trip was left active
+        if (_isTripActive) {
+          _startTracking(_activeTrip!.id);
+        }
       }
+
+      // Fetch Drive History
+      final history = await _db.getDriverTripHistory(profile.id);
+      setState(() {
+        _tripHistory = history;
+        _calculateMonthlyTotal();
+      });
     }
 
     setState(() {
       _isLoading = false;
+    });
+  }
+
+  void _calculateMonthlyTotal() {
+    final now = DateTime.now();
+    int totalSeconds = 0;
+    for (var trip in _tripHistory) {
+      if (trip.status == 'COMPLETED' && trip.endedAt != null) {
+        if (trip.startedAt.month == now.month && trip.startedAt.year == now.year) {
+          totalSeconds += trip.endedAt!.difference(trip.startedAt).inSeconds;
+        }
+      }
+    }
+    final int hours = totalSeconds ~/ 3600;
+    final int minutes = (totalSeconds % 3600) ~/ 60;
+    setState(() {
+      _thisMonthDuration = '${hours}h ${minutes}m';
     });
   }
 
@@ -200,6 +229,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     try {
       await _db.endTrip(_activeTrip!.id, _assignedVehicle!.id);
       _stopTracking();
+      await _loadDriverDetails();
       setState(() {
         _activeTrip = null;
         _isTripActive = false;
@@ -629,19 +659,114 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
                   const SizedBox(height: 12),
 
-                  // Route details schedule from design
+                  // Drive History Section
                   const Text(
-                    "Today's Trips",
+                    "Drive History",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildTripScheduleRow('Morning Route', _isTripActive ? 'Active' : 'Not started', _isTripActive ? AppColors.success : AppColors.textSecondary),
-                  const Divider(height: 24),
-                  _buildTripScheduleRow('Evening Route', '5:00 PM', AppColors.textSecondary),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.15), width: 1),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "This Month's Total Duration",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          _thisMonthDuration,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_tripHistory.isEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Text(
+                          "No drive history found.",
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _tripHistory.length,
+                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final trip = _tripHistory[index];
+                        final dateStr = intl.DateFormat('MMM dd, yyyy').format(trip.startedAt);
+                        
+                        String durationStr = "Active";
+                        if (trip.status == 'COMPLETED' && trip.endedAt != null) {
+                          final duration = trip.endedAt!.difference(trip.startedAt);
+                          final hours = duration.inHours;
+                          final mins = duration.inMinutes % 60;
+                          durationStr = hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
+                        }
+                        
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    dateStr,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Started at ${intl.DateFormat('hh:mm a').format(trip.startedAt)}",
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                durationStr,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: trip.status == 'ACTIVE' ? AppColors.success : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                 ],
               ),
             ),

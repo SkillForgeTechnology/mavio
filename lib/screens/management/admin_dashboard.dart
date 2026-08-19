@@ -31,6 +31,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   List<Map<String, dynamic>> _fleet = [];
   List<MavioProfile> _drivers = [];
   List<MavioProfile> _students = [];
+  String _vehicleQuery = "";
+  String _driverQuery = "";
+  String _studentQuery = "";
 
   Map<String, dynamic>? _selectedMapFleetItem;
   final MapController _mapController = MapController();
@@ -375,160 +378,518 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  void _showEditDriverAssignmentDialog(MavioProfile driver) {
-    String? selectedVehicleId = driver.assignedVehicleId;
+  void _showDriverDetailsAndEditDialog(MavioProfile d) {
+    final TextEditingController nameController = TextEditingController(text: d.name);
+    final TextEditingController emailController = TextEditingController(text: d.email);
+    final TextEditingController phoneController = TextEditingController(text: d.phone ?? '');
+    String? selectedVehicleId = d.assignedVehicleId;
+
     showDialog(
       context: context,
-      builder: (context) {
-        final vehicles = _fleet
-            .map((item) => item['vehicle'] as MavioVehicle)
-            .toList();
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            backgroundColor: Colors.white,
-            title: Text(
-              'Assign Vehicle to ${driver.name}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            content: DropdownButtonFormField<String>(
-              value: selectedVehicleId,
-              decoration: const InputDecoration(
-                labelText: 'Select Bus',
-                fillColor: Colors.white,
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-              items: [
-                const DropdownMenuItem<String>(
-                  value: null,
-                  child: Text('Unassigned'),
-                ),
-                ...vehicles.map((v) {
-                  return DropdownMenuItem<String>(
-                    value: v.id,
-                    child: Text(v.name),
-                  );
-                }),
-              ],
-              onChanged: (val) {
-                setDialogState(() {
-                  selectedVehicleId = val;
-                });
-              },
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Driver Profile',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(dialogContext),
+                  ),
+                ],
               ),
-              ElevatedButton(
-                onPressed: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-                  Navigator.pop(context);
-                  setState(() => _isLoading = true);
-                  try {
-                    await _db.updateDriverAssignment(
-                      driver.id,
-                      selectedVehicleId,
-                    );
-                    await _loadAdminData();
-                  } catch (e) {
-                    messenger.showSnackBar(
-                      SnackBar(
-                        content: Text('Error updating: $e'),
-                        backgroundColor: AppColors.error,
+              content: SizedBox(
+                width: 480,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Full Name',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                       ),
-                    );
-                  } finally {
-                    if (mounted) setState(() => _isLoading = false);
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(100, 40),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: nameController,
+                        decoration: InputDecoration(
+                          hintText: 'Enter name',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Email Address',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: emailController,
+                        decoration: InputDecoration(
+                          hintText: 'Enter email',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Phone Number',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: phoneController,
+                        decoration: InputDecoration(
+                          hintText: 'Enter phone',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Assign Vehicle / Bus',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String?>(
+                        value: selectedVehicleId,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('Unassigned'),
+                          ),
+                          ..._fleet.map((item) {
+                            final v = item['vehicle'] as MavioVehicle;
+                            return DropdownMenuItem<String?>(
+                              value: v.id,
+                              child: Text(v.name),
+                            );
+                          }),
+                        ],
+                        onChanged: (val) {
+                          setDialogState(() {
+                            selectedVehicleId = val;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Drive History & Durations',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      FutureBuilder<List<MavioTrip>>(
+                        future: _db.getDriverTripHistory(d.id),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(12),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+                          final history = snapshot.data ?? [];
+                          
+                          final now = DateTime.now();
+                          int monthlySeconds = 0;
+                          for (var trip in history) {
+                            if (trip.status == 'COMPLETED' && trip.endedAt != null) {
+                              if (trip.startedAt.month == now.month && trip.startedAt.year == now.year) {
+                                monthlySeconds += trip.endedAt!.difference(trip.startedAt).inSeconds;
+                              }
+                            }
+                          }
+                          final hHours = monthlySeconds ~/ 3600;
+                          final hMins = (monthlySeconds % 3600) ~/ 60;
+                          
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "This Month's Total: ${hHours}h ${hMins}m",
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                              ),
+                              const SizedBox(height: 10),
+                              if (history.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  child: Text('No drive history recorded.', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                )
+                              else
+                                ListView.separated(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: history.length > 5 ? 5 : history.length,
+                                  separatorBuilder: (_, __) => const Divider(height: 1),
+                                  itemBuilder: (context, idx) {
+                                    final trip = history[idx];
+                                    final dateLabel = intl.DateFormat('MMM dd, yyyy').format(trip.startedAt);
+                                    String durationLabel = "Active";
+                                    if (trip.status == 'COMPLETED' && trip.endedAt != null) {
+                                      final diff = trip.endedAt!.difference(trip.startedAt);
+                                      final hrs = diff.inHours;
+                                      final mns = diff.inMinutes % 60;
+                                      durationLabel = hrs > 0 ? '${hrs}h ${mns}m' : '${mns}m';
+                                    }
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(dateLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                          Text(durationLabel, style: TextStyle(fontSize: 13, color: trip.status == 'ACTIVE' ? AppColors.success : AppColors.textPrimary)),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-                child: const Text('Save'),
               ),
-            ],
-          ),
+              actions: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                      icon: const Icon(Icons.delete_forever),
+                      label: const Text('Delete'),
+                      onPressed: () => _confirmDeleteProfile(dialogContext, d),
+                    ),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () async {
+                            try {
+                              await _db.updateDriverDetails(
+                                id: d.id,
+                                name: nameController.text.trim(),
+                                email: emailController.text.trim(),
+                                phone: phoneController.text.trim(),
+                                assignedVehicleId: selectedVehicleId,
+                              );
+                              _loadAdminData();
+                              if (mounted) Navigator.pop(dialogContext);
+                            } catch (e) {
+                              _showSnackbar('Error updating driver: $e', AppColors.error);
+                            }
+                          },
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
         );
       },
     );
   }
 
-  void _showEditStudentAssignmentDialog(MavioProfile student) {
-    String? selectedVehicleId = student.assignedVehicleId;
-
+  void _confirmDeleteProfile(BuildContext dialogContext, MavioProfile profile) {
     showDialog(
       context: context,
       builder: (context) {
-        final vehicles = _fleet
-            .map((item) => item['vehicle'] as MavioVehicle)
-            .toList();
-        return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            backgroundColor: Colors.white,
-            title: Text(
-              'Assign Bus to ${student.name}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+        return AlertDialog(
+          title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Text('Are you sure you want to delete ${profile.name}? This will remove all their data and permanently block their login access.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: selectedVehicleId,
-                  decoration: const InputDecoration(
-                    labelText: 'Select Bus',
-                    fillColor: Colors.white,
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+              onPressed: () async {
+                try {
+                  Navigator.pop(context);
+                  Navigator.pop(dialogContext);
+                  
+                  await _db.deleteProfile(profile.id);
+                  _loadAdminData();
+                  _showSnackbar('${profile.name} deleted successfully.', AppColors.success);
+                } catch (e) {
+                  _showSnackbar('Error deleting: $e', AppColors.error);
+                }
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showStudentDetails(MavioProfile student) {
+    final TextEditingController nameController = TextEditingController(text: student.name);
+    final TextEditingController emailController = TextEditingController(text: student.email);
+    final TextEditingController phoneController = TextEditingController(text: student.phone ?? '');
+    final TextEditingController rollController = TextEditingController(text: student.rollNumber ?? '');
+    final TextEditingController dobController = TextEditingController(text: student.dob ?? '');
+    String? selectedVehicleId = student.assignedVehicleId;
+    bool dialogLoading = false;
+    final allVehicles = _fleet.map((item) => item['vehicle'] as MavioVehicle).toList();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Student Profile',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  items: [
-                    const DropdownMenuItem<String>(
-                      value: null,
-                      child: Text('Unassigned'),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(dialogContext),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Full Name',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: nameController,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Email Address',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: emailController,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Roll Number',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: rollController,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Phone Number',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: phoneController,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Date of Birth (YYYY-MM-DD)',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: dobController,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Assign Vehicle / Bus',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String?>(
+                        value: selectedVehicleId,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('Unassigned'),
+                          ),
+                          ...allVehicles.map((v) {
+                            return DropdownMenuItem<String?>(
+                              value: v.id,
+                              child: Text(v.name),
+                            );
+                          }),
+                        ],
+                        onChanged: (val) {
+                          setDialogState(() {
+                            selectedVehicleId = val;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                      icon: const Icon(Icons.delete_forever),
+                      label: const Text('Delete'),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) {
+                            return AlertDialog(
+                              title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.bold)),
+                              content: Text('Are you sure you want to delete ${student.name}? This will remove all their data and permanently block their login access.'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+                                  onPressed: () async {
+                                    try {
+                                      Navigator.pop(context);
+                                      Navigator.pop(dialogContext);
+                                      
+                                      await _db.deleteProfile(student.id);
+                                      _loadAdminData();
+                                      _showSnackbar('${student.name} deleted successfully.', AppColors.success);
+                                    } catch (e) {
+                                      _showSnackbar('Error deleting: $e', AppColors.error);
+                                    }
+                                  },
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
                     ),
-                    ...vehicles.map((v) {
-                      return DropdownMenuItem<String>(
-                        value: v.id,
-                        child: Text(v.name),
-                      );
-                    }),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: dialogLoading
+                              ? null
+                              : () async {
+                                  setDialogState(() {
+                                    dialogLoading = true;
+                                  });
+                                  try {
+                                    await _db.updateStudentDetails(
+                                      id: student.id,
+                                      name: nameController.text.trim(),
+                                      email: emailController.text.trim(),
+                                      phone: phoneController.text.trim(),
+                                      rollNumber: rollController.text.trim(),
+                                      dob: dobController.text.trim(),
+                                      assignedVehicleId: selectedVehicleId,
+                                    );
+                                    _loadAdminData();
+                                    if (mounted) {
+                                      Navigator.pop(dialogContext);
+                                    }
+                                  } catch (e) {
+                                    _showSnackbar('Error updating student: $e', AppColors.error);
+                                  } finally {
+                                    setDialogState(() {
+                                      dialogLoading = false;
+                                    });
+                                  }
+                                },
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
                   ],
-                  onChanged: (val) {
-                    setDialogState(() {
-                      selectedVehicleId = val;
-                    });
-                  },
                 ),
               ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  setState(() => _isLoading = true);
-                  try {
-                    await _db.updateStudentAssignment(
-                      student.id,
-                      selectedVehicleId,
-                    );
-                    await _loadAdminData();
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error updating: $e'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(100, 40),
-                ),
-                child: const Text('Save'),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -2004,6 +2365,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final vehicles = _fleet
         .map((item) => item['vehicle'] as MavioVehicle)
         .toList();
+    final filteredVehicles = vehicles.where((v) {
+      if (_vehicleQuery.isEmpty) return true;
+      return v.name.toLowerCase().contains(_vehicleQuery.toLowerCase()) ||
+             v.plateNumber.toLowerCase().contains(_vehicleQuery.toLowerCase());
+    }).toList();
+
     final bool isWeb = MediaQuery.of(context).size.width > 900;
     final double screenWidth = MediaQuery.of(context).size.width;
     final double contentWidth = isWeb ? (screenWidth - 280) : screenWidth;
@@ -2018,27 +2385,65 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: isWeb
-          ? GridView.builder(
-              padding: const EdgeInsets.all(24),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                mainAxisExtent: 96,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: TextField(
+              onChanged: (val) {
+                setState(() {
+                  _vehicleQuery = val;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: "Search Vehicles...",
+                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.borderLight),
+                ),
               ),
-              itemCount: vehicles.length,
-              itemBuilder: (context, index) {
-                return _buildVehicleCardItem(vehicles[index]);
-              },
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: vehicles.length,
-              itemBuilder: (context, index) {
-                return _buildVehicleCardItem(vehicles[index]);
-              },
             ),
+          ),
+          Expanded(
+            child: filteredVehicles.isEmpty
+                ? const Center(
+                    child: Text(
+                      "No vehicles found matching search.",
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  )
+                : (isWeb
+                    ? GridView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          mainAxisExtent: 96,
+                        ),
+                        itemCount: filteredVehicles.length,
+                        itemBuilder: (context, index) {
+                          return _buildVehicleCardItem(filteredVehicles[index]);
+                        },
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: filteredVehicles.length,
+                        itemBuilder: (context, index) {
+                          return _buildVehicleCardItem(filteredVehicles[index]);
+                        },
+                      )),
+          ),
+        ],
+      ),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2096,6 +2501,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildDriversList() {
+    final filteredDrivers = _drivers.where((d) {
+      if (_driverQuery.isEmpty) return true;
+      return d.name.toLowerCase().contains(_driverQuery.toLowerCase()) ||
+             (d.phone ?? '').toLowerCase().contains(_driverQuery.toLowerCase()) ||
+             d.email.toLowerCase().contains(_driverQuery.toLowerCase());
+    }).toList();
+
     final bool isWeb = MediaQuery.of(context).size.width > 900;
     final double screenWidth = MediaQuery.of(context).size.width;
     final double contentWidth = isWeb ? (screenWidth - 280) : screenWidth;
@@ -2110,27 +2522,65 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: isWeb
-          ? GridView.builder(
-              padding: const EdgeInsets.all(24),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                mainAxisExtent: 96,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: TextField(
+              onChanged: (val) {
+                setState(() {
+                  _driverQuery = val;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: "Search Drivers...",
+                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.borderLight),
+                ),
               ),
-              itemCount: _drivers.length,
-              itemBuilder: (context, index) {
-                return _buildDriverCardItem(_drivers[index]);
-              },
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _drivers.length,
-              itemBuilder: (context, index) {
-                return _buildDriverCardItem(_drivers[index]);
-              },
             ),
+          ),
+          Expanded(
+            child: filteredDrivers.isEmpty
+                ? const Center(
+                    child: Text(
+                      "No drivers found matching search.",
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  )
+                : (isWeb
+                    ? GridView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          mainAxisExtent: 96,
+                        ),
+                        itemCount: filteredDrivers.length,
+                        itemBuilder: (context, index) {
+                          return _buildDriverCardItem(filteredDrivers[index]);
+                        },
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: filteredDrivers.length,
+                        itemBuilder: (context, index) {
+                          return _buildDriverCardItem(filteredDrivers[index]);
+                        },
+                      )),
+          ),
+        ],
+      ),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2184,7 +2634,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(d.email),
-        onTap: () => _showEditDriverAssignmentDialog(d),
+        onTap: () => _showDriverDetailsAndEditDialog(d),
         trailing: Chip(
           label: Text(busName, style: const TextStyle(fontSize: 11)),
           backgroundColor: AppColors.surface,
@@ -2195,6 +2645,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildStudentsList() {
+    final filteredStudents = _students.where((s) {
+      if (_studentQuery.isEmpty) return true;
+      return s.name.toLowerCase().contains(_studentQuery.toLowerCase()) ||
+             (s.rollNumber ?? '').toLowerCase().contains(_studentQuery.toLowerCase()) ||
+             (s.phone ?? '').toLowerCase().contains(_studentQuery.toLowerCase()) ||
+             s.email.toLowerCase().contains(_studentQuery.toLowerCase());
+    }).toList();
+
     final bool isWeb = MediaQuery.of(context).size.width > 900;
     final double screenWidth = MediaQuery.of(context).size.width;
     final double contentWidth = isWeb ? (screenWidth - 280) : screenWidth;
@@ -2233,31 +2691,99 @@ class _AdminDashboardState extends State<AdminDashboard> {
       'students': unassignedStudents,
     });
 
-    Widget gridOrList = isWeb
-        ? GridView.builder(
-            padding: const EdgeInsets.all(24),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              mainAxisExtent: 110,
-            ),
-            itemCount: busGroups.length,
+    Widget gridOrList = _studentQuery.isNotEmpty
+        ? ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            itemCount: filteredStudents.length,
             itemBuilder: (context, index) {
-              return _buildBusGroupCard(busGroups[index]);
+              final s = filteredStudents[index];
+              String busName = "Unassigned";
+              if (s.assignedVehicleId != null) {
+                final v = _fleet.firstWhere(
+                  (item) => (item['vehicle'] as MavioVehicle).id == s.assignedVehicleId,
+                  orElse: () => {},
+                );
+                if (v.isNotEmpty) {
+                  busName = (v['vehicle'] as MavioVehicle).name;
+                }
+              }
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: AppColors.borderLight, width: 0.8),
+                ),
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: AppColors.primaryLight,
+                    child: Icon(Icons.person_rounded, color: AppColors.primary),
+                  ),
+                  title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text("Roll: ${s.rollNumber ?? 'N/A'} • ${s.email}"),
+                  trailing: Chip(
+                    label: Text(busName, style: const TextStyle(fontSize: 11)),
+                    backgroundColor: AppColors.surface,
+                    side: const BorderSide(color: AppColors.border),
+                  ),
+                  onTap: () => _showStudentDetails(s),
+                ),
+              );
             },
           )
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: busGroups.length,
-            itemBuilder: (context, index) {
-              return _buildBusGroupCard(busGroups[index]);
-            },
-          );
+        : (isWeb
+            ? GridView.builder(
+                padding: const EdgeInsets.all(24),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  mainAxisExtent: 110,
+                ),
+                itemCount: busGroups.length,
+                itemBuilder: (context, index) {
+                  return _buildBusGroupCard(busGroups[index]);
+                },
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: busGroups.length,
+                itemBuilder: (context, index) {
+                  return _buildBusGroupCard(busGroups[index]);
+                },
+              ));
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: gridOrList,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: TextField(
+              onChanged: (val) {
+                setState(() {
+                  _studentQuery = val;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: "Search by Roll Number, Name, or Email...",
+                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.borderLight),
+                ),
+              ),
+            ),
+          ),
+          Expanded(child: gridOrList),
+        ],
+      ),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2336,6 +2862,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     .map((f) => f['vehicle'] as MavioVehicle)
                     .toList(),
                 onRefresh: _loadAdminData,
+                onShowStudentDetails: _showStudentDetails,
               ),
             ),
           );
@@ -2951,6 +3478,7 @@ class BusStudentsScreen extends StatefulWidget {
   final List<MavioProfile> students;
   final List<MavioVehicle> allVehicles;
   final VoidCallback onRefresh;
+  final Function(MavioProfile) onShowStudentDetails;
 
   const BusStudentsScreen({
     super.key,
@@ -2958,6 +3486,7 @@ class BusStudentsScreen extends StatefulWidget {
     required this.students,
     required this.allVehicles,
     required this.onRefresh,
+    required this.onShowStudentDetails,
   });
 
   @override
@@ -2973,136 +3502,6 @@ class _BusStudentsScreenState extends State<BusStudentsScreen> {
   void initState() {
     super.initState();
     _currentStudents = List<MavioProfile>.from(widget.students);
-  }
-
-  void _showStudentDetails(MavioProfile student) {
-    String? selectedVehicleId = student.assignedVehicleId;
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Text(
-                student.name,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Email/Roll: ${student.email}',
-                    style: const TextStyle(color: AppColors.textSecondary),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Assign Vehicle',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String?>(
-                    value: selectedVehicleId,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    items: [
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('Unassigned'),
-                      ),
-                      ...widget.allVehicles.map((v) {
-                        return DropdownMenuItem<String?>(
-                          value: v.id,
-                          child: Text(v.name),
-                        );
-                      }),
-                    ],
-                    onChanged: (val) {
-                      setDialogState(() {
-                        selectedVehicleId = val;
-                      });
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () async {
-                          setDialogState(() {
-                            _isLoading = true;
-                          });
-                          try {
-                            await _db.updateStudentAssignment(
-                              student.id,
-                              selectedVehicleId,
-                            );
-                            widget.onRefresh();
-                            if (mounted) {
-                              Navigator.pop(dialogContext); // Close dialog
-                              Navigator.pop(
-                                context,
-                              ); // Pop back to category cards list to trigger updates
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error updating student: $e'),
-                                  backgroundColor: AppColors.error,
-                                ),
-                              );
-                            }
-                          } finally {
-                            setDialogState(() {
-                              _isLoading = false;
-                            });
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text('Save Changes'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
   }
 
   @override
@@ -3168,7 +3567,7 @@ class _BusStudentsScreenState extends State<BusStudentsScreen> {
                       Icons.chevron_right_rounded,
                       color: AppColors.textSecondary,
                     ),
-                    onTap: () => _showStudentDetails(s),
+                    onTap: () => widget.onShowStudentDetails(s),
                   ),
                 );
               },

@@ -73,7 +73,53 @@ class SupabaseService {
 
 
 
-  final List<MavioTrip> _mockTrips = [];
+  final List<MavioTrip> _mockTrips = [
+    MavioTrip(
+      id: 't-mock-1',
+      vehicleId: 'v1',
+      driverId: 'd1b11111-1111-1111-1111-111111111111',
+      status: 'COMPLETED',
+      startedAt: DateTime.now().subtract(const Duration(days: 1, hours: 4)),
+      endedAt: DateTime.now().subtract(const Duration(days: 1, hours: 2, minutes: 45)),
+      orgId: '8a7a9a1a-1234-5678-abcd-ef0123456789',
+    ),
+    MavioTrip(
+      id: 't-mock-2',
+      vehicleId: 'v1',
+      driverId: 'd1b11111-1111-1111-1111-111111111111',
+      status: 'COMPLETED',
+      startedAt: DateTime.now().subtract(const Duration(days: 2, hours: 4)),
+      endedAt: DateTime.now().subtract(const Duration(days: 2, hours: 2, minutes: 30)),
+      orgId: '8a7a9a1a-1234-5678-abcd-ef0123456789',
+    ),
+    MavioTrip(
+      id: 't-mock-3',
+      vehicleId: 'v1',
+      driverId: 'd1b11111-1111-1111-1111-111111111111',
+      status: 'COMPLETED',
+      startedAt: DateTime.now().subtract(const Duration(days: 3, hours: 4)),
+      endedAt: DateTime.now().subtract(const Duration(days: 3, hours: 2, minutes: 50)),
+      orgId: '8a7a9a1a-1234-5678-abcd-ef0123456789',
+    ),
+    MavioTrip(
+      id: 't-mock-4',
+      vehicleId: 'v2',
+      driverId: 'd2b22222-2222-2222-2222-222222222222',
+      status: 'COMPLETED',
+      startedAt: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
+      endedAt: DateTime.now().subtract(const Duration(days: 1, hours: 1, minutes: 45)),
+      orgId: '8a7a9a1a-1234-5678-abcd-ef0123456789',
+    ),
+    MavioTrip(
+      id: 't-mock-5',
+      vehicleId: 'v2',
+      driverId: 'd2b22222-2222-2222-2222-222222222222',
+      status: 'COMPLETED',
+      startedAt: DateTime.now().subtract(const Duration(days: 2, hours: 3)),
+      endedAt: DateTime.now().subtract(const Duration(days: 2, hours: 1, minutes: 30)),
+      orgId: '8a7a9a1a-1234-5678-abcd-ef0123456789',
+    ),
+  ];
   final StreamController<MavioLocationUpdate> _mockLocationStreamController =
       StreamController<MavioLocationUpdate>.broadcast();
 
@@ -242,12 +288,20 @@ class SupabaseService {
         );
 
         if (authRes.user != null) {
-          // Fetch corresponding Profile
-          final profileRes = await Supabase.instance.client
-              .from('profiles')
-              .select()
-              .eq('id', authRes.user!.id)
-              .single();
+          // Fetch corresponding Profile and check if active (not deleted)
+          Map<String, dynamic>? profileRes;
+          try {
+            profileRes = await Supabase.instance.client
+                .from('profiles')
+                .select()
+                .eq('id', authRes.user!.id)
+                .maybeSingle();
+          } catch (_) {}
+
+          if (profileRes == null) {
+            await Supabase.instance.client.auth.signOut();
+            throw Exception("This account has been deleted by the organization.");
+          }
 
           final profile = MavioProfile.fromJson(profileRes);
           if (profile.role != role) {
@@ -983,6 +1037,99 @@ class SupabaseService {
             'assigned_vehicle_id': vehicleId,
           })
           .eq('id', studentId);
+    }
+  }
+
+  Future<List<MavioTrip>> getDriverTripHistory(String driverId) async {
+    if (_useMockMode) {
+      return _mockTrips.where((t) => t.driverId == driverId).toList();
+    } else {
+      try {
+        final client = Supabase.instance.client;
+        final response = await client
+            .from('trips')
+            .select()
+            .eq('driver_id', driverId)
+            .order('started_at', ascending: false);
+        return (response as List).map((t) => MavioTrip.fromJson(t)).toList();
+      } catch (e) {
+        print("Error fetching driver trip history: $e");
+        return [];
+      }
+    }
+  }
+
+  Future<void> updateDriverDetails({
+    required String id,
+    required String name,
+    required String email,
+    String? phone,
+    String? assignedVehicleId,
+  }) async {
+    if (_useMockMode) {
+      final d = _mockProfiles[id];
+      if (d != null) {
+        _mockProfiles[id] = MavioProfile(
+          id: d.id,
+          email: email,
+          name: name,
+          role: d.role,
+          orgId: d.orgId,
+          assignedVehicleId: assignedVehicleId,
+          phone: phone,
+        );
+      }
+    } else {
+      await Supabase.instance.client.from('profiles').update({
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'assigned_vehicle_id': assignedVehicleId,
+      }).eq('id', id);
+    }
+  }
+
+  Future<void> updateStudentDetails({
+    required String id,
+    required String name,
+    required String email,
+    String? phone,
+    String? rollNumber,
+    String? dob,
+    String? assignedVehicleId,
+  }) async {
+    if (_useMockMode) {
+      final s = _mockProfiles[id];
+      if (s != null) {
+        _mockProfiles[id] = MavioProfile(
+          id: s.id,
+          email: email,
+          name: name,
+          role: s.role,
+          orgId: s.orgId,
+          assignedVehicleId: assignedVehicleId,
+          phone: phone,
+          rollNumber: rollNumber,
+          dob: dob,
+        );
+      }
+    } else {
+      await Supabase.instance.client.from('profiles').update({
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'roll_number': rollNumber,
+        'dob': dob,
+        'assigned_vehicle_id': assignedVehicleId,
+      }).eq('id', id);
+    }
+  }
+
+  Future<void> deleteProfile(String id) async {
+    if (_useMockMode) {
+      _mockProfiles.remove(id);
+    } else {
+      await Supabase.instance.client.from('profiles').delete().eq('id', id);
     }
   }
 }
