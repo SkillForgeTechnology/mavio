@@ -53,7 +53,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
   @override
   void dispose() {
-    _stopTracking();
+    _cleanupLocalTrackingUI();
     super.dispose();
   }
 
@@ -245,9 +245,18 @@ class _DriverDashboardState extends State<DriverDashboard> {
     }
   }
 
+  void _cleanupLocalTrackingUI() {
+    _gpsSubscription?.cancel();
+    _gpsSubscription = null;
+    _backgroundSubscription?.cancel();
+    _backgroundSubscription = null;
+    _tripDurationTimer?.cancel();
+    _tripDurationTimer = null;
+  }
+
   // Core tracking router
   void _startTracking(String tripId) async {
-    _stopTracking(); // Ensure cleanup
+    _cleanupLocalTrackingUI(); // Ensure cleanup of local variables only
 
     // Calculate elapsed duration if resuming from an active session
     int initialSeconds = 0;
@@ -273,11 +282,15 @@ class _DriverDashboardState extends State<DriverDashboard> {
     // Start background location service and pass tracking info
     if (!kIsWeb) {
       final backgroundService = FlutterBackgroundService();
-      await backgroundService.startService();
-      backgroundService.invoke('startTracking', {
-        'tripId': tripId,
-        'vehicleName': _assignedVehicle?.name ?? 'Mavio Bus',
-      });
+      final bool isServiceRunning = await backgroundService.isRunning();
+
+      if (!isServiceRunning) {
+        await backgroundService.startService();
+        backgroundService.invoke('startTracking', {
+          'tripId': tripId,
+          'vehicleName': _assignedVehicle?.name ?? 'Mavio Bus',
+        });
+      }
 
       // Bind UI updates to background telemetry broadcaster
       _backgroundSubscription = backgroundService.on('updateStats').listen((event) {
@@ -293,12 +306,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   void _stopTracking() {
-    _gpsSubscription?.cancel();
-    _gpsSubscription = null;
-    _backgroundSubscription?.cancel();
-    _backgroundSubscription = null;
-    _tripDurationTimer?.cancel();
-    _tripDurationTimer = null;
+    _cleanupLocalTrackingUI();
     if (!kIsWeb) {
       FlutterBackgroundService().invoke('stopService');
     }
