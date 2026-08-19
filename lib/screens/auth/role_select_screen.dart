@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/theme/theme.dart';
@@ -151,18 +152,20 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> with SingleTickerPr
                       const SizedBox(height: 16),
 
                       // 2. Driver Card
-                      _buildAnimatedItem(
-                        startVal: 0.4,
-                        endVal: 0.8,
-                        child: _buildRoleCard(
-                          context: context,
-                          title: 'Driver',
-                          subtitle: 'Start your trip and keep moving',
-                          icon: Icons.directions_car_rounded,
-                          onTap: () => _navigateToLogin(context, 'driver'),
+                      if (!kIsWeb) ...[
+                        _buildAnimatedItem(
+                          startVal: 0.4,
+                          endVal: 0.8,
+                          child: _buildRoleCard(
+                            context: context,
+                            title: 'Driver',
+                            subtitle: 'Start your trip and keep moving',
+                            icon: Icons.directions_car_rounded,
+                            onTap: () => _navigateToLogin(context, 'driver'),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
+                      ],
 
                       // 3. Management Card
                       _buildAnimatedItem(

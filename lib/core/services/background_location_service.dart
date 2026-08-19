@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -115,6 +116,7 @@ void onStart(ServiceInstance service) async {
 
 class BackgroundLocationService {
   static Future<void> initialize() async {
+    if (kIsWeb) return;
     final service = FlutterBackgroundService();
 
     // Create Notification Channel for Android 13/14 compatibility

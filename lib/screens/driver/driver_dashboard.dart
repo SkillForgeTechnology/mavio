@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -270,23 +271,25 @@ class _DriverDashboardState extends State<DriverDashboard> {
     });
 
     // Start background location service and pass tracking info
-    final backgroundService = FlutterBackgroundService();
-    await backgroundService.startService();
-    backgroundService.invoke('startTracking', {
-      'tripId': tripId,
-      'vehicleName': _assignedVehicle?.name ?? 'Mavio Bus',
-    });
+    if (!kIsWeb) {
+      final backgroundService = FlutterBackgroundService();
+      await backgroundService.startService();
+      backgroundService.invoke('startTracking', {
+        'tripId': tripId,
+        'vehicleName': _assignedVehicle?.name ?? 'Mavio Bus',
+      });
 
-    // Bind UI updates to background telemetry broadcaster
-    _backgroundSubscription = backgroundService.on('updateStats').listen((event) {
-      if (mounted) {
-        setState(() {
-          _isGpsOn = true;
-          _currentSpeed = (event?['speed'] as num?)?.toDouble() ?? 0.0;
-          _pingsSent = event?['uploads'] as int? ?? 0;
-        });
-      }
-    });
+      // Bind UI updates to background telemetry broadcaster
+      _backgroundSubscription = backgroundService.on('updateStats').listen((event) {
+        if (mounted) {
+          setState(() {
+            _isGpsOn = true;
+            _currentSpeed = (event?['speed'] as num?)?.toDouble() ?? 0.0;
+            _pingsSent = event?['uploads'] as int? ?? 0;
+          });
+        }
+      });
+    }
   }
 
   void _stopTracking() {
@@ -296,7 +299,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
     _backgroundSubscription = null;
     _tripDurationTimer?.cancel();
     _tripDurationTimer = null;
-    FlutterBackgroundService().invoke('stopService');
+    if (!kIsWeb) {
+      FlutterBackgroundService().invoke('stopService');
+    }
   }
 
   String _formatDuration(int totalSeconds) {
