@@ -1511,7 +1511,8 @@ class _ProfileTabState extends State<_ProfileTab> {
   @override
   Widget build(BuildContext context) {
     final tracking = Provider.of<TrackingProvider>(context);
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final auth = Provider.of<AuthProvider>(context);
+    final profile = auth.currentProfile;
     final vehicle = tracking.assignedVehicle;
 
     return Scaffold(
@@ -1579,13 +1580,13 @@ class _ProfileTabState extends State<_ProfileTab> {
                   ],
                 ),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 32),
 
-              // Detail Section Header
+              // 1. Personal Details Section Header
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Account Details',
+                  'Personal Details',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -1595,7 +1596,53 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
               const SizedBox(height: 8),
 
-              // Account Details List Card
+              // Personal Details Box
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.borderLight, width: 1.5),
+                ),
+                child: Column(
+                  children: [
+                    _buildDetailRow(
+                      icon: Icons.badge_rounded,
+                      label: 'Roll Number',
+                      value: profile?.rollNumber ?? 'N/A',
+                    ),
+                    const Divider(height: 32, color: AppColors.borderLight),
+                    _buildDetailRow(
+                      icon: Icons.cake_rounded,
+                      label: 'Date of Birth',
+                      value: profile?.dob ?? 'N/A',
+                    ),
+                    const Divider(height: 32, color: AppColors.borderLight),
+                    _buildDetailRow(
+                      icon: Icons.phone_android_rounded,
+                      label: 'Mobile Number',
+                      value: profile?.phone ?? 'N/A',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 2. Bus Details Section Header
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Bus Details',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Bus Details Box
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -1618,7 +1665,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                     ),
                     const Divider(height: 32, color: AppColors.borderLight),
                     _buildDetailRow(
-                      icon: Icons.badge_rounded,
+                      icon: Icons.verified_user_rounded,
                       label: 'Account Status',
                       value: 'Active Verification',
                       isSuccess: true,

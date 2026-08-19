@@ -34,8 +34,8 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> with SingleTickerPr
 
   void _navigateToLogin(BuildContext context, String role) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LoginScreen(role: role),
+      FadeSlidePageRoute(
+        child: LoginScreen(role: role),
       ),
     );
   }
@@ -67,7 +67,7 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
-    final collegeName = auth.verifiedOrg?.name ?? 'your college';
+    final orgName = auth.verifiedOrg?.name ?? 'your organization';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -81,7 +81,7 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> with SingleTickerPr
               Navigator.of(context).pop();
             } else {
               Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const OrgCodeScreen()),
+                FadeSlidePageRoute(child: const OrgCodeScreen()),
               );
             }
           },
@@ -101,7 +101,7 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> with SingleTickerPr
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 5), // Shifted upward
                       
                       // Welcome text section
                       _buildAnimatedItem(
@@ -113,29 +113,33 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> with SingleTickerPr
                             Text(
                               'Welcome to',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontSize: 16,
-                                color: AppColors.textSecondary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
                               ),
                             ),
+                            const SizedBox(height: 4),
                             Text(
-                              collegeName,
+                              orgName,
                               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 36,
+                                fontWeight: FontWeight.w800,
                                 color: AppColors.textPrimary,
+                                height: 1.15,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 12),
                             Text(
                               'Choose how you want to continue',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontSize: 15,
                                 color: AppColors.textSecondary,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 36),
 
                       // 1. Student Card
                       _buildAnimatedItem(
@@ -332,6 +336,14 @@ class _LiquidAuraBackgroundState extends State<_LiquidAuraBackground> with Singl
           ),
           child: Stack(
             children: [
+              // Subtle tech accent line painter in the background
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _TechPatternPainter(
+                    color: AppColors.primary.withOpacity(0.04),
+                  ),
+                ),
+              ),
               // Peach blob 1
               Positioned(
                 top: -60 + (120 * progress),
@@ -374,5 +386,50 @@ class _LiquidAuraBackgroundState extends State<_LiquidAuraBackground> with Singl
       },
     );
   }
+}
+
+class _TechPatternPainter extends CustomPainter {
+  final Color color;
+  _TechPatternPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    // Draw tech background concentric lines
+    canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.1), 160, paint);
+    canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.1), 200, paint);
+    
+    canvas.drawLine(
+      Offset(size.width * 0.7, 0),
+      Offset(size.width, size.height * 0.15),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.6, 0),
+      Offset(size.width, size.height * 0.2),
+      paint,
+    );
+
+    // Draw fine grid dots
+    final dotPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    for (int i = 0; i < 6; i++) {
+      for (int j = 0; j < 6; j++) {
+        canvas.drawCircle(
+          Offset(size.width * 0.1 + (i * 12), size.height * 0.35 + (j * 12)),
+          1.5,
+          dotPaint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 

@@ -44,7 +44,7 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
 
     if (success) {
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const RoleSelectScreen()),
+        FadeSlidePageRoute(child: const RoleSelectScreen()),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -88,10 +88,32 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                             const SizedBox(height: 20),
                             
                             // Form Card Content with Animations
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 40),
+                                // App logo animation
+                                AnimatedBuilder(
+                                  animation: _controller,
+                                  builder: (context, child) {
+                                    final double val = CurvedAnimation(
+                                      parent: _controller,
+                                      curve: const Interval(0.0, 0.5, curve: Curves.easeOutCubic),
+                                    ).value;
+                                    return Opacity(
+                                      opacity: val.clamp(0.0, 1.0),
+                                      child: Transform.scale(
+                                        scale: 0.8 + (0.2 * val),
+                                        child: child,
+                                      ),
+                                    );
+                                  },
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Image.asset(
+                                      'logo.png',
+                                      height: 64,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 28),
                                 
                                 // Slide down text
                                 AnimatedBuilder(
@@ -113,7 +135,7 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Enter College Code',
+                                        'Enter Organization Code',
                                         style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                                           fontSize: 30,
                                           color: AppColors.textPrimary,
@@ -121,7 +143,7 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        'Your college. Our network.',
+                                        'Your organization. Our network.',
                                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                           fontSize: 16,
                                         ),
@@ -210,7 +232,7 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                 children: [
                                   TextButton(
                                     onPressed: () {},
-                                    child: const Text('Can\'t find your code? Contact your college'),
+                                    child: const Text('Can\'t find your code? Contact your organization'),
                                   ),
                                   const SizedBox(height: 20),
                                 ],

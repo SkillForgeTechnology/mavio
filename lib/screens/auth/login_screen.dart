@@ -65,7 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => dashboard),
+        FadeSlidePageRoute(child: dashboard),
         (route) => false,
       );
     } else {
@@ -154,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Navigator.of(context).pop();
               } else {
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const RoleSelectScreen()),
+                  FadeSlidePageRoute(child: const RoleSelectScreen()),
                 );
               }
             },
