@@ -31,6 +31,17 @@
 
   <title>mavio</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          registration.unregister().then(function(boolean) {
+            console.log('Service worker unregistered:', boolean);
+          });
+        }
+      });
+    }
+  </script>
 </head>
 <body>
   <!--

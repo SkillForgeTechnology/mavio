@@ -583,7 +583,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       const Divider(),
                       const SizedBox(height: 12),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           TextButton.icon(
                             style: TextButton.styleFrom(foregroundColor: AppColors.error),
@@ -591,35 +590,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             label: const Text('Delete'),
                             onPressed: () => _confirmDeleteProfile(dialogContext, d),
                           ),
-                          Row(
-                            children: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(dialogContext),
-                                child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: () async {
-                                  try {
-                                    await _db.updateDriverDetails(
-                                      id: d.id,
-                                      name: nameController.text.trim(),
-                                      email: emailController.text.trim(),
-                                      phone: phoneController.text.trim(),
-                                      assignedVehicleId: selectedVehicleId,
-                                    );
-                                    _loadAdminData();
-                                    if (mounted) Navigator.pop(dialogContext);
-                                  } catch (e) {
-                                    _showSnackbar('Error updating driver: $e', AppColors.error);
-                                  }
-                                },
-                                child: const Text('Save'),
-                              ),
-                            ],
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () async {
+                              try {
+                                await _db.updateDriverDetails(
+                                  id: d.id,
+                                  name: nameController.text.trim(),
+                                  email: emailController.text.trim(),
+                                  phone: phoneController.text.trim(),
+                                  assignedVehicleId: selectedVehicleId,
+                                );
+                                _loadAdminData();
+                                if (mounted) Navigator.pop(dialogContext);
+                              } catch (e) {
+                                _showSnackbar('Error updating driver: $e', AppColors.error);
+                              }
+                            },
+                            child: const Text('Save'),
                           ),
                         ],
                       ),
@@ -812,7 +809,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       const Divider(),
                       const SizedBox(height: 12),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           TextButton.icon(
                             style: TextButton.styleFrom(foregroundColor: AppColors.error),
@@ -852,48 +848,46 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               );
                             },
                           ),
-                          Row(
-                            children: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(dialogContext),
-                                child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: dialogLoading
-                                    ? null
-                                    : () async {
-                                        setDialogState(() {
-                                          dialogLoading = true;
-                                        });
-                                        try {
-                                          await _db.updateStudentDetails(
-                                            id: student.id,
-                                            name: nameController.text.trim(),
-                                            email: emailController.text.trim(),
-                                            phone: phoneController.text.trim(),
-                                            rollNumber: rollController.text.trim(),
-                                            dob: dobController.text.trim(),
-                                            assignedVehicleId: selectedVehicleId,
-                                          );
-                                          _loadAdminData();
-                                          if (mounted) {
-                                            Navigator.pop(dialogContext);
-                                          }
-                                        } catch (e) {
-                                          _showSnackbar('Error updating student: $e', AppColors.error);
-                                        } finally {
-                                          setDialogState(() {
-                                            dialogLoading = false;
-                                          });
-                                        }
-                                      },
-                                child: const Text('Save'),
-                              ),
-                            ],
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: dialogLoading
+                                ? null
+                                : () async {
+                                    setDialogState(() {
+                                      dialogLoading = true;
+                                    });
+                                    try {
+                                      await _db.updateStudentDetails(
+                                        id: student.id,
+                                        name: nameController.text.trim(),
+                                        email: emailController.text.trim(),
+                                        phone: phoneController.text.trim(),
+                                        rollNumber: rollController.text.trim(),
+                                        dob: dobController.text.trim(),
+                                        assignedVehicleId: selectedVehicleId,
+                                      );
+                                      _loadAdminData();
+                                      if (mounted) {
+                                        Navigator.pop(dialogContext);
+                                      }
+                                    } catch (e) {
+                                      _showSnackbar('Error updating student: $e', AppColors.error);
+                                    } finally {
+                                      setDialogState(() {
+                                        dialogLoading = false;
+                                      });
+                                    }
+                                  },
+                            child: const Text('Save'),
                           ),
                         ],
                       ),
