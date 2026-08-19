@@ -1628,27 +1628,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           const SizedBox(height: 12),
           isWeb
-              ? GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    mainAxisExtent: 120,
+              ? SizedBox(
+                  height: 392,
+                  child: GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      mainAxisExtent: 120,
+                    ),
+                    itemCount: _fleet.length,
+                    itemBuilder: (context, index) {
+                      return _buildFleetCardItem(_fleet[index]);
+                    },
                   ),
-                  itemCount: _fleet.length,
-                  itemBuilder: (context, index) {
-                    return _buildFleetCardItem(_fleet[index]);
-                  },
                 )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _fleet.length,
-                  itemBuilder: (context, index) {
-                    return _buildFleetCardItem(_fleet[index]);
-                  },
+              : SizedBox(
+                  height: 400,
+                  child: ListView.builder(
+                    itemCount: _fleet.length,
+                    itemBuilder: (context, index) {
+                      return _buildFleetCardItem(_fleet[index]);
+                    },
+                  ),
                 ),
         ],
       ),
