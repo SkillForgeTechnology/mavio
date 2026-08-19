@@ -10,7 +10,7 @@ class SupabaseService {
   SupabaseService._internal();
 
   bool _isInitialized = false;
-  bool _useMockMode = true;
+  bool _useMockMode = false;
 
   // Mock Database State for Demo Mode
   final Map<String, MavioOrganization> _mockOrgs = {
@@ -167,12 +167,12 @@ class SupabaseService {
           }
         }
       } catch (e) {
-        print("MAVIO Connection Error: $e. Falling back to Demo Mode.");
-        _useMockMode = true;
+        print("MAVIO Connection Error: $e.");
+        _useMockMode = false;
       }
     } else {
-      print("MAVIO: Supabase keys not set. Running in Local Demo Mode.");
-      _useMockMode = true;
+      print("MAVIO: Supabase keys not set.");
+      _useMockMode = false;
     }
     _isInitialized = true;
   }
