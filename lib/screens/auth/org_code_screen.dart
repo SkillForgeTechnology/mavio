@@ -88,6 +88,11 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                             const SizedBox(height: 20),
                             
                             // Form Card Content with Animations
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 40),
+                                
                                 // App logo animation
                                 AnimatedBuilder(
                                   animation: _controller,
