@@ -129,7 +129,7 @@ BEGIN
     WHERE id = target_user_id;
   END IF;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog, extensions, auth;
 
 -- Helper: Delete user authentication and profile (restricted to management)
 CREATE OR REPLACE FUNCTION public.delete_auth_user(target_user_id UUID)
@@ -148,7 +148,7 @@ BEGIN
   -- Delete from auth.users (cascades to public.profiles)
   DELETE FROM auth.users WHERE id = target_user_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog, extensions, auth;
 
 
 

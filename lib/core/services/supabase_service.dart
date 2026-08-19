@@ -1097,7 +1097,8 @@ class SupabaseService {
           },
         );
       } catch (e) {
-        print("Warning: Could not sync driver auth email: $e");
+        print("Error syncing driver auth email: $e");
+        rethrow;
       }
     }
   }
@@ -1146,7 +1147,8 @@ class SupabaseService {
           },
         );
       } catch (e) {
-        print("Warning: Could not sync student auth details: $e");
+        print("Error syncing student auth details: $e");
+        rethrow;
       }
     }
   }
