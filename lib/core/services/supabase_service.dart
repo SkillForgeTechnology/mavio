@@ -18,6 +18,49 @@ class SupabaseService {
       id: '8a7a9a1a-1234-5678-abcd-ef0123456789',
       code: 'ABC123',
       name: 'ABC Engineering College',
+      email: 'admin@abc.edu',
+      phone: '+1 (555) 019-2834',
+      address: '100 Innovation Way, Boston, MA',
+      subscriptionStatus: 'free_trial',
+      maxVehicles: 12,
+      maxDrivers: 12,
+      createdAt: '2026-08-18T10:00:00Z',
+    ),
+    'XYZ456': MavioOrganization(
+      id: 'org-stanford-uuid-123456',
+      code: 'XYZ456',
+      name: 'Stanford University Route Hub',
+      email: 'transit-admin@stanford.edu',
+      phone: '+1 (650) 723-2300',
+      address: '450 Serra Mall, Stanford, CA 94305',
+      subscriptionStatus: 'active',
+      maxVehicles: 35,
+      maxDrivers: 30,
+      createdAt: '2026-08-10T08:30:00Z',
+    ),
+    'MITS99': MavioOrganization(
+      id: 'org-mit-uuid-789012',
+      code: 'MITS99',
+      name: 'Massachusetts Institute of Tech',
+      email: 'contact-transit@mit.edu',
+      phone: '+1 (617) 253-1000',
+      address: '77 Massachusetts Ave, Cambridge, MA 02139',
+      subscriptionStatus: 'inactive',
+      maxVehicles: 8,
+      maxDrivers: 8,
+      createdAt: '2026-07-28T09:15:00Z',
+    ),
+    'SF101': MavioOrganization(
+      id: 'org-skillforge-uuid-555555',
+      code: 'SF101',
+      name: 'SkillForge Technical Academy',
+      email: 'support@skillforgetechnology.app',
+      phone: '+1 (800) 555-0199',
+      address: 'Suite 400, 500 Silicon Blvd, San Jose, CA',
+      subscriptionStatus: 'free_trial',
+      maxVehicles: 20,
+      maxDrivers: 15,
+      createdAt: '2026-08-19T14:20:00Z',
     ),
   };
 
@@ -233,11 +276,35 @@ class SupabaseService {
   }
 
   // Create a new organization
-  Future<MavioOrganization?> createOrganization(String name, String code) async {
+  Future<MavioOrganization?> createOrganization({
+    required String name,
+    required String code,
+    String? email,
+    String? phone,
+    String? address,
+    String? subscriptionStatus,
+    int? maxVehicles,
+    int? maxDrivers,
+  }) async {
     final cleanCode = code.trim().toUpperCase();
+    final status = subscriptionStatus ?? 'free_trial';
+    final limitVehicles = maxVehicles ?? 10;
+    final limitDrivers = maxDrivers ?? 10;
+
     if (_useMockMode) {
       final id = 'org-${DateTime.now().millisecondsSinceEpoch}';
-      final newOrg = MavioOrganization(id: id, code: cleanCode, name: name);
+      final newOrg = MavioOrganization(
+        id: id,
+        code: cleanCode,
+        name: name,
+        email: email,
+        phone: phone,
+        address: address,
+        subscriptionStatus: status,
+        maxVehicles: limitVehicles,
+        maxDrivers: limitDrivers,
+        createdAt: DateTime.now().toIso8601String(),
+      );
       _mockOrgs[cleanCode] = newOrg;
       return newOrg;
     } else {
@@ -247,6 +314,12 @@ class SupabaseService {
             .insert({
               'name': name,
               'code': cleanCode,
+              'email': email,
+              'phone': phone,
+              'address': address,
+              'subscription_status': status,
+              'max_vehicles': limitVehicles,
+              'max_drivers': limitDrivers,
             })
             .select()
             .single();
@@ -259,10 +332,32 @@ class SupabaseService {
   }
 
   // Update an organization
-  Future<MavioOrganization?> updateOrganization(String id, String name, String code) async {
+  Future<MavioOrganization?> updateOrganization({
+    required String id,
+    required String name,
+    required String code,
+    String? email,
+    String? phone,
+    String? address,
+    String? subscriptionStatus,
+    int? maxVehicles,
+    int? maxDrivers,
+    String? createdAt,
+  }) async {
     final cleanCode = code.trim().toUpperCase();
     if (_useMockMode) {
-      final updatedOrg = MavioOrganization(id: id, code: cleanCode, name: name);
+      final updatedOrg = MavioOrganization(
+        id: id,
+        code: cleanCode,
+        name: name,
+        email: email,
+        phone: phone,
+        address: address,
+        subscriptionStatus: subscriptionStatus,
+        maxVehicles: maxVehicles,
+        maxDrivers: maxDrivers,
+        createdAt: createdAt,
+      );
       // Clean up old key if code changed
       _mockOrgs.removeWhere((k, v) => v.id == id);
       _mockOrgs[cleanCode] = updatedOrg;
@@ -274,6 +369,12 @@ class SupabaseService {
             .update({
               'name': name,
               'code': cleanCode,
+              'email': email,
+              'phone': phone,
+              'address': address,
+              'subscription_status': subscriptionStatus,
+              'max_vehicles': maxVehicles,
+              'max_drivers': maxDrivers,
             })
             .eq('id', id)
             .select()

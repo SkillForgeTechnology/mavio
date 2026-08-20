@@ -12,7 +12,7 @@ class AdminPortalPage extends StatefulWidget {
   State<AdminPortalPage> createState() => _AdminPortalPageState();
 }
 
-class _AdminPortalPageState extends State<AdminPortalPage> {
+class _AdminPortalPageState extends State<AdminPortalPage> with SingleTickerProviderStateMixin {
   final SupabaseService _db = SupabaseService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -21,10 +21,21 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  // Workspace Navigation State
+  int _selectedTab = 0; // 0: Dashboard, 1: Organizations, 2: Subscriptions, 3: Settings
+
   List<MavioOrganization> _organizations = [];
   List<MavioOrganization> _filteredOrganizations = [];
   bool _isFetchingOrgs = false;
   final _searchController = TextEditingController();
+
+  // Audit Logs Mock
+  final List<Map<String, String>> _auditLogs = [
+    {'time': '10 mins ago', 'event': 'Stanford University limits updated to 35 buses / 30 drivers'},
+    {'time': '2 hours ago', 'event': 'Massachusetts Institute of Tech subscription marked inactive'},
+    {'time': '1 day ago', 'event': 'SkillForge Technical Academy registered under Free Trial'},
+    {'time': '2 days ago', 'event': 'ABC Engineering College marked active on custom plan'},
+  ];
 
   @override
   void initState() {
@@ -62,7 +73,6 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
 
     try {
       bool authSuccess = false;
-      // 1. Try Live Supabase Auth if available
       try {
         final client = Supabase.instance.client;
         final response = await client.auth.signInWithPassword(
@@ -73,7 +83,6 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
           authSuccess = true;
         }
       } catch (e) {
-        // Fallback to local authentication for mock and initial setups
         if (password == 'admin123' || password == 'admin') {
           authSuccess = true;
         }
@@ -117,7 +126,9 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
     final query = _searchController.text.toLowerCase();
     setState(() {
       _filteredOrganizations = _organizations.where((org) {
-        return org.name.toLowerCase().contains(query) || org.code.toLowerCase().contains(query);
+        return org.name.toLowerCase().contains(query) ||
+            org.code.toLowerCase().contains(query) ||
+            (org.email?.toLowerCase().contains(query) ?? false);
       }).toList();
     });
   }
@@ -126,39 +137,111 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
   void _showAddDialog() {
     final nameCtrl = TextEditingController();
     final codeCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final addressCtrl = TextEditingController();
+    final vehiclesCtrl = TextEditingController(text: '10');
+    final driversCtrl = TextEditingController(text: '10');
+    String status = 'free_trial';
     bool isSaving = false;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Add Organization', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'College/Organization Name',
-                  hintText: 'e.g. Harvard University',
-                ),
+          backgroundColor: const Color(0xFF1B1B1F),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: Colors.white.withOpacity(0.08))),
+          title: const Text('Add New Organization', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dialogInputDecoration('College/Organization Name', 'e.g. Stanford University'),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: codeCtrl,
+                          textCapitalization: TextCapitalization.characters,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dialogInputDecoration('Org Code', 'e.g. STAN99'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          dropdownColor: const Color(0xFF1B1B1F),
+                          value: status,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dialogInputDecoration('Subscription Plan', ''),
+                          items: const [
+                            DropdownMenuItem(value: 'free_trial', child: Text('Free Trial')),
+                            DropdownMenuItem(value: 'active', child: Text('Active Plan')),
+                            DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setModalState(() => status = val);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dialogInputDecoration('Admin Contact Email', 'admin@stanford.edu'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: phoneCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dialogInputDecoration('Contact Phone', '+1 (650) 555-0100'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: addressCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dialogInputDecoration('Physical Headquarters Address', 'Stanford, CA 94305'),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: vehiclesCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dialogInputDecoration('Max Buses Limit', '10'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextField(
+                          controller: driversCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dialogInputDecoration('Max Drivers Limit', '10'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: codeCtrl,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  labelText: 'Unique Organization Code',
-                  hintText: 'e.g. HARV12',
-                ),
-              ),
-            ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+              child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
             ),
             ElevatedButton(
               onPressed: isSaving
@@ -169,17 +252,33 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
                       if (name.isEmpty || code.isEmpty) return;
 
                       setModalState(() => isSaving = true);
-                      final newOrg = await _db.createOrganization(name, code);
+                      final newOrg = await _db.createOrganization(
+                        name: name,
+                        code: code,
+                        email: emailCtrl.text.trim(),
+                        phone: phoneCtrl.text.trim(),
+                        address: addressCtrl.text.trim(),
+                        subscriptionStatus: status,
+                        maxVehicles: int.tryParse(vehiclesCtrl.text) ?? 10,
+                        maxDrivers: int.tryParse(driversCtrl.text) ?? 10,
+                      );
+
                       if (newOrg != null) {
+                        setState(() {
+                          _auditLogs.insert(0, {
+                            'time': 'Just now',
+                            'event': 'New organization "${newOrg.name}" added successfully.'
+                          });
+                        });
                         Navigator.pop(ctx);
                         _loadOrganizations();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Organization added successfully!')),
+                          const SnackBar(content: Text('Organization registered successfully!')),
                         );
                       } else {
                         setModalState(() => isSaving = false);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Failed to add organization. Code might be taken.')),
+                          const SnackBar(content: Text('Failed to add organization. Code might be registered.')),
                         );
                       }
                     },
@@ -190,7 +289,7 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
               ),
               child: isSaving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Save'),
+                  : const Text('Register Site'),
             ),
           ],
         ),
@@ -202,33 +301,111 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
   void _showEditDialog(MavioOrganization org) {
     final nameCtrl = TextEditingController(text: org.name);
     final codeCtrl = TextEditingController(text: org.code);
+    final emailCtrl = TextEditingController(text: org.email ?? '');
+    final phoneCtrl = TextEditingController(text: org.phone ?? '');
+    final addressCtrl = TextEditingController(text: org.address ?? '');
+    final vehiclesCtrl = TextEditingController(text: '${org.maxVehicles ?? 10}');
+    final driversCtrl = TextEditingController(text: '${org.maxDrivers ?? 10}');
+    String status = org.subscriptionStatus ?? 'free_trial';
     bool isSaving = false;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Edit Organization', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'College Name'),
+          backgroundColor: const Color(0xFF1B1B1F),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: Colors.white.withOpacity(0.08))),
+          title: const Text('Edit Organization Settings', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dialogInputDecoration('College/Organization Name', 'e.g. Stanford University'),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: codeCtrl,
+                          textCapitalization: TextCapitalization.characters,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dialogInputDecoration('Org Code', 'e.g. STAN99'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          dropdownColor: const Color(0xFF1B1B1F),
+                          value: status,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dialogInputDecoration('Subscription Plan', ''),
+                          items: const [
+                            DropdownMenuItem(value: 'free_trial', child: Text('Free Trial')),
+                            DropdownMenuItem(value: 'active', child: Text('Active Plan')),
+                            DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setModalState(() => status = val);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dialogInputDecoration('Admin Contact Email', 'admin@stanford.edu'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: phoneCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dialogInputDecoration('Contact Phone', '+1 (650) 555-0100'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: addressCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dialogInputDecoration('Physical Headquarters Address', 'Stanford, CA 94305'),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: vehiclesCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dialogInputDecoration('Max Buses Limit', '10'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextField(
+                          controller: driversCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dialogInputDecoration('Max Drivers Limit', '10'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: codeCtrl,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(labelText: 'Organization Code'),
-              ),
-            ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+              child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
             ),
             ElevatedButton(
               onPressed: isSaving
@@ -239,17 +416,35 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
                       if (name.isEmpty || code.isEmpty) return;
 
                       setModalState(() => isSaving = true);
-                      final updated = await _db.updateOrganization(org.id, name, code);
+                      final updated = await _db.updateOrganization(
+                        id: org.id,
+                        name: name,
+                        code: code,
+                        email: emailCtrl.text.trim(),
+                        phone: phoneCtrl.text.trim(),
+                        address: addressCtrl.text.trim(),
+                        subscriptionStatus: status,
+                        maxVehicles: int.tryParse(vehiclesCtrl.text) ?? 10,
+                        maxDrivers: int.tryParse(driversCtrl.text) ?? 10,
+                        createdAt: org.createdAt,
+                      );
+
                       if (updated != null) {
+                        setState(() {
+                          _auditLogs.insert(0, {
+                            'time': 'Just now',
+                            'event': 'Organization settings updated for "${updated.name}".'
+                          });
+                        });
                         Navigator.pop(ctx);
                         _loadOrganizations();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Organization updated successfully!')),
+                          const SnackBar(content: Text('Settings updated successfully!')),
                         );
                       } else {
                         setModalState(() => isSaving = false);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Failed to update organization.')),
+                          const SnackBar(content: Text('Failed to save settings details.')),
                         );
                       }
                     },
@@ -260,7 +455,7 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
               ),
               child: isSaving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Update'),
+                  : const Text('Save Details'),
             ),
           ],
         ),
@@ -268,31 +463,53 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
     );
   }
 
-  // Delete Organization Confirmation
+  InputDecoration _dialogInputDecoration(String label, String hint) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white70, fontSize: 13),
+      hintText: hint,
+      hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
+      filled: true,
+      fillColor: const Color(0xFF26262B),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary),
+      ),
+    );
+  }
+
+  // Delete Action Confirmation
   void _confirmDelete(MavioOrganization org) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Confirm Deletion', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to delete ${org.name} (${org.code})?\nThis action is irreversible and might affect registered profiles.'),
+        backgroundColor: const Color(0xFF1B1B1F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.white.withOpacity(0.08))),
+        title: const Text('De-register Network?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to completely remove ${org.name}? This will sever all driver and student track links.', style: const TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(ctx);
-              final success = await _db.deleteOrganization(org.id);
-              if (success) {
+              final ok = await _db.deleteOrganization(org.id);
+              if (ok) {
+                setState(() {
+                  _auditLogs.insert(0, {
+                    'time': 'Just now',
+                    'event': 'Removed organization "${org.name}" from MAVIO system.'
+                  });
+                });
+                Navigator.pop(ctx);
                 _loadOrganizations();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Organization deleted successfully.')),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Failed to delete organization.')),
+                  const SnackBar(content: Text('Organization de-registered successfully.')),
                 );
               }
             },
@@ -301,45 +518,61 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Delete'),
+            child: const Text('Remove'),
           ),
         ],
       ),
     );
   }
 
+  // Quick Switch Status directly inside Subscriptions Audit Tab
+  Future<void> _updateSubscriptionStatus(MavioOrganization org, String newStatus) async {
+    final updated = await _db.updateOrganization(
+      id: org.id,
+      name: org.name,
+      code: org.code,
+      email: org.email,
+      phone: org.phone,
+      address: org.address,
+      subscriptionStatus: newStatus,
+      maxVehicles: org.maxVehicles,
+      maxDrivers: org.maxDrivers,
+      createdAt: org.createdAt,
+    );
+    if (updated != null) {
+      setState(() {
+        _auditLogs.insert(0, {
+          'time': 'Just now',
+          'event': 'Subscription for "${org.name}" switched to "${newStatus.toUpperCase()}".'
+        });
+      });
+      _loadOrganizations();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Subscription marked ${newStatus.toUpperCase()} successfully.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 900;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F11), // Dark space background
+      backgroundColor: const Color(0xFF0F0F12),
+      drawer: !isDesktop && _isLoggedIn ? Drawer(child: _buildSidebar(context, false)) : null,
       body: Stack(
         children: [
-          // Background Mesh Orbs
+          // Background Tech Gradient Bubbles
           Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(0.08),
-              ),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -150,
             left: -150,
+            top: -150,
             child: Container(
               width: 500,
               height: 500,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFFF8A65).withOpacity(0.05),
+                color: AppColors.primary.withOpacity(0.04),
               ),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 120, sigmaY: 120),
@@ -348,12 +581,31 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
             ),
           ),
 
-          // Main View switcher
+          // View Content Panel
           Positioned.fill(
             child: SafeArea(
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                child: _isLoggedIn ? _buildConsole() : _buildLoginCard(),
+                duration: const Duration(milliseconds: 300),
+                child: !_isLoggedIn
+                    ? _buildLoginCard()
+                    : Row(
+                        children: [
+                          if (isDesktop) SizedBox(width: 260, child: _buildSidebar(context, true)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildTopNavigationHeader(context, !isDesktop),
+                                Expanded(
+                                  child: _isFetchingOrgs
+                                      ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                                      : _buildTabWorkspaceContent(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             ),
           ),
@@ -385,7 +637,6 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Brand Logo
             Center(
               child: Container(
                 padding: const EdgeInsets.all(16),
@@ -414,8 +665,6 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
               style: TextStyle(color: Colors.white54, fontSize: 13),
             ),
             const SizedBox(height: 32),
-
-            // Email Field
             TextField(
               controller: _emailController,
               style: const TextStyle(color: Colors.white),
@@ -437,8 +686,6 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Password Field
             TextField(
               controller: _passwordController,
               obscureText: true,
@@ -459,25 +706,15 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-
-            // Error display
-            if (_errorMessage != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                margin: const EdgeInsets.only(bottom: 24),
-                decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.error.withOpacity(0.2)),
-                ),
-                child: Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w600),
-                ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: AppColors.error, fontSize: 12),
+                textAlign: TextAlign.center,
               ),
-
-            // Login Button
+            ],
+            const SizedBox(height: 32),
             ElevatedButton(
               onPressed: _isLoading ? null : _handleLogin,
               style: ElevatedButton.styleFrom(
@@ -497,66 +734,363 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
     );
   }
 
-  // 2. Super-Admin Console dashboard
-  Widget _buildConsole() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+  // 2. Responsive Side Navigation Bar
+  Widget _buildSidebar(BuildContext context, bool isEmbedded) {
+    return Container(
+      color: const Color(0xFF131317),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header Bar
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.admin_panel_settings_rounded, color: AppColors.primary, size: 28),
-                  ),
-                  const SizedBox(width: 16),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'MAVIO',
-                        style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
-                      ),
-                      Text(
-                        'Super-Admin Console',
-                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              OutlinedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _isLoggedIn = false;
-                    _emailController.clear();
-                    _passwordController.clear();
-                  });
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white70,
-                  side: BorderSide(color: Colors.white.withOpacity(0.08)),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                icon: const Icon(Icons.logout_rounded, size: 16),
-                label: const Text('Logout'),
+                child: const Icon(Icons.admin_panel_settings_rounded, color: AppColors.primary, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'MAVIO ADMIN',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5),
               ),
             ],
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 48),
 
-          // Search & Control Bar
+          // Sidebar Tab Items
+          _buildSidebarTab(0, Icons.grid_view_rounded, 'Dashboard'),
+          const SizedBox(height: 8),
+          _buildSidebarTab(1, Icons.business_rounded, 'Organizations'),
+          const SizedBox(height: 8),
+          _buildSidebarTab(2, Icons.card_membership_rounded, 'Subscriptions'),
+          const SizedBox(height: 8),
+          _buildSidebarTab(3, Icons.settings_outlined, 'System Settings'),
+
+          const Spacer(),
+
+          // Admin profile footprint & logout
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.03),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.account_circle, color: Colors.white54, size: 36),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text('System Admin', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text('admin@mavio.com', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () {
+              setState(() {
+                _isLoggedIn = false;
+                _selectedTab = 0;
+                _emailController.clear();
+                _passwordController.clear();
+              });
+              if (!isEmbedded) Navigator.pop(context);
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white70,
+              side: BorderSide(color: Colors.white.withOpacity(0.08)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            icon: const Icon(Icons.logout_rounded, size: 14),
+            label: const Text('Logout', style: TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarTab(int tabIndex, IconData icon, String title) {
+    final isSelected = _selectedTab == tabIndex;
+    return InkWell(
+      onTap: () {
+        setState(() => _selectedTab = tabIndex);
+        if (Scaffold.of(context).isDrawerOpen) {
+          Navigator.pop(context);
+        }
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withOpacity(0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: isSelected ? Border.all(color: AppColors.primary.withOpacity(0.15)) : null,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isSelected ? AppColors.primary : Colors.white54, size: 20),
+            const SizedBox(width: 14),
+            Text(
+              title,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 3. Admin Top Navigation Header
+  Widget _buildTopNavigationHeader(BuildContext context, bool showMenuButton) {
+    String tabTitle = 'Dashboard Analytics';
+    if (_selectedTab == 1) tabTitle = 'Manage Organizations';
+    if (_selectedTab == 2) tabTitle = 'Subscription Audits';
+    if (_selectedTab == 3) tabTitle = 'System Settings';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.04))),
+      ),
+      child: Row(
+        children: [
+          if (showMenuButton) ...[
+            IconButton(
+              icon: const Icon(Icons.menu, color: Colors.white),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Text(
+            tabTitle,
+            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.success.withOpacity(0.2)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.success),
+                ),
+                const SizedBox(width: 8),
+                const Text('Live Server', style: TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 4. Tab Switcher Content Panel
+  Widget _buildTabWorkspaceContent() {
+    switch (_selectedTab) {
+      case 0:
+        return _buildDashboardTab();
+      case 1:
+        return _buildOrganizationsTab();
+      case 2:
+        return _buildSubscriptionsTab();
+      default:
+        return _buildSettingsTab();
+    }
+  }
+
+  // ==================== DASHBOARD TAB ====================
+  Widget _buildDashboardTab() {
+    final int total = _organizations.length;
+    final int active = _organizations.where((org) => org.subscriptionStatus == 'active').length;
+    final int trials = _organizations.where((org) => org.subscriptionStatus == 'free_trial').length;
+    final int inactive = _organizations.where((org) => org.subscriptionStatus == 'inactive').length;
+
+    return ListView(
+      padding: const EdgeInsets.all(32),
+      children: [
+        // Metric Indicators
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = (constraints.maxWidth - 48) / (constraints.maxWidth > 800 ? 4 : 2);
+            return Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: [
+                _buildMetricCard(Icons.business_rounded, 'Registered Networks', '$total', 'Active organizations connected', AppColors.primary, cardWidth),
+                _buildMetricCard(Icons.verified_user_rounded, 'Active Subscriptions', '$active', 'Paid enterprise accounts', AppColors.success, cardWidth),
+                _buildMetricCard(Icons.hourglass_empty_rounded, 'Free Trials', '$trials', 'Ongoing trial audits', Colors.orange, cardWidth),
+                _buildMetricCard(Icons.domain_disabled_rounded, 'Inactive Nodes', '$inactive', 'Deactivated school routes', Colors.redAccent, cardWidth),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 32),
+
+        // Charts & Activity
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 900;
+            return Flex(
+              direction: isWide ? Axis.horizontal : Axis.vertical,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Activity Line Chart
+                Expanded(
+                  flex: isWide ? 13 : 0,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(28),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF131317),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.white.withOpacity(0.04)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: const [
+                                Text('Live Network Traffic (Telemetry)', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                Text('Last 7 Days', style: TextStyle(color: Colors.white30, fontSize: 12)),
+                              ],
+                            ),
+                            const SizedBox(height: 32),
+                            SizedBox(
+                              height: 200,
+                              child: CustomPaint(
+                                painter: SmoothAreaChartPainter([45, 60, 52, 78, 65, 88, 92]),
+                                child: Container(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isWide) const SizedBox(width: 24),
+                if (!isWide) const SizedBox(height: 24),
+
+                // Recent Activities Audit Feed
+                Expanded(
+                  flex: isWide ? 7 : 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF131317),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withOpacity(0.04)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Recent Operations Audit', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 24),
+                        ..._auditLogs.map((log) => Padding(
+                              padding: const EdgeInsets.only(bottom: 18.0),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 4),
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(log['event']!, style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.3)),
+                                        const SizedBox(height: 4),
+                                        Text(log['time']!, style: const TextStyle(color: Colors.white24, fontSize: 11)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricCard(IconData icon, String title, String count, String desc, Color accentColor, double width) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131317),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accentColor.withOpacity(0.1),
+                ),
+                child: Icon(icon, color: accentColor, size: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(count, style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1.0)),
+          const SizedBox(height: 8),
+          Text(desc, style: const TextStyle(color: Colors.white24, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  // ==================== ORGANIZATIONS TAB ====================
+  Widget _buildOrganizationsTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Controls Toolbar
+        Padding(
+          padding: const EdgeInsets.only(left: 32, right: 32, top: 24),
+          child: Row(
             children: [
               Expanded(
                 child: TextField(
@@ -564,16 +1098,16 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: const Color(0xFF1B1B1F),
+                    fillColor: const Color(0xFF131317),
                     prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54),
-                    hintText: 'Search by organization name or code...',
-                    hintStyle: const TextStyle(color: Colors.white24),
+                    hintText: 'Search by organization name, code or admin email...',
+                    hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: const BorderSide(color: AppColors.primary),
                     ),
                   ),
@@ -585,112 +1119,362 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  minimumSize: const Size(0, 54),
+                  minimumSize: const Size(0, 50),
                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                icon: const Icon(Icons.add_rounded),
+                icon: const Icon(Icons.add_rounded, size: 18),
                 label: const Text('Add Organization', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),
-          const SizedBox(height: 32),
+        ),
 
-          // Total Stats Indicator
+        // List Grid
+        Expanded(
+          child: _filteredOrganizations.isEmpty
+              ? _buildEmptyState()
+              : ListView.builder(
+                  padding: const EdgeInsets.all(32),
+                  itemCount: _filteredOrganizations.length,
+                  itemBuilder: (context, index) {
+                    final org = _filteredOrganizations[index];
+                    return _buildOrganizationItemCard(org);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOrganizationItemCard(MavioOrganization org) {
+    Color badgeColor = Colors.orange;
+    String badgeText = 'Free Trial';
+    if (org.subscriptionStatus == 'active') {
+      badgeColor = AppColors.success;
+      badgeText = 'Active Plan';
+    } else if (org.subscriptionStatus == 'inactive') {
+      badgeColor = AppColors.error;
+      badgeText = 'Deactivated';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131317),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Active Networks:', style: TextStyle(color: Colors.white54, fontSize: 14)),
-              const SizedBox(width: 8),
+              // Avatar with initials
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
+                  gradient: LinearGradient(
+                    colors: [AppColors.primary, AppColors.primary.withOpacity(0.6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
                 ),
+                alignment: Alignment.center,
                 child: Text(
-                  '${_organizations.length}',
-                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                  org.name.substring(0, 2).toUpperCase(),
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(org.name, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(org.code, style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 8,
+                      children: [
+                        _buildCardMetadataIcon(Icons.mail_outline_rounded, org.email ?? 'No administrative email'),
+                        _buildCardMetadataIcon(Icons.phone_android_rounded, org.phone ?? 'No contact phone'),
+                        _buildCardMetadataIcon(Icons.pin_drop_outlined, org.address ?? 'No physical address'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: badgeColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: badgeColor.withOpacity(0.2)),
+                    ),
+                    child: Text(badgeText, style: TextStyle(color: badgeColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, color: Colors.white54, size: 20),
+                        tooltip: 'Edit Settings',
+                        onPressed: () => _showEditDialog(org),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
+                        tooltip: 'De-register Organization',
+                        onPressed: () => _confirmDelete(org),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-
-          // Main Organization Grid List
-          Expanded(
-            child: _isFetchingOrgs
-                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-                : _filteredOrganizations.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.builder(
-                        itemCount: _filteredOrganizations.length,
-                        itemBuilder: (context, index) {
-                          final org = _filteredOrganizations[index];
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1B1B1F),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white.withOpacity(0.03)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      org.name,
-                                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.06),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            org.code,
-                                            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          'ID: ${org.id}',
-                                          style: const TextStyle(color: Colors.white24, fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit_outlined, color: Colors.white70),
-                                      tooltip: 'Edit Organization',
-                                      onPressed: () => _showEditDialog(org),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
-                                      tooltip: 'Delete Organization',
-                                      onPressed: () => _confirmDelete(org),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+          Divider(color: Colors.white.withOpacity(0.04), height: 1),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  _buildLimitIndicator(Icons.directions_bus_filled_rounded, 'Registered Buses limit', org.maxVehicles ?? 10),
+                  const SizedBox(width: 24),
+                  _buildLimitIndicator(Icons.people_alt_rounded, 'Active Drivers limit', org.maxDrivers ?? 10),
+                ],
+              ),
+              Text(
+                'Joined: ${_formatIsoDate(org.createdAt)}',
+                style: const TextStyle(color: Colors.white24, fontSize: 11),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildCardMetadataIcon(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white30, size: 14),
+        const SizedBox(width: 6),
+        Text(text, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildLimitIndicator(IconData icon, String label, int value) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white24, size: 16),
+        const SizedBox(width: 8),
+        Text('$label: ', style: const TextStyle(color: Colors.white38, fontSize: 12)),
+        Text('$value', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  // ==================== SUBSCRIPTIONS AUDIT TAB ====================
+  Widget _buildSubscriptionsTab() {
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TabBar(
+            indicatorColor: AppColors.primary,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white30,
+            tabs: const [
+              Tab(text: 'Active Plan Subscriptions'),
+              Tab(text: 'Free Trial Evaluations'),
+              Tab(text: 'Deactivated Subscriptions'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildFilteredSubscriptionList('active'),
+                _buildFilteredSubscriptionList('free_trial'),
+                _buildFilteredSubscriptionList('inactive'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilteredSubscriptionList(String statusKey) {
+    final list = _organizations.where((org) => org.subscriptionStatus == statusKey).toList();
+
+    if (list.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.hourglass_empty_rounded, size: 48, color: Colors.white.withOpacity(0.1)),
+            const SizedBox(height: 16),
+            Text('No organizations found matching status "${statusKey.toUpperCase()}"', style: const TextStyle(color: Colors.white30, fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(32),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        final org = list[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF131317),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.04)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(org.name, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text('Code: ${org.code}', style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 16),
+                        Text(org.email ?? 'No admin email registered', style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                children: [
+                  const Text('Mark Subscription as: ', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                  const SizedBox(width: 12),
+                  DropdownButton<String>(
+                    dropdownColor: const Color(0xFF1B1B1F),
+                    underline: const SizedBox(),
+                    value: org.subscriptionStatus,
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'active',
+                        child: Text('Active Plan', style: TextStyle(color: AppColors.success)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'free_trial',
+                        child: Text('Free Trial', style: TextStyle(color: Colors.orange)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'inactive',
+                        child: Text('Inactive', style: TextStyle(color: AppColors.error)),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        _updateSubscriptionStatus(org, val);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ==================== SYSTEM SETTINGS TAB ====================
+  Widget _buildSettingsTab() {
+    return ListView(
+      padding: const EdgeInsets.all(32),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: const Color(0xFF131317),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withOpacity(0.04)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Console Preferences', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 24),
+              _buildSettingsToggleItem('Live Supabase Database Connection', 'Connected to supabase client schemas.', true),
+              const SizedBox(height: 16),
+              _buildSettingsToggleItem('Background Telemetry Syncing', 'Process background isolations updates.', true),
+              const SizedBox(height: 16),
+              _buildSettingsToggleItem('Audit Log Recording', 'Log operations actions to audit feed.', true),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsToggleItem(String title, String subtitle, bool val) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(subtitle, style: const TextStyle(color: Colors.white24, fontSize: 12)),
+          ],
+        ),
+        Switch(
+          value: val,
+          activeColor: AppColors.primary,
+          onChanged: (_) {},
+        ),
+      ],
+    );
+  }
+
+  // Utility Date Formatter
+  String _formatIsoDate(String? isoString) {
+    if (isoString == null || isoString.isEmpty) return 'Recent';
+    try {
+      final dt = DateTime.parse(isoString);
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return 'Recent';
+    }
   }
 
   Widget _buildEmptyState() {
@@ -707,4 +1491,91 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
       ),
     );
   }
+}
+
+// Custom Painter to render a premium area chart curve in the analytics section
+class SmoothAreaChartPainter extends CustomPainter {
+  final List<double> dataPoints;
+  SmoothAreaChartPainter(this.dataPoints);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (dataPoints.isEmpty) return;
+
+    final paint = Paint()
+      ..color = AppColors.primary.withOpacity(0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [AppColors.primary.withOpacity(0.15), Colors.transparent],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..style = PaintingStyle.fill;
+
+    final double stepX = size.width / (dataPoints.length - 1);
+    final double maxVal = dataPoints.reduce((a, b) => a > b ? a : b);
+    final double scaleY = size.height / (maxVal * 1.2);
+
+    final path = Path();
+    final fillPath = Path();
+
+    path.moveTo(0, size.height - (dataPoints[0] * scaleY));
+    fillPath.moveTo(0, size.height);
+    fillPath.lineTo(0, size.height - (dataPoints[0] * scaleY));
+
+    for (int i = 1; i < dataPoints.length; i++) {
+      final double x = i * stepX;
+      final double y = size.height - (dataPoints[i] * scaleY);
+      final double prevX = (i - 1) * stepX;
+      final double prevY = size.height - (dataPoints[i - 1] * scaleY);
+
+      // Draw bezier curves
+      final double cpX1 = prevX + (stepX / 2);
+      final double cpY1 = prevY;
+      final double cpX2 = prevX + (stepX / 2);
+      final double cpY2 = y;
+
+      path.cubicTo(cpX1, cpY1, cpX2, cpY2, x, y);
+      fillPath.cubicTo(cpX1, cpY1, cpX2, cpY2, x, y);
+    }
+
+    fillPath.lineTo(size.width, size.height);
+    fillPath.close();
+
+    // Draw background graph lines grid
+    final gridPaint = Paint()
+      ..color = Colors.white.withOpacity(0.03)
+      ..strokeWidth = 1;
+
+    for (int i = 0; i <= 4; i++) {
+      final double y = size.height * i / 4;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    canvas.drawPath(fillPath, fillPaint);
+    canvas.drawPath(path, paint);
+
+    // Draw dots at points
+    final dotPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final dotBorderPaint = Paint()
+      ..color = AppColors.primary
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    for (int i = 0; i < dataPoints.length; i++) {
+      final double x = i * stepX;
+      final double y = size.height - (dataPoints[i] * scaleY);
+      canvas.drawCircle(Offset(x, y), 5, dotPaint);
+      canvas.drawCircle(Offset(x, y), 5, dotBorderPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

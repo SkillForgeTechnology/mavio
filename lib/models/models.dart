@@ -2,15 +2,55 @@ class MavioOrganization {
   final String id;
   final String code;
   final String name;
+  final String? email;
+  final String? phone;
+  final String? address;
+  final String? subscriptionStatus; // 'active' | 'inactive' | 'free_trial'
+  final int? maxVehicles;
+  final int? maxDrivers;
+  final String? createdAt;
 
-  MavioOrganization({required this.id, required this.code, required this.name});
+  MavioOrganization({
+    required this.id,
+    required this.code,
+    required this.name,
+    this.email,
+    this.phone,
+    this.address,
+    this.subscriptionStatus = 'free_trial',
+    this.maxVehicles = 10,
+    this.maxDrivers = 10,
+    this.createdAt,
+  });
 
   factory MavioOrganization.fromJson(Map<String, dynamic> json) {
     return MavioOrganization(
       id: json['id'] as String,
       code: json['code'] as String,
       name: json['name'] as String,
+      email: json['email'] as String?,
+      phone: json['phone'] as String?,
+      address: json['address'] as String?,
+      subscriptionStatus: json['subscription_status'] as String? ?? 'free_trial',
+      maxVehicles: json['max_vehicles'] as int? ?? 10,
+      maxDrivers: json['max_drivers'] as int? ?? 10,
+      createdAt: json['created_at'] as String?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'code': code,
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'address': address,
+      'subscription_status': subscriptionStatus,
+      'max_vehicles': maxVehicles,
+      'max_drivers': maxDrivers,
+      'created_at': createdAt,
+    };
   }
 }
 

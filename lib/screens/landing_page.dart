@@ -1,11 +1,8 @@
 import 'dart:ui' show ImageFilter;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../core/theme/theme.dart';
-import '../../providers/auth_provider.dart';
+import '../core/theme/theme.dart';
+import '../providers/auth_provider.dart';
 import 'auth/org_code_screen.dart';
 import 'student/student_dashboard.dart';
 import 'driver/driver_dashboard.dart';
@@ -22,6 +19,8 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _featuresKey = GlobalKey();
   final GlobalKey _techKey = GlobalKey();
+  final GlobalKey _pricingKey = GlobalKey();
+  final GlobalKey _faqKey = GlobalKey();
 
   final ValueNotifier<double> _scrollOffset = ValueNotifier<double>(0.0);
 
@@ -34,21 +33,20 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    _scrollOffset.dispose();
+    super.dispose();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Pre-cache all visual assets so they render instantly without flicker
     precacheImage(const AssetImage('logo.png'), context);
     precacheImage(const AssetImage('company-logo.png'), context);
     precacheImage(const AssetImage('assets/home.png'), context);
     precacheImage(const AssetImage('assets/driver.png'), context);
     precacheImage(const AssetImage('assets/3.png'), context);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    _scrollOffset.dispose();
-    super.dispose();
   }
 
   void _scrollToSection(GlobalKey key) {
@@ -135,10 +133,9 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
               controller: _scrollController,
               child: Column(
                 children: [
-                  // Space to account for fixed/sticky navbar
                   SizedBox(height: isDesktop ? 90 : 76),
 
-                  // 1. Hero Section (Overhauled centered/split layout)
+                  // 1. Overhauled Split Hero Section
                   _buildHero(isDesktop, screenWidth),
 
                   // 2. Metrics Section
@@ -150,16 +147,31 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                     child: _buildShowcaseSection(isDesktop, screenWidth),
                   ),
 
-                  // 4. Highlight Highlights (Core features grid with Scroll Reveal)
+                  // 4. Bento Feature Grid
                   _buildCoreHighlights(isDesktop),
 
-                  // 5. Technology Architecture Section (Scroll Reveal)
+                  // 5. Technology Architecture Section
                   Container(
                     key: _techKey,
                     child: _buildTechSection(isDesktop, screenWidth),
                   ),
 
-                  // 6. Footer Section
+                  // 6. Live Dashboard Preview Panel
+                  _buildLiveOperationsPreview(isDesktop, screenWidth),
+
+                  // 7. Pricing & Subscription Plans
+                  Container(
+                    key: _pricingKey,
+                    child: _buildPricingSection(isDesktop),
+                  ),
+
+                  // 8. FAQ Section
+                  Container(
+                    key: _faqKey,
+                    child: _buildFAQSection(isDesktop),
+                  ),
+
+                  // 9. Footer Section
                   _buildFooter(),
                 ],
               ),
@@ -244,6 +256,8 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                     _buildNavLink('Overview', () => _scrollController.animateTo(0, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut)),
                     _buildNavLink('Features', () => _scrollToSection(_featuresKey)),
                     _buildNavLink('Architecture', () => _scrollToSection(_techKey)),
+                    _buildNavLink('Pricing', () => _scrollToSection(_pricingKey)),
+                    _buildNavLink('FAQ', () => _scrollToSection(_faqKey)),
                   ],
                 ),
 
@@ -327,7 +341,6 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                       child: Stack(
                         alignment: Alignment.centerRight,
                         children: [
-                          // Soft Ambient Glow Background Orbs behind mockups
                           Positioned(
                             right: 60,
                             top: 60,
@@ -345,7 +358,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                             ),
                           ),
 
-                          // Driver Portal mockup (Floating background mockup)
+                          // Driver Portal mockup
                           Positioned(
                             left: 10,
                             bottom: 30,
@@ -359,7 +372,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                             ),
                           ),
 
-                          // Student Dashboard mockup (Floating foreground mockup)
+                          // Student Dashboard mockup
                           Positioned(
                             right: 20,
                             top: 20,
@@ -520,146 +533,122 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
   Widget _buildMetricsSection(bool isDesktop) {
     return Container(
       color: Colors.white,
-      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 60),
-      child: isDesktop
-          ? Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildMetricItem('2.1s', 'Location Refresh Frequency', 'Instant coordinates updates sync via Supabase websockets.'),
-                _buildMetricItem('99.9%', 'Telemetry Accuracy', 'Fine-grained location filters remove GPS noise instantly.'),
-                _buildMetricItem('100%', 'Privacy Compliance', 'Profile deletions execute instant cascading purges of location logs.'),
-              ],
-            )
-          : Column(
-              children: [
-                _buildMetricItem('2.1s', 'Location Refresh Frequency', 'Instant coordinates updates sync via Supabase websockets.'),
-                const SizedBox(height: 32),
-                _buildMetricItem('99.9%', 'Telemetry Accuracy', 'Fine-grained location filters remove GPS noise.'),
-                const SizedBox(height: 32),
-                _buildMetricItem('100%', 'Privacy Compliance', 'Profile deletions execute cascading log purges.'),
-              ],
-            ),
+      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 64),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final double blockWidth = (constraints.maxWidth - 48) / (isDesktop ? 3 : 1);
+          return Wrap(
+            spacing: 24,
+            runSpacing: 24,
+            alignment: WrapAlignment.center,
+            children: [
+              _buildMetricItem('2.1s', 'Location Refresh Frequency', 'Instant coordinates updates sync via WebSockets mapping.', blockWidth),
+              _buildMetricItem('99.9%', 'Telemetry Accuracy', 'Fine-grained location filters remove GPS coordinate drifts.', blockWidth),
+              _buildMetricItem('100%', 'Privacy Compliance', 'Profile deletions execute instant database sweeps.', blockWidth),
+            ],
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildMetricItem(String value, String title, String desc) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.w900,
-            color: AppColors.primary,
-            letterSpacing: -1.0,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          width: 250,
-          child: Text(
-            desc,
-            textAlign: TextAlign.center,
+  Widget _buildMetricItem(String value, String title, String desc, double width) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.borderLight, width: 1.0),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            value,
             style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-              height: 1.4,
+              fontSize: 48,
+              fontWeight: FontWeight.w900,
+              color: AppColors.primary,
+              letterSpacing: -1.5,
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            desc,
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
-  // Alternating Pillars Showcase (Scroll Reveal)
+  // Showcase Sections (Alternating feature description rows)
   Widget _buildShowcaseSection(bool isDesktop, double screenWidth) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 80),
       child: Column(
         children: [
-          // Section Header
-          Center(
-            child: ScrollReveal(
-              child: Column(
-                children: [
-                  Text(
-                    'SYSTEM PILLARS',
-                    style: TextStyle(
-                      color: AppColors.primary.withOpacity(0.8),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                      letterSpacing: 1.5,
-                    ),
+          // Row 1: Live Interactive Student Dashboard Map
+          ScrollReveal(
+            child: Flex(
+              direction: isDesktop ? Axis.horizontal : Axis.vertical,
+              children: [
+                if (isDesktop)
+                  Expanded(
+                    flex: 13,
+                    child: _buildShowcaseVisual('assets/home.png', screenWidth),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'End-to-End Transit Orchestration',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
-                      letterSpacing: -0.5,
-                    ),
+                if (isDesktop) const Spacer(flex: 2),
+                Expanded(
+                  flex: 11,
+                  child: _buildShowcaseText(
+                    'Live Student Dashboard',
+                    'Interactive Mapping',
+                    'Allows students to locate operating campus buses on clean maps. Real-time active updates prevent missing transit routes by providing instant delay notifications and driver coordinates.',
+                    Icons.map_rounded,
                   ),
-                  const SizedBox(height: 16),
-                  const SizedBox(
-                    width: 600,
-                    child: Text(
-                      'Mavio splits operations into targeted components optimized for drivers, students, and administration administrators.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textSecondary, height: 1.5),
-                    ),
-                  ),
+                ),
+                if (!isDesktop) ...[
+                  const SizedBox(height: 32),
+                  _buildShowcaseVisual('assets/home.png', screenWidth),
                 ],
-              ),
+              ],
             ),
           ),
-          const SizedBox(height: 80),
+          const SizedBox(height: 120),
 
-          // Row 1: Student App (Mockup on Right)
+          // Row 2: Live Driver Telemetry Console Isolate
           ScrollReveal(
-            child: _buildShowcaseRow(
-              isDesktop,
-              '01',
-              'Student Real-Time Tracking',
-              'Plan commute routes precisely. Students check active map pins, view details on bus speed, and see vehicle registrations in custom split details modules.',
-              'assets/home.png',
-              true,
-            ),
-          ),
-          const SizedBox(height: 100),
-
-          // Row 2: Driver App (Mockup on Left)
-          ScrollReveal(
-            child: _buildShowcaseRow(
-              isDesktop,
-              '02',
-              'Driver Background Telemetry',
-              'Start live coordinates tracking with a single tap. The battery-optimized location isolate tracks positions in the background even if the app gets cleared from recents.',
-              'assets/driver.png',
-              false,
-            ),
-          ),
-          const SizedBox(height: 100),
-
-          // Row 3: Admin Console (Mockup on Right)
-          ScrollReveal(
-            child: _buildShowcaseRow(
-              isDesktop,
-              '03',
-              'Administrative Orchestration',
-              'Full management console: register fleets, audit driver assignments, inspect tracked stop schedules, and cascade deletion requests instantly.',
-              'assets/3.png',
-              true,
+            child: Flex(
+              direction: isDesktop ? Axis.horizontal : Axis.vertical,
+              children: [
+                Expanded(
+                  flex: 11,
+                  child: _buildShowcaseText(
+                    'Dedicated Driver Console',
+                    'Background GPS Streams',
+                    'Optimized driver console uses isolates to push coordinates, route calculations, and network latency checks asynchronously, maintaining background updates even when minimized.',
+                    Icons.navigation_rounded,
+                  ),
+                ),
+                if (isDesktop) const Spacer(flex: 2),
+                Expanded(
+                  flex: 13,
+                  child: _buildShowcaseVisual('assets/driver.png', screenWidth),
+                ),
+                if (!isDesktop) ...[
+                  const SizedBox(height: 32),
+                  _buildShowcaseVisual('assets/driver.png', screenWidth),
+                ],
+              ],
             ),
           ),
         ],
@@ -667,152 +656,128 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     );
   }
 
-  Widget _buildShowcaseRow(
-    bool isDesktop,
-    String index,
-    String title,
-    String description,
-    String assetPath,
-    bool imageOnRight,
-  ) {
-    final textContent = Column(
+  Widget _buildShowcaseText(String tag, String title, String description, IconData icon) {
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          index,
-          style: TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.w900,
-            color: AppColors.primary.withOpacity(0.15),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            color: AppColors.textPrimary,
-          ),
+        Row(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              tag,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         Text(
+          title,
+          style: const TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.w900,
+            color: AppColors.textPrimary,
+            letterSpacing: -1.0,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
           description,
           style: const TextStyle(
-            fontSize: 15,
+            fontSize: 16,
             color: AppColors.textSecondary,
             height: 1.6,
           ),
         ),
       ],
     );
+  }
 
-    final imageContent = Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
-          )
-        ],
-      ),
-      child: _PhoneFrame(
-        assetPath: assetPath,
-        height: 380,
-      ),
-    );
-
-    if (!isDesktop) {
-      return Column(
+  Widget _buildShowcaseVisual(String assetPath, double screenWidth) {
+    return Center(
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          textContent,
-          const SizedBox(height: 32),
-          imageContent,
+          Container(
+            width: 320,
+            height: 320,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primary.withOpacity(0.03),
+            ),
+          ),
+          _PhoneFrame(assetPath: assetPath, height: 420),
         ],
-      );
-    }
-
-    return Row(
-      children: [
-        if (imageOnRight) ...[
-          Expanded(flex: 5, child: textContent),
-          const Spacer(flex: 1),
-          Expanded(flex: 4, child: imageContent),
-        ] else ...[
-          Expanded(flex: 4, child: imageContent),
-          const Spacer(flex: 1),
-          Expanded(flex: 5, child: textContent),
-        ],
-      ],
+      ),
     );
   }
 
-  // Core Highlights (Feature Grid with Scroll Reveal)
+  // Bento Features Grid Section
   Widget _buildCoreHighlights(bool isDesktop) {
     return Container(
       color: Colors.white,
       padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 80),
       child: Column(
         children: [
-          ScrollReveal(
-            child: Column(
-              children: [
-                const Text(
-                  'KEY ADVANTAGES',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Engineered for High Performance',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
+          const Text('All-in-One Architecture', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 12),
+          const Text(
+            'Engineered for Scale',
+            style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -1.0),
           ),
-          const SizedBox(height: 56),
+          const SizedBox(height: 48),
 
-          isDesktop
-              ? Row(
-                  children: [
-                    Expanded(
-                      child: ScrollReveal(
-                        child: _buildHighlightCard(Icons.offline_bolt_rounded, 'Speedy Data Sync', 'Supabase streaming keeps map pins moving live with latency under 100ms.'),
-                      ),
+          // Bento Layout
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final double colWidth = (constraints.maxWidth - 32) / (isDesktop ? 3 : 1);
+              return Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                alignment: WrapAlignment.center,
+                children: [
+                  // Column 1
+                  SizedBox(
+                    width: colWidth,
+                    child: Column(
+                      children: [
+                        _buildHighlightCard(Icons.offline_bolt_rounded, 'Speedy Data Sync', 'Supabase stream sockets keep map pins moving live with latency under 100ms.'),
+                        const SizedBox(height: 16),
+                        _buildHighlightCard(Icons.shield_rounded, 'Secure RLS Schemas', 'Database permissions restrict profiles and routes updates to logged in clients.'),
+                      ],
                     ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      child: ScrollReveal(
-                        child: _buildHighlightCard(Icons.shield_rounded, 'Secure Credentials', 'Logins authenticated via encrypted client schemas keeping user profiles protected.'),
-                      ),
+                  ),
+                  // Column 2
+                  SizedBox(
+                    width: colWidth,
+                    child: Column(
+                      children: [
+                        _buildHighlightCard(Icons.battery_saver_rounded, 'Isolate Telemetry', 'Separate dart task processing allows background GPS tracking without rendering freezes.'),
+                        const SizedBox(height: 16),
+                        _buildHighlightCard(Icons.history_rounded, 'Automatic Route Logs', 'Store historical logs of route speeds, stops, and passenger counts automatically.'),
+                      ],
                     ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      child: ScrollReveal(
-                        child: _buildHighlightCard(Icons.battery_saver_rounded, 'Isolate Telemetry', 'Separate dart task processing allows background GPS tracking without power drain.'),
-                      ),
+                  ),
+                  // Column 3
+                  SizedBox(
+                    width: colWidth,
+                    child: Column(
+                      children: [
+                        _buildHighlightCard(Icons.notifications_active_rounded, 'Live Delay Alerts', 'Asynchronous push broadcasts update students instantly if buses hit traffic.'),
+                        const SizedBox(height: 16),
+                        _buildHighlightCard(Icons.qr_code_scanner_rounded, 'Unique Org Access Codes', 'Bypass credential bloat with short, direct alphanumeric codes for quick onboarding.'),
+                      ],
                     ),
-                  ],
-                )
-              : Column(
-                  children: [
-                    ScrollReveal(child: _buildHighlightCard(Icons.offline_bolt_rounded, 'Speedy Data Sync', 'Supabase streaming keeps map pins moving live with latency under 100ms.')),
-                    const SizedBox(height: 24),
-                    ScrollReveal(child: _buildHighlightCard(Icons.shield_rounded, 'Secure Credentials', 'Logins authenticated via encrypted client schemas.')),
-                    const SizedBox(height: 24),
-                    ScrollReveal(child: _buildHighlightCard(Icons.battery_saver_rounded, 'Isolate Telemetry', 'Separate dart task processing allows background GPS tracking.')),
-                  ],
-                ),
+                  ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -820,47 +785,33 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
 
   Widget _buildHighlightCard(IconData icon, String title, String desc) {
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: const Color(0xFFFAFAFA),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.borderLight, width: 0.8),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.borderLight, width: 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(16),
+              shape: BoxShape.circle,
+              color: AppColors.primary.withOpacity(0.1),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 28),
+            child: Icon(icon, color: AppColors.primary, size: 20),
           ),
-          const SizedBox(height: 24),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            desc,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-              height: 1.5,
-            ),
-          ),
+          const SizedBox(height: 16),
+          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          const SizedBox(height: 8),
+          Text(desc, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5)),
         ],
       ),
     );
   }
 
-  // Technology Architecture Section (Scroll Reveal)
+  // Technology Architecture Section
   Widget _buildTechSection(bool isDesktop, double screenWidth) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 80),
@@ -868,12 +819,12 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           ? Row(
               children: [
                 Expanded(
-                  flex: 5,
+                  flex: 11,
                   child: ScrollReveal(child: _buildTechText()),
                 ),
-                const Spacer(flex: 1),
+                const Spacer(flex: 2),
                 Expanded(
-                  flex: 5,
+                  flex: 13,
                   child: ScrollReveal(child: _buildTechVisuals()),
                 ),
               ],
@@ -881,7 +832,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           : Column(
               children: [
                 ScrollReveal(child: _buildTechText()),
-                const SizedBox(height: 48),
+                const SizedBox(height: 56),
                 ScrollReveal(child: _buildTechVisuals()),
               ],
             ),
@@ -892,121 +843,434 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'A PRODUCT OF SKILLFORGE TECHNOLOGY',
-          style: TextStyle(
-            color: AppColors.primary,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-            letterSpacing: 1.0,
-          ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'MAVIO is a Product of SkillForge Technology',
-          style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.w900,
-            color: AppColors.textPrimary,
-            letterSpacing: -1.0,
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'MAVIO is designed, engineered, and built by SkillForge Technology. '
-          'By leveraging SkillForge\'s advanced enterprise telemetry servers, real-time sync systems, '
-          'and location background isolates, Mavio ensures optimal tracking reliability for campuses of any size.',
-          style: TextStyle(
-            fontSize: 15,
-            color: AppColors.textSecondary,
-            height: 1.6,
-          ),
-        ),
-        const SizedBox(height: 32),
-        Row(
+        const Row(
           children: [
-            Image.asset('company-logo.png', height: 26),
-            const SizedBox(width: 16),
-            TextButton(
-              onPressed: () async {
-                final url = Uri.parse('https://skillforgetechnology.app/');
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(url);
-                }
-              },
-              child: const Text(
-                'Visit SkillForge Technology site',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  decoration: TextDecoration.underline,
-                ),
-              ),
+            Icon(Icons.terminal_rounded, color: AppColors.primary, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Security and Pipelines',
+              style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
             ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Solid Tech Foundation.',
+          style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -1.0),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'MAVIO relies on Supabase Row Level Security (RLS), encrypted clients, and location streams isolation to prevent data leaks. Our background pipelines run completely separate from UI threads to guarantee zero stuttering.',
+          style: TextStyle(fontSize: 16, color: AppColors.textSecondary, height: 1.6),
+        ),
+        const SizedBox(height: 28),
+        _buildTechPipelineStep('1', 'Supabase streaming pipelines keep sync under 100ms.'),
+        const SizedBox(height: 12),
+        _buildTechPipelineStep('2', 'Encrypted local auth stores bypass standard passwords entry.'),
+        const SizedBox(height: 12),
+        _buildTechPipelineStep('3', 'GPS updates continue seamlessly when device is locked.'),
+      ],
+    );
+  }
+
+  Widget _buildTechPipelineStep(String num, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withOpacity(0.12)),
+          alignment: Alignment.center,
+          child: Text(num, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+        ),
+        const SizedBox(width: 16),
+        Expanded(child: Text(text, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w600))),
+      ],
+    );
+  }
+
+  Widget _buildTechVisuals() {
+    return Center(
+      child: Container(
+        width: 460,
+        height: 300,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.border, width: 1.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Telemetry Architecture Pipeline', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 16)),
+            const SizedBox(height: 24),
+            _buildArchitectureNode('Client UI', 'Renders telemetry markers in map views', AppColors.primary),
+            _buildArchitectureConnector(),
+            _buildArchitectureNode('Isolates Pipeline', 'Decoupled background coordinates calculations', Colors.indigoAccent),
+            _buildArchitectureConnector(),
+            _buildArchitectureNode('Supabase Channels', 'WebSockets stream channels mapped under 100ms', AppColors.success),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArchitectureNode(String title, String desc, Color dotColor) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
+        ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 13)),
+            Text(desc, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildTechVisuals() {
+  Widget _buildArchitectureConnector() {
     return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: AppColors.borderLight, width: 0.8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+      margin: const EdgeInsets.only(left: 4.5, top: 4, bottom: 4),
+      width: 1,
+      height: 20,
+      color: AppColors.border,
+    );
+  }
+
+  // Live Operations Mock Telemetry Dashboard
+  Widget _buildLiveOperationsPreview(bool isDesktop, double screenWidth) {
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 80),
       child: Column(
         children: [
-          _buildTechStep('Isolate Streamer', 'Continuous background tracking isolate pushes JSON payloads.', Icons.alt_route_rounded),
-          const SizedBox(height: 16),
-          const Icon(Icons.arrow_downward_rounded, color: AppColors.primary, size: 24),
-          const SizedBox(height: 16),
-          _buildTechStep('Supabase Realtime', 'Dynamic channels broadcast live locations to active connections.', Icons.cloud_done_rounded),
-          const SizedBox(height: 16),
-          const Icon(Icons.arrow_downward_rounded, color: AppColors.primary, size: 24),
-          const SizedBox(height: 16),
-          _buildTechStep('Student Interactive Maps', 'Flutter Map displays smooth coordinates markers with minimal latency.', Icons.map_rounded),
+          const Text('Live Operations Console', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 12),
+          const Text(
+            'Active Network Performance',
+            style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -1.0),
+          ),
+          const SizedBox(height: 40),
+          Container(
+            width: 800,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F0F12),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 30,
+                  offset: const Offset(0, 15),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.success),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Live Simulation Feed', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const Text('Ping: 42ms', style: TextStyle(color: Colors.white30, fontSize: 12)),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  alignment: WrapAlignment.spaceBetween,
+                  children: [
+                    _buildPreviewMetric('Active Vehicles', '14 Buses', AppColors.primary),
+                    _buildPreviewMetric('Daily Coordinates Pushes', '1,429,820', Colors.indigoAccent),
+                    _buildPreviewMetric('Avg Route Delay', '0.4 mins', AppColors.success),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.02),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.check_circle_rounded, color: AppColors.success, size: 16),
+                      SizedBox(width: 12),
+                      Text('All active university routes reporting normal telemetry speeds.', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTechStep(String title, String desc, IconData icon) {
-    return Row(
+  Widget _buildPreviewMetric(String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CircleAvatar(
-          radius: 24,
-          backgroundColor: AppColors.primary.withOpacity(0.08),
-          foregroundColor: AppColors.primary,
-          child: Icon(icon, size: 22),
+        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.w900)),
+      ],
+    );
+  }
+
+  // Pricing & Subscription Plans
+  Widget _buildPricingSection(bool isDesktop) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 80),
+      child: Column(
+        children: [
+          const Text('Subscription Plans', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 12),
+          const Text(
+            'Transparent Pricing Tiers',
+            style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -1.0),
+          ),
+          const SizedBox(height: 48),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final double cardWidth = (constraints.maxWidth - 48) / (isDesktop ? 3 : 1);
+              return Wrap(
+                spacing: 24,
+                runSpacing: 24,
+                alignment: WrapAlignment.center,
+                children: [
+                  _buildPricingCard(
+                    title: 'Free Trial',
+                    price: '\$0',
+                    billing: '2-week pilot evaluation',
+                    features: [
+                      'Register up to 2 active vehicles',
+                      'Connect up to 2 drivers accounts',
+                      'Standard live WebSockets mapping',
+                      'Self-service setup console',
+                    ],
+                    buttonText: 'Start Trial Now',
+                    isPopular: false,
+                    width: cardWidth,
+                  ),
+                  _buildPricingCard(
+                    title: 'Premium Campus',
+                    price: '\$299',
+                    billing: 'Billed monthly per site',
+                    features: [
+                      'Register up to 25 active vehicles',
+                      'Connect up to 25 active drivers',
+                      'Separate Dart isolate GPS telemetry',
+                      'Historical routes speeds analytics',
+                      'Email & Priority SLA Support',
+                    ],
+                    buttonText: 'Upgrade to Premium',
+                    isPopular: true,
+                    width: cardWidth,
+                  ),
+                  _buildPricingCard(
+                    title: 'Enterprise Custom',
+                    price: 'Custom',
+                    billing: 'Tailored limits & SSO',
+                    features: [
+                      'Unlimited active vehicles & drivers',
+                      'Custom university subdomain & logo',
+                      'API access to database telemetry',
+                      'Dedicated account manager support',
+                      'SSO integration (SAML/OAuth)',
+                    ],
+                    buttonText: 'Contact Sales',
+                    isPopular: false,
+                    width: cardWidth,
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPricingCard({
+    required String title,
+    required String price,
+    required String billing,
+    required List<String> features,
+    required String buttonText,
+    required bool isPopular,
+    required double width,
+  }) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isPopular ? AppColors.primary : AppColors.border,
+          width: isPopular ? 2.0 : 1.0,
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isPopular ? 0.06 : 0.02),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (isPopular) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text('Most Popular', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 11)),
+              ),
+            ),
+          ],
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textPrimary)),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                desc,
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
-              ),
+              Text(price, style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -1.0)),
+              if (price != 'Custom') ...[
+                const SizedBox(width: 4),
+                const Text('/month', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+              ],
             ],
           ),
+          const SizedBox(height: 8),
+          Text(billing, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          const SizedBox(height: 32),
+          Divider(color: AppColors.border.withOpacity(0.6), height: 1),
+          const SizedBox(height: 32),
+          ...features.map((feature) => Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 16),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(feature, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.3))),
+                  ],
+                ),
+              )),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _navigateToLogin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isPopular ? AppColors.primary : Colors.white,
+              foregroundColor: isPopular ? Colors.white : AppColors.textPrimary,
+              elevation: 0,
+              minimumSize: const Size(0, 50),
+              side: isPopular ? null : const BorderSide(color: AppColors.border, width: 1.2),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: Text(buttonText, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // FAQ Section
+  Widget _buildFAQSection(bool isDesktop) {
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 64 : 24, vertical: 80),
+      child: Column(
+        children: [
+          const Text('Got Questions?', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 12),
+          const Text(
+            'Frequently Answered Details',
+            style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -1.0),
+          ),
+          const SizedBox(height: 48),
+          Container(
+            width: 800,
+            child: Column(
+              children: [
+                _buildFAQTile('How does the background location telemetry work?', 'MAVIO runs GPS updates in a separate Dart isolate that runs Location Services inside a foreground process. This prevents coordinate updates from freezing when drivers minimize the app or lock their screens.'),
+                const SizedBox(height: 16),
+                _buildFAQTile('Is student location data tracked or stored?', 'No, student privacy is fully protected. Student devices only request coordinate streams from active university buses during operating hours. We never track or save location details of student devices.'),
+                const SizedBox(height: 16),
+                _buildFAQTile('What database stack guarantees the low latency?', 'We utilize Supabase WebSocket Channels which stream coordinate delta patches directly from database tables to client layouts. Latency averages under 100ms, ensuring real-time marker precision.'),
+                const SizedBox(height: 16),
+                _buildFAQTile('How can our campus request custom enterprise limits?', 'School administrations can link their customized portals by reaching out to our team at admin@mavio.com. We configure custom subdomains, SAML SSO integration, and driver limits manually.'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFAQTile(String question, String answer) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight, width: 1.0),
+      ),
+      child: Theme(
+        data: ThemeData().copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          iconColor: AppColors.primary,
+          textColor: AppColors.primary,
+          title: Text(
+            question,
+            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 15),
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
+              child: Text(
+                answer,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -1134,6 +1398,44 @@ class _FloatingWidgetState extends State<_FloatingWidget> with SingleTickerProvi
   }
 }
 
+// Phone Device Frame Mockup wrapper
+class _PhoneFrame extends StatelessWidget {
+  final String assetPath;
+  final double height;
+
+  const _PhoneFrame({required this.assetPath, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    final double width = height * 0.48;
+
+    return Container(
+      width: width,
+      height: height,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(height * 0.08),
+        border: Border.all(color: const Color(0xFF2E2E33), width: 4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 32,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(height * 0.06),
+        child: Image.asset(
+          assetPath,
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+}
+
 // Custom Viewport-based Scroll Reveal Animator
 class ScrollReveal extends StatefulWidget {
   final Widget child;
@@ -1171,21 +1473,23 @@ class _ScrollRevealState extends State<ScrollReveal> with SingleTickerProviderSt
 
     if (widget.animateOnLoad) {
       _hasRevealed = true;
-      _controller.forward();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _controller.forward();
+        }
+      });
     }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Safely retrieve the ancestor scrollable position
     final newPosition = Scrollable.maybeOf(context)?.position;
     if (newPosition != _scrollPosition) {
       _scrollPosition?.removeListener(_checkVisibility);
       _scrollPosition = newPosition;
       _scrollPosition?.addListener(_checkVisibility);
     }
-    // Check initial visibility after layout
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkVisibility());
   }
 
@@ -1207,7 +1511,6 @@ class _ScrollRevealState extends State<ScrollReveal> with SingleTickerProviderSt
       final position = renderBox.localToGlobal(Offset.zero);
       final viewportHeight = MediaQuery.of(context).size.height;
 
-      // Reveal when the element enters the viewport with a small buffer margin
       if (position.dy < viewportHeight - 80) {
         setState(() {
           _hasRevealed = true;
@@ -1215,7 +1518,6 @@ class _ScrollRevealState extends State<ScrollReveal> with SingleTickerProviderSt
         _controller.forward();
       }
     } catch (_) {
-      // Catch layout safety checks if render object is not ready
     }
   }
 
@@ -1233,71 +1535,6 @@ class _ScrollRevealState extends State<ScrollReveal> with SingleTickerProviderSt
         );
       },
       child: widget.child,
-    );
-  }
-}
-
-// Phone Device Frame Wrapper
-class _PhoneFrame extends StatefulWidget {
-  final String assetPath;
-  final double height;
-
-  const _PhoneFrame({
-    required this.assetPath,
-    this.height = 420,
-  });
-
-  @override
-  State<_PhoneFrame> createState() => _PhoneFrameState();
-}
-
-class _PhoneFrameState extends State<_PhoneFrame> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        transform: Matrix4.identity()
-          ..translate(0.0, _isHovered ? -12.0 : 0.0, 0.0)
-          ..scale(_isHovered ? 1.04 : 1.0),
-        child: Container(
-          height: widget.height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(38),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(_isHovered ? 0.22 : 0.14),
-                blurRadius: _isHovered ? 45 : 25,
-                offset: Offset(0, _isHovered ? 20 : 12),
-              ),
-              BoxShadow(
-                color: AppColors.primary.withOpacity(_isHovered ? 0.22 : 0.0),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(38),
-            child: Container(
-              color: const Color(0xFF1E1E1E), // Matte Bezel
-              padding: const EdgeInsets.all(9.0),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(30),
-                child: Image.asset(
-                  widget.assetPath,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
