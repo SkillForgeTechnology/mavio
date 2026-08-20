@@ -14,6 +14,7 @@ class AdminPortalPage extends StatefulWidget {
 
 class _AdminPortalPageState extends State<AdminPortalPage> with SingleTickerProviderStateMixin {
   final SupabaseService _db = SupabaseService();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -559,6 +560,7 @@ class _AdminPortalPageState extends State<AdminPortalPage> with SingleTickerProv
     final isDesktop = screenWidth > 900;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFF0F0F12),
       drawer: !isDesktop && _isLoggedIn ? Drawer(child: _buildSidebar(context, false)) : null,
       body: Stack(
@@ -825,7 +827,7 @@ class _AdminPortalPageState extends State<AdminPortalPage> with SingleTickerProv
     return InkWell(
       onTap: () {
         setState(() => _selectedTab = tabIndex);
-        if (Scaffold.of(context).isDrawerOpen) {
+        if (_scaffoldKey.currentState?.isDrawerOpen == true) {
           Navigator.pop(context);
         }
       },
@@ -872,7 +874,7 @@ class _AdminPortalPageState extends State<AdminPortalPage> with SingleTickerProv
           if (showMenuButton) ...[
             IconButton(
               icon: const Icon(Icons.menu, color: Colors.white),
-              onPressed: () => Scaffold.of(context).openDrawer(),
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
             const SizedBox(width: 12),
           ],
@@ -1502,37 +1504,45 @@ class SmoothAreaChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (dataPoints.isEmpty) return;
 
+    final double paddingLeft = 40.0;
+    final double paddingBottom = 25.0;
+    final double chartWidth = size.width - paddingLeft;
+    final double chartHeight = size.height - paddingBottom;
+
     final paint = Paint()
-      ..color = AppColors.primary.withOpacity(0.8)
+      ..color = AppColors.primary
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
 
     final fillPaint = Paint()
       ..shader = LinearGradient(
-        colors: [AppColors.primary.withOpacity(0.15), Colors.transparent],
+        colors: [AppColors.primary.withOpacity(0.25), AppColors.primary.withOpacity(0.0)],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ).createShader(Rect.fromLTWH(paddingLeft, 0, chartWidth, chartHeight))
       ..style = PaintingStyle.fill;
 
-    final double stepX = size.width / (dataPoints.length - 1);
+    final double stepX = chartWidth / (dataPoints.length - 1);
     final double maxVal = dataPoints.reduce((a, b) => a > b ? a : b);
-    final double scaleY = size.height / (maxVal * 1.2);
+    final double scaleY = chartHeight / (maxVal * 1.15);
 
     final path = Path();
     final fillPath = Path();
 
-    path.moveTo(0, size.height - (dataPoints[0] * scaleY));
-    fillPath.moveTo(0, size.height);
-    fillPath.lineTo(0, size.height - (dataPoints[0] * scaleY));
+    final double firstX = paddingLeft;
+    final double firstY = chartHeight - (dataPoints[0] * scaleY);
+
+    path.moveTo(firstX, firstY);
+    fillPath.moveTo(firstX, chartHeight);
+    fillPath.lineTo(firstX, firstY);
 
     for (int i = 1; i < dataPoints.length; i++) {
-      final double x = i * stepX;
-      final double y = size.height - (dataPoints[i] * scaleY);
-      final double prevX = (i - 1) * stepX;
-      final double prevY = size.height - (dataPoints[i - 1] * scaleY);
+      final double x = paddingLeft + i * stepX;
+      final double y = chartHeight - (dataPoints[i] * scaleY);
+      final double prevX = paddingLeft + (i - 1) * stepX;
+      final double prevY = chartHeight - (dataPoints[i - 1] * scaleY);
 
-      // Draw bezier curves
+      // Smooth bezier curves
       final double cpX1 = prevX + (stepX / 2);
       final double cpY1 = prevY;
       final double cpX2 = prevX + (stepX / 2);
@@ -1542,18 +1552,44 @@ class SmoothAreaChartPainter extends CustomPainter {
       fillPath.cubicTo(cpX1, cpY1, cpX2, cpY2, x, y);
     }
 
-    fillPath.lineTo(size.width, size.height);
+    fillPath.lineTo(paddingLeft + chartWidth, chartHeight);
     fillPath.close();
 
-    // Draw background graph lines grid
+    // Draw background grid lines
     final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.03)
+      ..color = Colors.white.withOpacity(0.04)
       ..strokeWidth = 1;
 
     for (int i = 0; i <= 4; i++) {
-      final double y = size.height * i / 4;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      final double y = chartHeight * i / 4;
+      canvas.drawLine(Offset(paddingLeft, y), Offset(paddingLeft + chartWidth, y), gridPaint);
+      
+      // Draw Y labels
+      final int labelVal = ((maxVal * 1.15) * (4 - i) / 4).round();
+      _drawText(canvas, '${labelVal}k', Offset(paddingLeft - 10, y), Colors.white30, alignment: Alignment.centerRight);
     }
+
+    // Draw vertical grid lines
+    for (int i = 0; i < dataPoints.length; i++) {
+      final double x = paddingLeft + i * stepX;
+      canvas.drawLine(Offset(x, 0), Offset(x, chartHeight), gridPaint);
+      
+      // Draw X labels (Days)
+      final List<String> days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      if (i < days.length) {
+        _drawText(canvas, days[i], Offset(x, chartHeight + 12), Colors.white38);
+      }
+    }
+
+    // Draw target horizontal dashed line
+    final targetPaint = Paint()
+      ..color = AppColors.success.withOpacity(0.3)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    
+    final double targetY = chartHeight * 0.25;
+    canvas.drawLine(Offset(paddingLeft, targetY), Offset(paddingLeft + chartWidth, targetY), targetPaint);
+    _drawText(canvas, 'GOAL', Offset(paddingLeft + chartWidth - 10, targetY - 8), AppColors.success.withOpacity(0.7), fontSize: 8);
 
     canvas.drawPath(fillPath, fillPaint);
     canvas.drawPath(path, paint);
@@ -1566,14 +1602,39 @@ class SmoothAreaChartPainter extends CustomPainter {
     final dotBorderPaint = Paint()
       ..color = AppColors.primary
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 2.5;
+
+    final pulsePaint = Paint()
+      ..color = AppColors.primary.withOpacity(0.2)
+      ..style = PaintingStyle.fill;
 
     for (int i = 0; i < dataPoints.length; i++) {
-      final double x = i * stepX;
-      final double y = size.height - (dataPoints[i] * scaleY);
-      canvas.drawCircle(Offset(x, y), 5, dotPaint);
-      canvas.drawCircle(Offset(x, y), 5, dotBorderPaint);
+      final double x = paddingLeft + i * stepX;
+      final double y = chartHeight - (dataPoints[i] * scaleY);
+      
+      canvas.drawCircle(Offset(x, y), 8, pulsePaint);
+      canvas.drawCircle(Offset(x, y), 4, dotPaint);
+      canvas.drawCircle(Offset(x, y), 4, dotBorderPaint);
     }
+  }
+
+  void _drawText(Canvas canvas, String text, Offset offset, Color color, {double fontSize = 9, Alignment alignment = Alignment.center}) {
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(color: color, fontSize: fontSize, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    
+    Offset finalOffset = offset;
+    if (alignment == Alignment.center) {
+      finalOffset = offset - Offset(textPainter.width / 2, textPainter.height / 2);
+    } else if (alignment == Alignment.centerRight) {
+      finalOffset = offset - Offset(textPainter.width, textPainter.height / 2);
+    }
+    textPainter.paint(canvas, finalOffset);
   }
 
   @override
