@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'core/services/background_location_service.dart';
 import 'core/theme/theme.dart';
 import 'providers/auth_provider.dart';
@@ -10,6 +11,7 @@ import 'screens/admin/admin_portal_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
   await BackgroundLocationService.initialize();
   runApp(
     MultiProvider(
