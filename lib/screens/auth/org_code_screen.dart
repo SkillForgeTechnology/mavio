@@ -194,6 +194,8 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                           controller: _codeController,
                                           autofocus: true,
                                           textCapitalization: TextCapitalization.characters,
+                                          textInputAction: TextInputAction.done,
+                                          onFieldSubmitted: (_) => _submitCode(),
                                           validator: (val) {
                                             if (val == null || val.trim().isEmpty) {
                                               return 'Please enter your organization code';

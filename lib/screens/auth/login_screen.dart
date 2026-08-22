@@ -21,6 +21,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FocusNode _passwordFocusNode = FocusNode();
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
 
@@ -33,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -250,6 +252,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   keyboardType: widget.role == 'student'
                                       ? TextInputType.text
                                       : TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) {
+                                    FocusScope.of(context).requestFocus(_passwordFocusNode);
+                                  },
                                   validator: (val) {
                                     if (val == null || val.trim().isEmpty) {
                                       return widget.role == 'student'
@@ -289,6 +295,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 TextFormField(
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
+                                  focusNode: _passwordFocusNode,
+                                  textInputAction: TextInputAction.done,
+                                  onFieldSubmitted: (_) => _performLogin(),
                                   validator: (val) {
                                     if (val == null || val.isEmpty) {
                                       return widget.role == 'student'
