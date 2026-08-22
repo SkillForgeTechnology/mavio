@@ -258,6 +258,11 @@ class SupabaseService {
 
   // Fetch all organizations (for super-admin)
   Future<List<MavioOrganization>> fetchOrganizations() async {
+    // Run periodic database storage cleanup silently (60 days old trips pruning)
+    runPeriodicCleanup().catchError((e) {
+      print("Error in cleanup: $e");
+    });
+
     if (_useMockMode) {
       return _mockOrgs.values.toList();
     } else {
@@ -272,6 +277,21 @@ class SupabaseService {
         print("Error fetching organizations: $e");
         return [];
       }
+    }
+  }
+
+  // Periodic database cleanup: delete trips older than 60 days
+  Future<void> runPeriodicCleanup() async {
+    if (_useMockMode) return;
+    try {
+      final client = Supabase.instance.client;
+      final limitDate = DateTime.now().subtract(const Duration(days: 60)).toUtc().toIso8601String();
+      await client
+          .from('trips')
+          .delete()
+          .lt('started_at', limitDate);
+    } catch (e) {
+      print("Periodic cleanup error: $e");
     }
   }
 
@@ -327,6 +347,51 @@ class SupabaseService {
       } catch (e) {
         print("Error creating organization: $e");
         return null;
+      }
+    }
+  }
+
+  // Get all buses, drivers, and students for a specific organization (used in Admin Portal detailed view)
+  Future<Map<String, dynamic>> getOrganizationDetailData(String orgId) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (_useMockMode) {
+      final buses = _mockVehicles.where((v) => v.orgId == orgId).toList();
+      final drivers = _mockProfiles.values.where((p) => p.orgId == orgId && p.role == 'driver').toList();
+      final students = _mockProfiles.values.where((p) => p.orgId == orgId && p.role == 'student').toList();
+      return {
+        'buses': buses,
+        'drivers': drivers,
+        'students': students,
+      };
+    } else {
+      try {
+        final busesRes = await Supabase.instance.client
+            .from('vehicles')
+            .select()
+            .eq('org_id', orgId);
+        final profilesRes = await Supabase.instance.client
+            .from('profiles')
+            .select()
+            .eq('org_id', orgId);
+
+        final buses = (busesRes as List).map((x) => MavioVehicle.fromJson(x)).toList();
+        final profiles = (profilesRes as List).map((x) => MavioProfile.fromJson(x)).toList();
+
+        final drivers = profiles.where((p) => p.role == 'driver').toList();
+        final students = profiles.where((p) => p.role == 'student').toList();
+
+        return {
+          'buses': buses,
+          'drivers': drivers,
+          'students': students,
+        };
+      } catch (e) {
+        print("Error fetching org details: $e");
+        return {
+          'buses': <MavioVehicle>[],
+          'drivers': <MavioProfile>[],
+          'students': <MavioProfile>[],
+        };
       }
     }
   }
@@ -822,6 +887,27 @@ class SupabaseService {
       print("Error getting latest location update: $e");
     }
     return null;
+  }
+
+  // Helper: Get list of historical coordinates for a trip (ascending order)
+  Future<List<Map<String, double>>> getTripPathCoordinates(String tripId) async {
+    if (_useMockMode) return [];
+    try {
+      final response = await Supabase.instance.client
+          .from('location_updates')
+          .select('latitude, longitude')
+          .eq('trip_id', tripId)
+          .order('created_at', ascending: true);
+      
+      final list = response as List;
+      return list.map((item) => {
+        'latitude': (item['latitude'] as num).toDouble(),
+        'longitude': (item['longitude'] as num).toDouble(),
+      }).toList();
+    } catch (e) {
+      print("Error fetching trip coordinates: $e");
+      return [];
+    }
   }
 
   // Helper: Get latest location updates for all active trips (limits query payload)
@@ -1355,6 +1441,68 @@ class SupabaseService {
         'delete_auth_user',
         params: {'target_user_id': id},
       );
+    }
+  }
+
+  // Update student's self-service alert stop location and radius
+  Future<void> updateProfileAlertStop({
+    required String id,
+    required double? latitude,
+    required double? longitude,
+    required int radiusMeters,
+  }) async {
+    if (_useMockMode) {
+      final s = _mockProfiles[id];
+      if (s != null) {
+        final updated = s.copyWith(
+          alertLatitude: latitude,
+          alertLongitude: longitude,
+          alertRadiusMeters: radiusMeters,
+        );
+        _mockProfiles[id] = updated;
+        if (_currentUserProfile?.id == id) {
+          _currentUserProfile = updated;
+        }
+      }
+    } else {
+      await Supabase.instance.client.from('profiles').update({
+        'alert_latitude': latitude,
+        'alert_longitude': longitude,
+        'alert_radius_meters': radiusMeters,
+      }).eq('id', id);
+
+      if (_currentUserProfile?.id == id) {
+        _currentUserProfile = _currentUserProfile?.copyWith(
+          alertLatitude: latitude,
+          alertLongitude: longitude,
+          alertRadiusMeters: radiusMeters,
+        );
+      }
+    }
+  }
+
+  // Update student's OneSignal subscription ID
+  Future<void> updateProfileOneSignalId({
+    required String id,
+    required String? onesignalId,
+  }) async {
+    if (_useMockMode) {
+      final s = _mockProfiles[id];
+      if (s != null) {
+        final updated = s.copyWith(onesignalId: onesignalId);
+        _mockProfiles[id] = updated;
+        if (_currentUserProfile?.id == id) {
+          _currentUserProfile = updated;
+        }
+      }
+    } else {
+      await Supabase.instance.client.from('profiles').update({
+        'onesignal_id': onesignalId,
+      }).eq('id', id);
+
+      if (_currentUserProfile?.id == id) {
+        _currentUserProfile = _currentUserProfile?.copyWith(onesignalId: onesignalId);
+      }
     }
   }
 }

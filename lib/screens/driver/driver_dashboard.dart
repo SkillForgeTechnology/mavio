@@ -10,6 +10,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:intl/intl.dart' as intl;
 import '../../providers/auth_provider.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../core/theme/theme.dart';
 import '../../models/models.dart';
 import '../auth/splash_screen.dart';
@@ -49,6 +50,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
     super.initState();
     _loadDriverDetails();
     _checkGpsStatus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PushNotificationService.setupVerificationObserver(context);
+    });
   }
 
   @override

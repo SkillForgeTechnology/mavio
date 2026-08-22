@@ -1,0 +1,18 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+
+# Public sections to index
+Allow: /$
+Allow: /index.html
+Allow: /privacy
+Allow: /terms
+
+# Disallow indexing private dashboards & login forms to protect credentials and secure traffic
+Disallow: /admin
+Disallow: /login
+Disallow: /dashboard
+Disallow: /student
+Disallow: /driver
+Disallow: /api/
+
+Sitemap: https://mavio.skillforgetechnology.app/sitemap.xml

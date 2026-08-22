@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/services/supabase_service.dart';
+import '../core/services/push_notification_service.dart';
 import '../models/models.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -23,6 +24,12 @@ class AuthProvider extends ChangeNotifier {
     await _db.init();
     _isLoading = false;
     notifyListeners();
+    
+    if (currentProfile != null) {
+      PushNotificationService.syncSubscriptionId(currentProfile!.id).catchError((e) {
+        print("Error syncing OneSignal on init: $e");
+      });
+    }
   }
 
   // 1. Verify Organization Code
@@ -83,6 +90,11 @@ class AuthProvider extends ChangeNotifier {
         _currentProfile = profile;
         _isLoading = false;
         notifyListeners();
+        
+        PushNotificationService.syncSubscriptionId(profile.id).catchError((e) {
+          print("Error syncing OneSignal on login: $e");
+        });
+        
         return true;
       } else {
         _error = "Authentication failed.";

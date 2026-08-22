@@ -240,6 +240,13 @@ class _MavioBulkImportScreenState extends State<MavioBulkImportScreen> {
 
     try {
       if (widget.importType == 'vehicle') {
+        final org = widget.db.currentOrganization;
+        final isFreeTrial = org?.subscriptionStatus == 'free_trial';
+        if (isFreeTrial && (widget.fleet.length + _parsedRows.length) > 25) {
+          setState(() => _isLoading = false);
+          _showLimitExceededDialog();
+          return;
+        }
         for (var row in _parsedRows) {
           await widget.db.addVehicle(
             row['Bus Name']!,
@@ -665,6 +672,119 @@ class _MavioBulkImportScreenState extends State<MavioBulkImportScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _showLimitExceededDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          title: const Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.amber,
+                size: 28,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Limit Reached',
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          content: Text(
+            'Importing these records will exceed your vehicle limit! Free Trial organizations are limited to 25 vehicles '
+            '(current fleet: ${widget.fleet.length}, attempting to import: ${_parsedRows.length}). '
+            'Please upgrade your subscription by contacting us to add more buses.',
+            style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Close',
+                style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _showContactSupportInfo();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              child: const Text('Contact Support'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showContactSupportInfo() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          title: const Text(
+            'Upgrade Plan',
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'To upgrade your subscription, please get in touch with our enterprise support team:',
+                style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.email_outlined, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'support@mavio.io',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(Icons.phone_outlined, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    '+1 (800) 555-0199',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

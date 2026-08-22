@@ -64,7 +64,10 @@ class MavioProfile {
   final String? phone;
   final String? rollNumber;
   final String? dob;
-
+  final double? alertLatitude;
+  final double? alertLongitude;
+  final int alertRadiusMeters;
+  final String? onesignalId;
 
   MavioProfile({
     required this.id,
@@ -76,6 +79,10 @@ class MavioProfile {
     this.phone,
     this.rollNumber,
     this.dob,
+    this.alertLatitude,
+    this.alertLongitude,
+    this.alertRadiusMeters = 500,
+    this.onesignalId,
   });
 
   factory MavioProfile.fromJson(Map<String, dynamic> json) {
@@ -89,6 +96,10 @@ class MavioProfile {
       phone: json['phone'] as String?,
       rollNumber: json['roll_number'] as String?,
       dob: json['dob'] as String?,
+      alertLatitude: json['alert_latitude'] != null ? (json['alert_latitude'] as num).toDouble() : null,
+      alertLongitude: json['alert_longitude'] != null ? (json['alert_longitude'] as num).toDouble() : null,
+      alertRadiusMeters: json['alert_radius_meters'] as int? ?? 500,
+      onesignalId: json['onesignal_id'] as String?,
     );
   }
 
@@ -97,6 +108,10 @@ class MavioProfile {
     String? phone,
     String? rollNumber,
     String? dob,
+    double? alertLatitude,
+    double? alertLongitude,
+    int? alertRadiusMeters,
+    String? onesignalId,
   }) {
     return MavioProfile(
       id: id,
@@ -108,6 +123,10 @@ class MavioProfile {
       phone: phone ?? this.phone,
       rollNumber: rollNumber ?? this.rollNumber,
       dob: dob ?? this.dob,
+      alertLatitude: alertLatitude ?? this.alertLatitude,
+      alertLongitude: alertLongitude ?? this.alertLongitude,
+      alertRadiusMeters: alertRadiusMeters ?? this.alertRadiusMeters,
+      onesignalId: onesignalId ?? this.onesignalId,
     );
   }
 }

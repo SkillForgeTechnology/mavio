@@ -5,8 +5,11 @@ import 'package:latlong2/latlong.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/tracking_provider.dart';
 import '../../core/theme/theme.dart';
+import '../../core/services/supabase_service.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../models/models.dart';
 import '../auth/splash_screen.dart';
+import 'stop_selection_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class StudentDashboard extends StatefulWidget {
@@ -27,6 +30,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _trackingProvider.loadStudentDashboard();
+      PushNotificationService.setupVerificationObserver(context);
     });
   }
 
@@ -1034,6 +1038,8 @@ class _MapTabState extends State<_MapTab> {
   @override
   Widget build(BuildContext context) {
     final tracking = Provider.of<TrackingProvider>(context);
+    final auth = Provider.of<AuthProvider>(context);
+    final profile = auth.currentProfile;
     final isLive = tracking.isTripLive;
     final latestLoc = tracking.latestLocation;
 
@@ -1066,6 +1072,69 @@ class _MapTabState extends State<_MapTab> {
                 panBuffer: 1,
                 keepBuffer: 3,
               ),
+
+              // Glowing Route Path Line
+              if (isLive && tracking.tripPath.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: tracking.tripPath,
+                      strokeWidth: 4.5,
+                      color: AppColors.primary,
+                      borderColor: AppColors.primary.withOpacity(0.3),
+                      borderStrokeWidth: 4.0,
+                    ),
+                  ],
+                ),
+
+              // Pinned Student Alert Stop Circle Layer
+              if (profile?.alertLatitude != null && profile?.alertLongitude != null)
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: LatLng(profile!.alertLatitude!, profile.alertLongitude!),
+                      radius: profile.alertRadiusMeters.toDouble(),
+                      useRadiusInMeter: true,
+                      color: AppColors.primary.withOpacity(0.08),
+                      borderColor: AppColors.primary.withOpacity(0.4),
+                      borderStrokeWidth: 1.2,
+                    ),
+                  ],
+                ),
+
+              // Pinned Student Alert Stop Marker Layer
+              if (profile?.alertLatitude != null && profile?.alertLongitude != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: LatLng(profile!.alertLatitude!, profile.alertLongitude!),
+                      width: 40,
+                      height: 40,
+                      child: Tooltip(
+                        message: 'Your Alert Location',
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.primary, width: 2.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.home_rounded,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
 
               // Glowing Bus Marker Layer
               MarkerLayer(
@@ -1669,6 +1738,103 @@ class _ProfileTabState extends State<_ProfileTab> {
                       label: 'Account Status',
                       value: 'Active Verification',
                       isSuccess: true,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 3. Proximity Alert Configuration
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Proximity Alert Stop',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.borderLight, width: 1.5),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.notifications_active_outlined, color: AppColors.primary, size: 22),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Your Stop Alert Location',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                profile?.alertLatitude != null 
+                                    ? 'Radius: ${(profile!.alertRadiusMeters / 1000).toStringAsFixed(1)} km • Selected'
+                                    : 'Not configured yet',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (profile?.alertLatitude != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Lat: ${profile!.alertLatitude!.toStringAsFixed(5)}, Lng: ${profile.alertLongitude!.toStringAsFixed(5)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                     ElevatedButton.icon(
+                      onPressed: () {
+                        if (profile != null) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => StudentStopSelectionPage(profile: profile),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.map_rounded, size: 16),
+                      label: Text(
+                        profile?.alertLatitude != null ? 'Edit Alert Location' : 'Set Alert Location',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        minimumSize: const Size(0, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ],
                 ),

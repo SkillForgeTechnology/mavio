@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/theme.dart';
 import '../providers/auth_provider.dart';
 import 'auth/org_code_screen.dart';
@@ -27,6 +29,8 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
 
   final ValueNotifier<double> _scrollOffset = ValueNotifier<double>(0.0);
   VideoPlayerController? _videoController;
+  bool _showSplash = true;
+  bool _removeSplash = false;
 
   @override
   void initState() {
@@ -35,23 +39,32 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
       _scrollOffset.value = _scrollController.offset;
     });
 
+    _initializeVideo();
+  }
+
+  void _initializeVideo() {
     if (kIsWeb) {
       _videoController = VideoPlayerController.networkUrl(
         Uri.parse('hero-sec-video.mp4'),
       );
     } else {
-      _videoController = VideoPlayerController.asset(
-        'assets/hero-sec-video.mp4',
-      );
+      _videoController = VideoPlayerController.asset('assets/hero-sec-video.mp4');
     }
 
-    _videoController!
-      ..initialize().then((_) {
+    // Set volume to 0.0 BEFORE initialization so browser autoplay policy doesn't block media buffering
+    _videoController!.setVolume(0.0);
+
+    _videoController!.initialize().then((_) {
+      if (mounted) {
         setState(() {});
         _videoController?.setLooping(true);
-        _videoController?.setVolume(0.0);
-        _videoController?.play();
-      });
+        _videoController?.play().catchError((error) {
+          debugPrint("Video play failed: $error");
+        });
+      }
+    }).catchError((error) {
+      debugPrint("Video initialization failed: $error");
+    });
   }
 
   @override
@@ -78,6 +91,174 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
         curve: Curves.easeInOutCubic,
       );
     }
+  }
+
+  void _showContactDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+        ),
+        content: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Top Logos Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset('logo.png', height: 45),
+                  const SizedBox(width: 20),
+                  Container(
+                    height: 30,
+                    width: 1.5,
+                    color: AppColors.border,
+                  ),
+                  const SizedBox(width: 20),
+                  Image.asset('company-logo.png', height: 40),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Contact Our Sales & Setup Team',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Let us help you configure the real-time student visibility transit system for your institution.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Email Detail
+              _buildContactItem(
+                icon: Icons.email_outlined,
+                title: 'Email Us',
+                value: 'info@skillforgetechnology.app',
+                onTap: () => launchUrl(Uri.parse('mailto:info@skillforgetechnology.app')),
+              ),
+              const SizedBox(height: 12),
+              
+              // Mobile Detail
+              _buildContactItem(
+                icon: Icons.phone_android_outlined,
+                title: 'Mobile / Phone',
+                value: '+91 93455 18760',
+                onTap: () => launchUrl(Uri.parse('tel:+919345518760')),
+              ),
+              const SizedBox(height: 24),
+              
+              // Call & WhatsApp Action Row
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => launchUrl(
+                        Uri.parse('https://wa.me/919345518760?text=Hi%2C%20I\'m%20interested%20in%20Mavio%20Transit%20Service!'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Colors.white),
+                      label: const Text('WhatsApp', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF25D366),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => launchUrl(Uri.parse('tel:+919345518760')),
+                      icon: const Icon(Icons.call_outlined, size: 18, color: Colors.white),
+                      label: const Text('Call Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContactItem({
+    required IconData icon,
+    required String title,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.background.withOpacity(0.04),
+          border: Border.all(color: AppColors.border.withOpacity(0.4)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _navigateToLogin() {
@@ -113,21 +294,20 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
       backgroundColor: const Color(0xFFFAFAFA),
       body: Stack(
         children: [
-          // Background Decorative Mesh Orbs (Clipped properly to prevent HTML overlay leakages)
+          // Background Decorative Mesh Orbs (Gradients are hardware-accelerated and do not cause scroll lag)
           Positioned(
             top: -150,
             left: -150,
-            child: ClipOval(
-              child: Container(
-                width: 500,
-                height: 500,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary.withOpacity(0.04),
-                ),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 90, sigmaY: 90),
-                  child: Container(color: Colors.transparent),
+            child: Container(
+              width: 500,
+              height: 500,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    AppColors.primary.withOpacity(0.08),
+                    AppColors.primary.withOpacity(0.0),
+                  ],
                 ),
               ),
             ),
@@ -135,17 +315,16 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           Positioned(
             top: 400,
             right: -200,
-            child: ClipOval(
-              child: Container(
-                width: 600,
-                height: 600,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFFF8A65).withOpacity(0.03),
-                ),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 120, sigmaY: 120),
-                  child: Container(color: Colors.transparent),
+            child: Container(
+              width: 600,
+              height: 600,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFFFF8A65).withOpacity(0.06),
+                    const Color(0xFFFF8A65).withOpacity(0.0),
+                  ],
                 ),
               ),
             ),
@@ -211,6 +390,30 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
               },
             ),
           ),
+
+          // Premium Animated Splash Loader Overlay
+          if (!_removeSplash)
+            Positioned.fill(
+              child: AnimatedOpacity(
+                opacity: _showSplash ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+                onEnd: () {
+                  if (!_showSplash) {
+                    setState(() {
+                      _removeSplash = true;
+                    });
+                  }
+                },
+                child: MavioSplashLoader(
+                  onFinished: () {
+                    setState(() {
+                      _showSplash = false;
+                    });
+                  },
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -227,7 +430,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
         vertical: isScrolled ? 16 : 24,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(isScrolled ? 0.8 : 1.0),
+        color: Colors.white.withOpacity(isScrolled ? 0.95 : 1.0),
         border: Border(
           bottom: BorderSide(
             color: isScrolled
@@ -246,94 +449,86 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
               ]
             : [],
       ),
-      child: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: isScrolled ? 15.0 : 0.0,
-            sigmaY: isScrolled ? 15.0 : 0.0,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Logo
+          Row(
             children: [
-              // Logo
-              Row(
-                children: [
-                  Image.asset('logo.png', height: 38),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'MAVIO',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.primary,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ],
-              ),
-
-              // Nav items (Desktop)
-              if (isDesktop)
-                Row(
-                  children: [
-                    _buildNavLink(
-                      'Overview',
-                      () => _scrollController.animateTo(
-                        0,
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.easeInOut,
-                      ),
-                    ),
-                    _buildNavLink(
-                      'Features',
-                      () => _scrollToSection(_featuresKey),
-                    ),
-                    _buildNavLink(
-                      'Architecture',
-                      () => _scrollToSection(_techKey),
-                    ),
-                    _buildNavLink(
-                      'Pricing',
-                      () => _scrollToSection(_pricingKey),
-                    ),
-                    _buildNavLink('FAQ', () => _scrollToSection(_faqKey)),
-                  ],
-                ),
-
-              // Launch Button
-              ElevatedButton(
-                onPressed: _navigateToLogin,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(0, 0),
-                  elevation: isScrolled ? 2 : 0,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 18,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Launch Portal',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward_rounded, size: 16),
-                  ],
+              Image.asset('logo.png', height: 38),
+              const SizedBox(width: 12),
+              const Text(
+                'MAVIO',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primary,
+                  letterSpacing: 1.0,
                 ),
               ),
             ],
           ),
-        ),
+
+          // Nav items (Desktop)
+          if (isDesktop)
+            Row(
+              children: [
+                _buildNavLink(
+                  'Overview',
+                  () => _scrollController.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeInOut,
+                  ),
+                ),
+                _buildNavLink(
+                  'Features',
+                  () => _scrollToSection(_featuresKey),
+                ),
+                _buildNavLink(
+                  'Architecture',
+                  () => _scrollToSection(_techKey),
+                ),
+                _buildNavLink(
+                  'Pricing',
+                  () => _scrollToSection(_pricingKey),
+                ),
+                _buildNavLink('FAQ', () => _scrollToSection(_faqKey)),
+              ],
+            ),
+
+          // Launch Button
+          ElevatedButton(
+            onPressed: _navigateToLogin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(0, 0),
+              elevation: isScrolled ? 2 : 0,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 18,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Launch Portal',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Icon(Icons.arrow_forward_rounded, size: 16),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -482,135 +677,134 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     return Container(
       width: double.infinity,
       color: const Color(0xFFFAF6F2),
-      child: AspectRatio(
-        aspectRatio:
-            _videoController != null && _videoController!.value.isInitialized
-            ? _videoController!.value.aspectRatio
-            : 16 / 9,
-        child: Stack(
-          children: [
-            // Background Video Player
-            Positioned.fill(
-              child:
-                  _videoController != null &&
-                      _videoController!.value.isInitialized
-                  ? VideoPlayer(_videoController!)
-                  : Container(
-                      color: const Color(0xFFFAF6F2),
+      child: Column(
+        children: [
+          AspectRatio(
+            aspectRatio:
+                _videoController != null && _videoController!.value.isInitialized
+                ? _videoController!.value.aspectRatio
+                : 16 / 9,
+            child: Stack(
+              children: [
+                 // Background Video Player
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: _videoController != null &&
+                            _videoController!.value.isInitialized
+                        ? VideoPlayer(_videoController!)
+                        : Container(
+                            color: const Color(0xFFFAF6F2),
+                          ),
+                  ),
+                ),
+                // Dark glassmorphic gradient overlay to guarantee text and buttons readability
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.0),
+                            Colors.black.withOpacity(0.15),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Notification icon button positioned exactly over the Gemini watermark logo inside the right phone tab bar
+                Align(
+                  alignment: const Alignment(0.83, 0.70),
+                  child: GestureDetector(
+                    onTap: () => _showAlertsDialog(context),
+                    child: Container(
+                      width: 73,
+                      height: 73,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.primary, width: 2.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.35),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
                       child: const Center(
-                        child: CircularProgressIndicator(
+                        child: Icon(
+                          Icons.notifications_active_rounded,
                           color: AppColors.primary,
+                          size: 26,
                         ),
                       ),
-                    ),
-            ),
-            // Dark glassmorphic gradient overlay to guarantee text and buttons readability
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.0),
-                      Colors.black.withOpacity(0.4),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Notification icon button positioned exactly over the Gemini watermark logo inside the right phone tab bar
-            Align(
-              alignment: const Alignment(0.83, 0.70),
-              child: GestureDetector(
-                onTap: () => _showAlertsDialog(context),
-                child: Container(
-                  width: 73,
-                  height: 73,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primary, width: 2.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.35),
-                        blurRadius: 12,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.notifications_active_rounded,
-                      color: AppColors.primary,
-                      size: 26,
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-            // CTA Buttons Row overlaying the bottom-center of the video
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: EdgeInsets.only(bottom: isDesktop ? 36 : 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: isDesktop ? 170 : 120,
-                      height: isDesktop ? 52 : 38,
-                      child: ElevatedButton(
-                        onPressed: _navigateToLogin,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          elevation: 4,
-                        ),
-                        child: Text(
-                          'Enter Portal',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: isDesktop ? 15 : 12,
-                          ),
-                        ),
+          ),
+          // CTA Buttons Row placed below the video
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: isDesktop ? 30 : 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: isDesktop ? 170 : 120,
+                  height: isDesktop ? 52 : 38,
+                  child: ElevatedButton(
+                    onPressed: _navigateToLogin,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 4,
+                    ),
+                    child: Text(
+                      'Enter Portal',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: isDesktop ? 15 : 12,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    SizedBox(
-                      width: isDesktop ? 190 : 130,
-                      height: isDesktop ? 52 : 38,
-                      child: OutlinedButton(
-                        onPressed: () => _scrollToSection(_featuresKey),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white.withOpacity(0.9),
-                          foregroundColor: AppColors.textPrimary,
-                          side: const BorderSide(
-                            color: AppColors.border,
-                            width: 1.2,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        child: Text(
-                          'Explore Features',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: isDesktop ? 15 : 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: isDesktop ? 190 : 130,
+                  height: isDesktop ? 52 : 38,
+                  child: OutlinedButton(
+                    onPressed: () => _scrollToSection(_featuresKey),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.textPrimary,
+                      side: const BorderSide(
+                        color: AppColors.border,
+                        width: 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    child: Text(
+                      'Explore Features',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: isDesktop ? 15 : 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1546,22 +1740,23 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                     price: '\$0',
                     billing: '2-week pilot evaluation',
                     features: [
-                      'Register up to 2 active vehicles',
-                      'Connect up to 2 drivers accounts',
+                      'Register up to 25 active vehicles',
+                      'Unlimited active drivers & students',
                       'Standard live WebSockets mapping',
                       'Self-service setup console',
                     ],
                     buttonText: 'Start Trial Now',
                     isPopular: false,
                     width: cardWidth,
+                    onPressed: _showContactDialog,
                   ),
                   _buildPricingCard(
                     title: 'Premium Campus',
-                    price: '\$299',
-                    billing: 'Billed monthly per site',
+                    price: '\$389.99',
+                    billing: 'Billed annually per site',
                     features: [
                       'Register up to 25 active vehicles',
-                      'Connect up to 25 active drivers',
+                      'Unlimited active drivers & students',
                       'Separate Dart isolate GPS telemetry',
                       'Historical routes speeds analytics',
                       'Email & Priority SLA Support',
@@ -1569,6 +1764,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                     buttonText: 'Upgrade to Premium',
                     isPopular: true,
                     width: cardWidth,
+                    onPressed: _showContactDialog,
                   ),
                   _buildPricingCard(
                     title: 'Enterprise Custom',
@@ -1584,6 +1780,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                     buttonText: 'Contact Sales',
                     isPopular: false,
                     width: cardWidth,
+                    onPressed: _showContactDialog,
                   ),
                 ],
               );
@@ -1602,6 +1799,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     required String buttonText,
     required bool isPopular,
     required double width,
+    required VoidCallback onPressed,
   }) {
     return Container(
       width: width,
@@ -1672,9 +1870,9 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
               ),
               if (price != 'Custom') ...[
                 const SizedBox(width: 4),
-                const Text(
-                  '/month',
-                  style: TextStyle(
+                Text(
+                  price.contains('389.99') ? '/year' : '/month',
+                  style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 14,
                   ),
@@ -1721,7 +1919,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _navigateToLogin,
+            onPressed: onPressed,
             style: ElevatedButton.styleFrom(
               backgroundColor: isPopular ? AppColors.primary : Colors.white,
               foregroundColor: isPopular ? Colors.white : AppColors.textPrimary,
@@ -2153,6 +2351,379 @@ class _ScrollRevealState extends State<ScrollReveal>
         );
       },
       child: widget.child,
+    );
+  }
+}
+
+class MavioSplashLoader extends StatefulWidget {
+  final VoidCallback onFinished;
+
+  const MavioSplashLoader({super.key, required this.onFinished});
+
+  @override
+  State<MavioSplashLoader> createState() => _MavioSplashLoaderState();
+}
+
+class _MavioSplashLoaderState extends State<MavioSplashLoader>
+    with TickerProviderStateMixin {
+  late AnimationController _animationController;
+  late AnimationController _pulseController;
+  late Animation<double> _busPositionAnimation;
+  late Animation<double> _logoScaleAnimation;
+  late Animation<double> _wheelRotationAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
+    // Animates from 0.0 (left) to 1.0 (right)
+    _busPositionAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOutCubic,
+      ),
+    );
+
+    // Wheel turns 15 full rotations over the course of 3 seconds
+    _wheelRotationAnimation = Tween<double>(begin: 0.0, end: 15.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOutCubic,
+      ),
+    );
+
+    // Gently scale the logo
+    _logoScaleAnimation = Tween<double>(begin: 0.88, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.4, curve: Curves.easeOutBack),
+      ),
+    );
+
+    _animationController.forward().then((_) {
+      widget.onFinished();
+    });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildWheel(Animation<double> rotation) {
+    return RotationTransition(
+      turns: rotation,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 1.5),
+        ),
+        child: Center(
+          child: Container(
+            width: 2,
+            height: 2,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAF6F2), // Premium Light Cream Background
+      body: Stack(
+        children: [
+          // Ambient Mesh Glow Orb 1 (Top Left)
+          Positioned(
+            top: -150,
+            left: -150,
+            child: Container(
+              width: 400,
+              height: 400,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withOpacity(0.04),
+              ),
+            ),
+          ),
+          // Ambient Mesh Glow Orb 2 (Bottom Right)
+          Positioned(
+            bottom: -200,
+            right: -100,
+            child: Container(
+              width: 500,
+              height: 500,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFFF8A65).withOpacity(0.03),
+              ),
+            ),
+          ),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Premium Logo Entrance
+                ScaleTransition(
+                  scale: _logoScaleAnimation,
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.borderLight,
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.06),
+                              blurRadius: 20,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'logo.png',
+                          height: 80,
+                          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                            if (wasSynchronouslyLoaded) return child;
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                if (frame == null)
+                                  const Icon(
+                                    Icons.directions_bus_rounded,
+                                    size: 80,
+                                    color: AppColors.primary,
+                                  ),
+                                AnimatedOpacity(
+                                  opacity: frame == null ? 0 : 1,
+                                  duration: const Duration(milliseconds: 300),
+                                  child: child,
+                                ),
+                              ],
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) => const Icon(
+                            Icons.directions_bus_rounded,
+                            size: 80,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'MAVIO',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 8.0,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Your Journey, Always in Sight',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                          letterSpacing: 0.8,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 80),
+                // Premium Glowing Progress Bar with Rotating Custom Vector Bus
+                SizedBox(
+                  width: 300,
+                  child: Column(
+                    children: [
+                      AnimatedBuilder(
+                        animation: _animationController,
+                        builder: (context, child) {
+                          // Bouncing vibration to simulate road physics
+                          final double roadVibration =
+                              (1.0 - _animationController.value) *
+                                  1.0 *
+                                  (((DateTime.now().millisecondsSinceEpoch / 80)
+                                                  .floor() %
+                                              2 ==
+                                          0)
+                                      ? 1.0
+                                      : -1.0);
+
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              // Glowing Progress Track Background (Light Border style)
+                              Container(
+                                height: 6,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: AppColors.border.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                              // Neon Orange Glow filled track
+                              FractionallySizedBox(
+                                widthFactor: _busPositionAnimation.value,
+                                child: Container(
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        AppColors.primary,
+                                        Color(0xFFFF8A65),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(3),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary.withOpacity(0.25),
+                                        blurRadius: 6,
+                                        spreadRadius: 1,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              // Custom Animated Vector Bus
+                              Positioned(
+                                left: _busPositionAnimation.value * 300 - 21,
+                                top: -34 + roadVibration,
+                                child: SizedBox(
+                                  width: 42,
+                                  height: 38,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      // Bus Main Body
+                                      Container(
+                                        width: 42,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          borderRadius: BorderRadius.circular(5),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: AppColors.primary
+                                                  .withOpacity(0.3),
+                                              blurRadius: 8,
+                                              offset: const Offset(-2, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Stack(
+                                          children: [
+                                            // Glass windshield
+                                            Positioned(
+                                              right: 3,
+                                              top: 4,
+                                              child: Container(
+                                                width: 7,
+                                                height: 10,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white
+                                                      .withOpacity(0.4),
+                                                  borderRadius:
+                                                      const BorderRadius.only(
+                                                    topRight: Radius.circular(2),
+                                                    bottomRight:
+                                                        Radius.circular(2),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            // Passenger Windows
+                                            Positioned(
+                                              left: 4,
+                                              top: 4,
+                                              child: Row(
+                                                children: List.generate(
+                                                  3,
+                                                  (index) => Container(
+                                                    margin: const EdgeInsets
+                                                        .only(right: 3),
+                                                    width: 6,
+                                                    height: 7,
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white
+                                                          .withOpacity(0.35),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              1),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Front wheel
+                                      Positioned(
+                                        bottom: 10,
+                                        right: 6,
+                                        child: _buildWheel(
+                                            _wheelRotationAnimation),
+                                      ),
+                                      // Back wheel
+                                      Positioned(
+                                        bottom: 10,
+                                        left: 6,
+                                        child: _buildWheel(
+                                            _wheelRotationAnimation),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      FadeTransition(
+                        opacity: _pulseController,
+                        child: const Text(
+                          'Establishing Secure Connection...',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

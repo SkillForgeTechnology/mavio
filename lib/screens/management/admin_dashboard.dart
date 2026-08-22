@@ -9,6 +9,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import '../../providers/auth_provider.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../core/theme/theme.dart';
 import '../../models/models.dart';
 import '../auth/splash_screen.dart';
@@ -70,6 +71,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     // Subscribe to mock updates for live map tracking on admin
     _subscribeToLiveLocations();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PushNotificationService.setupVerificationObserver(context);
+    });
   }
 
   @override
@@ -93,16 +98,53 @@ class _AdminDashboardState extends State<AdminDashboard> {
     try {
       final data = await _db.getAdminDashboardData();
       if (!mounted) return;
+      
+      final fleetData = List<Map<String, dynamic>>.from(data['fleet']);
+      fleetData.sort((a, b) {
+        final vA = a['vehicle'] as MavioVehicle;
+        final vB = b['vehicle'] as MavioVehicle;
+        return _naturalCompare(vA.name, vB.name);
+      });
+
+      final driversData = List<MavioProfile>.from(data['drivers']);
+      driversData.sort((a, b) => _naturalCompare(a.name, b.name));
+
+      final studentsData = List<MavioProfile>.from(data['students']);
+      studentsData.sort((a, b) => _naturalCompare(a.name, b.name));
+
       setState(() {
         _totalBuses = data['totalBuses'] as int;
         _activeNow = data['activeNow'] as int;
-        _fleet = data['fleet'] as List<Map<String, dynamic>>;
-        _drivers = data['drivers'] as List<MavioProfile>;
-        _students = data['students'] as List<MavioProfile>;
+        _fleet = fleetData;
+        _drivers = driversData;
+        _students = studentsData;
       });
     } catch (e) {
       print("Admin Refresh Error: $e");
     }
+  }
+
+  int _naturalCompare(String a, String b) {
+    final regExp = RegExp(r'(\d+)|(\D+)');
+    final matchesA = regExp.allMatches(a.toUpperCase()).map((m) => m.group(0)!).toList();
+    final matchesB = regExp.allMatches(b.toUpperCase()).map((m) => m.group(0)!).toList();
+
+    for (int i = 0; i < matchesA.length && i < matchesB.length; i++) {
+      final strA = matchesA[i];
+      final strB = matchesB[i];
+
+      final numA = int.tryParse(strA);
+      final numB = int.tryParse(strB);
+
+      if (numA != null && numB != null) {
+        final comp = numA.compareTo(numB);
+        if (comp != 0) return comp;
+      } else {
+        final comp = strA.compareTo(strB);
+        if (comp != 0) return comp;
+      }
+    }
+    return matchesA.length.compareTo(matchesB.length);
   }
 
   void _subscribeToLiveLocations() {
@@ -209,6 +251,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 final messenger = ScaffoldMessenger.of(context);
+                final org = _db.currentOrganization;
+                final isFreeTrial = org?.subscriptionStatus == 'free_trial';
+                if (isFreeTrial && _totalBuses >= 25) {
+                  Navigator.pop(context);
+                  _showLimitExceededDialog();
+                  return;
+                }
                 Navigator.pop(context);
                 setState(() => _isLoading = true);
                 try {
@@ -227,6 +276,118 @@ class _AdminDashboardState extends State<AdminDashboard> {
               },
               style: ElevatedButton.styleFrom(minimumSize: const Size(100, 40)),
               child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showLimitExceededDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          title: const Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.amber,
+                size: 28,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Limit Reached',
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Vehicle limit reached! Free Trial organizations are limited to 25 vehicles. '
+            'Please upgrade your subscription by contacting us to add more buses.',
+            style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Close',
+                style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _showContactSupportInfo();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              child: const Text('Contact Support'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showContactSupportInfo() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          title: const Text(
+            'Upgrade Plan',
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'To upgrade your subscription, please get in touch with our enterprise support team:',
+                style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.email_outlined, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'support@mavio.io',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(Icons.phone_outlined, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    '+1 (800) 555-0199',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
             ),
           ],
         );
@@ -1009,7 +1170,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
+                      _buildPlanBadge(),
+                      const SizedBox(height: 12),
                       TextButton.icon(
                         onPressed: () => _confirmLogout(context),
                         icon: const Icon(
@@ -1136,6 +1299,41 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  Widget _buildPlanBadge() {
+    final org = _db.currentOrganization;
+    final planStatus = org?.subscriptionStatus ?? 'free_trial';
+
+    Color color;
+    String label;
+    if (planStatus == 'active') {
+      color = Colors.green;
+      label = 'Premium';
+    } else if (planStatus == 'inactive') {
+      color = AppColors.error;
+      label = 'Inactive';
+    } else {
+      color = Colors.amber;
+      label = 'Free Trial';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+    );
+  }
+
   Widget _buildWebSidebarItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
     return InkWell(
@@ -1191,13 +1389,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              collegeName,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    collegeName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildPlanBadge(),
+              ],
             ),
             const Text(
               'Management Console',
@@ -1936,52 +2143,65 @@ class _AdminDashboardState extends State<AdminDashboard> {
           point: markerPos,
           width: isLive ? 52 : 40,
           height: isLive ? 52 : 40,
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedMapFleetItem = item;
-              });
-              _mapController.move(markerPos, 14.0);
-            },
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                if (isLive)
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                Container(
-                  width: isLive ? 38 : 30,
-                  height: isLive ? 38 : 30,
-                  decoration: BoxDecoration(
-                    color: isLive
-                        ? AppColors.primary
-                        : AppColors.textSecondary.withOpacity(0.8),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? Colors.amber[600]! : Colors.white,
-                      width: isSelected ? 3.0 : (isLive ? 2.5 : 1.5),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isLive ? AppColors.primary : Colors.black)
-                            .withOpacity(0.2),
-                        blurRadius: 6,
+          child: Tooltip(
+            message: v.name,
+            preferBelow: false,
+            decoration: BoxDecoration(
+              color: AppColors.textPrimary.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            textStyle: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedMapFleetItem = item;
+                });
+                _mapController.move(markerPos, 14.0);
+              },
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (isLive)
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.2),
+                        shape: BoxShape.circle,
                       ),
-                    ],
+                    ),
+                  Container(
+                    width: isLive ? 38 : 30,
+                    height: isLive ? 38 : 30,
+                    decoration: BoxDecoration(
+                      color: isLive
+                          ? AppColors.primary
+                          : AppColors.textSecondary.withOpacity(0.8),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected ? Colors.amber[600]! : Colors.white,
+                        width: isSelected ? 3.0 : (isLive ? 2.5 : 1.5),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (isLive ? AppColors.primary : Colors.black)
+                              .withOpacity(0.2),
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.directions_bus_rounded,
+                      color: Colors.white,
+                      size: isLive ? 18 : 14,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.directions_bus_rounded,
-                    color: Colors.white,
-                    size: isLive ? 18 : 14,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -2376,6 +2596,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final vehicles = _fleet
         .map((item) => item['vehicle'] as MavioVehicle)
         .toList();
+    vehicles.sort((a, b) => _naturalCompare(a.name, b.name));
     final filteredVehicles = vehicles.where((v) {
       if (_vehicleQuery.isEmpty) return true;
       return v.name.toLowerCase().contains(_vehicleQuery.toLowerCase()) ||
@@ -2518,6 +2739,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
              (d.phone ?? '').toLowerCase().contains(_driverQuery.toLowerCase()) ||
              d.email.toLowerCase().contains(_driverQuery.toLowerCase());
     }).toList();
+    filteredDrivers.sort((a, b) => _naturalCompare(a.name, b.name));
 
     final bool isWeb = MediaQuery.of(context).size.width > 900;
     final double screenWidth = MediaQuery.of(context).size.width;
@@ -2663,6 +2885,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
              (s.phone ?? '').toLowerCase().contains(_studentQuery.toLowerCase()) ||
              s.email.toLowerCase().contains(_studentQuery.toLowerCase());
     }).toList();
+    filteredStudents.sort((a, b) => _naturalCompare(a.name, b.name));
 
     final bool isWeb = MediaQuery.of(context).size.width > 900;
     final double screenWidth = MediaQuery.of(context).size.width;

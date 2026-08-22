@@ -8,11 +8,13 @@ import 'screens/auth/splash_screen.dart';
 import 'screens/privacy_policy_page.dart';
 import 'screens/account_deletion_page.dart';
 import 'screens/admin/admin_portal_page.dart';
+import 'core/services/push_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
   await BackgroundLocationService.initialize();
+  await PushNotificationService.initialize();
   runApp(
     MultiProvider(
       providers: [
@@ -23,12 +25,15 @@ void main() async {
   );
 }
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class MainApp extends StatelessWidget {
   const MainApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'MAVIO',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

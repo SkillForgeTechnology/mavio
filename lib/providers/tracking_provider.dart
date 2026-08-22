@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../core/services/supabase_service.dart';
 import '../models/models.dart';
 
@@ -14,6 +15,7 @@ class TrackingProvider extends ChangeNotifier {
   String _driverEmail = "";
   String _driverPhone = "";
   MavioLocationUpdate? _latestLocation;
+  List<LatLng> _tripPath = [];
   StreamSubscription<MavioLocationUpdate>? _locationSub;
   Timer? _tripCheckTimer;
 
@@ -25,6 +27,7 @@ class TrackingProvider extends ChangeNotifier {
   String get driverEmail => _driverEmail;
   String get driverPhone => _driverPhone;
   MavioLocationUpdate? get latestLocation => _latestLocation;
+  List<LatLng> get tripPath => _tripPath;
 
   bool get isTripLive => _activeTrip != null && _activeTrip!.status == 'ACTIVE';
 
@@ -92,10 +95,23 @@ class TrackingProvider extends ChangeNotifier {
     });
   }
 
-  void _subscribeToLocationUpdates(String tripId) {
+  Future<void> _subscribeToLocationUpdates(String tripId) async {
     _locationSub?.cancel();
+    _tripPath = [];
+    try {
+      final coords = await _db.getTripPathCoordinates(tripId);
+      _tripPath = coords.map((c) => LatLng(c['latitude']!, c['longitude']!)).toList();
+      notifyListeners();
+    } catch (e) {
+      print("Error fetching initial trip path: $e");
+    }
+
     _locationSub = _db.streamLocationUpdates(tripId).listen((update) {
       _latestLocation = update;
+      final newPoint = LatLng(update.latitude, update.longitude);
+      if (_tripPath.isEmpty || _tripPath.last != newPoint) {
+        _tripPath.add(newPoint);
+      }
       notifyListeners();
     }, onError: (err) {
       print("Error in location stream: $err");
@@ -105,6 +121,7 @@ class TrackingProvider extends ChangeNotifier {
   void _unsubscribeFromLocationUpdates() {
     _locationSub?.cancel();
     _locationSub = null;
+    _tripPath = [];
   }
 
   @override
