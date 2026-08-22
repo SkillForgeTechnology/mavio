@@ -115,3 +115,29 @@ CREATE TRIGGER tr_check_bus_proximity_and_notify
 AFTER INSERT ON public.location_updates
 FOR EACH ROW
 EXECUTE FUNCTION public.check_bus_proximity_and_notify();
+
+-- =========================================================================
+-- 4. AUTOMATIC VEHICLE LIMIT ADJUSTMENT ON PLAN STATUS CHANGES
+-- =========================================================================
+CREATE OR REPLACE FUNCTION public.set_default_vehicle_limit_on_plan_change()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- If free trial: set max vehicles to 15
+  IF NEW.subscription_status = 'free_trial' AND (OLD.subscription_status IS NULL OR OLD.subscription_status != 'free_trial') THEN
+    NEW.max_vehicles := 15;
+  -- If active plan: set max vehicles to 25
+  ELSIF NEW.subscription_status = 'active' AND (OLD.subscription_status IS NULL OR OLD.subscription_status != 'active') THEN
+    NEW.max_vehicles := 25;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Drop trigger if it already exists to avoid duplicates
+DROP TRIGGER IF EXISTS tr_set_default_vehicle_limit_on_plan_change ON public.organizations;
+
+-- Attach trigger BEFORE INSERT or UPDATE to automatically adjust max_vehicles field
+CREATE TRIGGER tr_set_default_vehicle_limit_on_plan_change
+BEFORE INSERT OR UPDATE OF subscription_status ON public.organizations
+FOR EACH ROW
+EXECUTE FUNCTION public.set_default_vehicle_limit_on_plan_change();

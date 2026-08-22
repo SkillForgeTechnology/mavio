@@ -753,7 +753,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
     MavioOrganization org,
     String newStatus,
   ) async {
-    int maxVehicles = org.maxVehicles;
+    int maxVehicles = org.maxVehicles ?? 15;
     if (newStatus == 'free_trial') {
       maxVehicles = 15;
     } else if (newStatus == 'active') {
