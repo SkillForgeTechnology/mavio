@@ -137,6 +137,7 @@ class MavioVehicle {
   final String regNumber;
   final String status; // 'LIVE' | 'STOPPED' | 'OFFLINE'
   final String orgId;
+  final String? createdAt;
 
   MavioVehicle({
     required this.id,
@@ -144,6 +145,7 @@ class MavioVehicle {
     required this.regNumber,
     required this.status,
     required this.orgId,
+    this.createdAt,
   });
 
   factory MavioVehicle.fromJson(Map<String, dynamic> json) {
@@ -153,6 +155,7 @@ class MavioVehicle {
       regNumber: json['reg_number'] as String,
       status: json['status'] as String,
       orgId: json['org_id'] as String,
+      createdAt: json['created_at'] as String?,
     );
   }
 }

@@ -35,6 +35,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   List<MavioProfile> _drivers = [];
   List<MavioProfile> _students = [];
   String _vehicleQuery = "";
+  String _vehicleSortOption = "name";
   String _driverQuery = "";
   String _studentQuery = "";
 
@@ -1838,61 +1839,65 @@ class _AdminDashboardState extends State<AdminDashboard> {
           if (_totalBuses > maxVehiclesLimit) ...[
             Container(
               margin: const EdgeInsets.only(bottom: 24),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF3F3),
+                color: const Color(0xFFFFF5F5),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.redAccent,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.redAccent,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
                           'Action Required: Fleet Over Plan Limit',
                           style: TextStyle(
                             color: Color(0xFF7F1D1D),
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: 15,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Your institution has registered $_totalBuses buses but your current plan is limited to $maxVehiclesLimit. '
-                          'The extra ${_totalBuses - maxVehiclesLimit} buses have been temporarily deactivated and cannot be tracked by drivers. '
-                          'Please delete excess buses or upgrade your plan to reactivate them.',
-                          style: const TextStyle(
-                            color: Color(0xFF991B1B),
-                            fontSize: 12,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Your institution has registered $_totalBuses buses but your current plan is limited to $maxVehiclesLimit. '
+                    'The extra ${_totalBuses - maxVehiclesLimit} buses have been temporarily deactivated and cannot be tracked by drivers. '
+                    'Please delete excess buses or upgrade your plan to reactivate them.',
+                    style: const TextStyle(
+                      color: Color(0xFF991B1B),
+                      fontSize: 13,
+                      height: 1.5,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  ElevatedButton(
-                    onPressed: _showContactSupportInfo,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _showContactSupportInfo,
+                      icon: const Icon(Icons.upgrade_rounded, color: Colors.white, size: 18),
+                      label: const Text(
+                        'Upgrade Plan Now',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    child: const Text(
-                      'Upgrade Now',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                     ),
                   ),
                 ],
@@ -2780,7 +2785,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final vehicles = _fleet
         .map((item) => item['vehicle'] as MavioVehicle)
         .toList();
-    vehicles.sort((a, b) => _naturalCompare(a.name, b.name));
+
+    if (_vehicleSortOption == 'name') {
+      vehicles.sort((a, b) => _naturalCompare(a.name, b.name));
+    } else if (_vehicleSortOption == 'date_oldest') {
+      vehicles.sort((a, b) {
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return a.createdAt!.compareTo(b.createdAt!);
+      });
+    } else if (_vehicleSortOption == 'date_newest') {
+      vehicles.sort((a, b) {
+        if (a.createdAt == null) return -1;
+        if (b.createdAt == null) return 1;
+        return b.createdAt!.compareTo(a.createdAt!);
+      });
+    }
+
     final filteredVehicles = vehicles.where((v) {
       if (_vehicleQuery.isEmpty) return true;
       return v.name.toLowerCase().contains(_vehicleQuery.toLowerCase()) ||
@@ -2805,27 +2826,75 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            child: TextField(
-              onChanged: (val) {
-                setState(() {
-                  _vehicleQuery = val;
-                });
-              },
-              decoration: InputDecoration(
-                hintText: "Search Vehicles...",
-                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: (val) {
+                      setState(() {
+                        _vehicleQuery = val;
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: "Search Vehicles...",
+                      prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.borderLight),
+                      ),
+                    ),
+                  ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.borderLight),
+                const SizedBox(width: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _vehicleSortOption,
+                      dropdownColor: Colors.white,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                      icon: const Icon(Icons.sort_rounded, color: AppColors.textSecondary),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'name',
+                          child: Text('Sort by Name (A-Z)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'date_oldest',
+                          child: Text('Sort by Date (Oldest First)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'date_newest',
+                          child: Text('Sort by Date (Newest First)'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _vehicleSortOption = val;
+                          });
+                        }
+                      },
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
           Expanded(
@@ -2887,7 +2956,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildVehicleCardItem(MavioVehicle v) {
     final allVehicles = _fleet.map((item) => item['vehicle'] as MavioVehicle).toList();
-    allVehicles.sort((a, b) => a.id.compareTo(b.id));
+    allVehicles.sort((a, b) {
+      if (a.createdAt == null) return 1;
+      if (b.createdAt == null) return -1;
+      return a.createdAt!.compareTo(b.createdAt!);
+    });
     final index = allVehicles.indexWhere((x) => x.id == v.id);
     final limit = _db.currentOrganization?.maxVehicles ?? 15;
     final isDeactivated = index != -1 && index >= limit;

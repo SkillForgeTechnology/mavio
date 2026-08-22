@@ -741,14 +741,18 @@ class SupabaseService {
     List<MavioVehicle> vehicles = [];
     if (_useMockMode) {
       vehicles = _mockVehicles.where((v) => v.orgId == orgId).toList();
-      vehicles.sort((a, b) => a.id.compareTo(b.id));
+      vehicles.sort((a, b) {
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return a.createdAt!.compareTo(b.createdAt!);
+      });
     } else {
       try {
         final res = await Supabase.instance.client
             .from('vehicles')
             .select()
             .eq('org_id', orgId)
-            .order('id', ascending: true);
+            .order('created_at', ascending: true);
         vehicles = (res as List).map((v) => MavioVehicle.fromJson(v)).toList();
       } catch (e) {
         print("Error fetching vehicles for validation: $e");
@@ -1091,7 +1095,7 @@ class SupabaseService {
             .from('vehicles')
             .select()
             .eq('org_id', orgId)
-            .order('id', ascending: true);
+            .order('created_at', ascending: true);
         final vehicles = (vehiclesRes as List).map((v) => MavioVehicle.fromJson(v)).toList();
 
         // 2. Fetch Active Trips
