@@ -40,6 +40,24 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
     });
 
     _initializeVideo();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final fragment = Uri.base.fragment.toLowerCase();
+      if (fragment.isNotEmpty) {
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (!mounted) return;
+          if (fragment == 'features') {
+            _scrollToSection(_featuresKey);
+          } else if (fragment == 'architecture' || fragment == 'tech') {
+            _scrollToSection(_techKey);
+          } else if (fragment == 'pricing') {
+            _scrollToSection(_pricingKey);
+          } else if (fragment == 'faq') {
+            _scrollToSection(_faqKey);
+          }
+        });
+      }
+    });
   }
 
   void _initializeVideo() {
