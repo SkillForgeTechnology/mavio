@@ -253,10 +253,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 if (!formKey.currentState!.validate()) return;
                 final messenger = ScaffoldMessenger.of(context);
                 final org = _db.currentOrganization;
-                final isFreeTrial = org?.subscriptionStatus == 'free_trial';
-                if (isFreeTrial && _totalBuses >= 25) {
+                final limit = org?.maxVehicles ?? 15;
+                if (_totalBuses >= limit) {
                   Navigator.pop(context);
-                  _showLimitExceededDialog();
+                  _showLimitExceededDialog(limit);
                   return;
                 }
                 Navigator.pop(context);
@@ -284,7 +284,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  void _showLimitExceededDialog() {
+  void _showLimitExceededDialog(int limit) {
     showDialog(
       context: context,
       builder: (context) {
@@ -305,10 +305,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             ],
           ),
-          content: const Text(
-            'Vehicle limit reached! Free Trial organizations are limited to 25 vehicles. '
+          content: Text(
+            'Vehicle limit reached! Your plan is limited to $limit vehicles. '
             'Please upgrade your subscription by contacting us to add more buses.',
-            style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+            style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
           ),
           actions: [
             TextButton(
@@ -1827,6 +1827,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildDashboardTab(String collegeName) {
     final bool isWeb = MediaQuery.of(context).size.width > 900;
+    final org = _db.currentOrganization;
+    final maxVehiclesLimit = org?.maxVehicles ?? 15;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -1838,10 +1841,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     Expanded(
                       child: _buildKPIBlock(
                         label: 'Total Buses',
-                        value: _totalBuses.toString(),
+                        value: '$_totalBuses / $maxVehiclesLimit',
                         icon: Icons.directions_bus_rounded,
                         color: AppColors.primary,
-                        description: 'Registered fleet vehicles',
+                        description: 'Plan limit: $maxVehiclesLimit buses',
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -1884,10 +1887,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         Expanded(
                           child: _buildKPIBlock(
                             label: 'Total Buses',
-                            value: _totalBuses.toString(),
+                            value: '$_totalBuses / $maxVehiclesLimit',
                             icon: Icons.directions_bus_rounded,
                             color: AppColors.primary,
-                            description: 'Fleet vehicles',
+                            description: 'Limit: $maxVehiclesLimit buses',
                           ),
                         ),
                         const SizedBox(width: 12),

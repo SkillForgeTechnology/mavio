@@ -242,10 +242,10 @@ class _MavioBulkImportScreenState extends State<MavioBulkImportScreen> {
     try {
       if (widget.importType == 'vehicle') {
         final org = widget.db.currentOrganization;
-        final isFreeTrial = org?.subscriptionStatus == 'free_trial';
-        if (isFreeTrial && (widget.fleet.length + _parsedRows.length) > 25) {
+        final limit = org?.maxVehicles ?? 15;
+        if ((widget.fleet.length + _parsedRows.length) > limit) {
           setState(() => _isLoading = false);
-          _showLimitExceededDialog();
+          _showLimitExceededDialog(limit);
           return;
         }
         for (var row in _parsedRows) {
@@ -676,7 +676,7 @@ class _MavioBulkImportScreenState extends State<MavioBulkImportScreen> {
     );
   }
 
-  void _showLimitExceededDialog() {
+  void _showLimitExceededDialog(int limit) {
     showDialog(
       context: context,
       builder: (context) {
@@ -698,7 +698,7 @@ class _MavioBulkImportScreenState extends State<MavioBulkImportScreen> {
             ],
           ),
           content: Text(
-            'Importing these records will exceed your vehicle limit! Free Trial organizations are limited to 25 vehicles '
+            'Importing these records will exceed your vehicle limit! Your organization plan is limited to $limit vehicles '
             '(current fleet: ${widget.fleet.length}, attempting to import: ${_parsedRows.length}). '
             'Please upgrade your subscription by contacting us to add more buses.',
             style: const TextStyle(color: AppColors.textSecondary, height: 1.4),

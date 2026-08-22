@@ -308,7 +308,7 @@ class SupabaseService {
   }) async {
     final cleanCode = code.trim().toUpperCase();
     final status = subscriptionStatus ?? 'free_trial';
-    final limitVehicles = maxVehicles ?? 10;
+    final limitVehicles = maxVehicles ?? (status == 'free_trial' ? 15 : (status == 'active' ? 25 : 10));
     final limitDrivers = maxDrivers ?? 10;
 
     if (_useMockMode) {

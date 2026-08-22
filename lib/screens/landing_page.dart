@@ -1738,9 +1738,9 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                   _buildPricingCard(
                     title: 'Free Trial',
                     price: '\$0',
-                    billing: '2-week pilot evaluation',
+                    billing: '1-month evaluation (cancel anytime)',
                     features: [
-                      'Register up to 25 active vehicles',
+                      'Register up to 15 active vehicles',
                       'Unlimited active drivers & students',
                       'Standard live WebSockets mapping',
                       'Self-service setup console',

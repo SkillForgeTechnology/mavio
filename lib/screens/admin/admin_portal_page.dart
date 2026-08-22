@@ -753,6 +753,84 @@ class _AdminPortalPageState extends State<AdminPortalPage>
     MavioOrganization org,
     String newStatus,
   ) async {
+    int maxVehicles = org.maxVehicles;
+    if (newStatus == 'free_trial') {
+      maxVehicles = 15;
+    } else if (newStatus == 'active') {
+      maxVehicles = 25;
+    }
+
+    if (newStatus == 'custom') {
+      final TextEditingController limitController = TextEditingController(text: org.maxVehicles.toString());
+      final enteredLimit = await showDialog<int>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1B1B1F),
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text(
+              'Set Custom Vehicle Limit',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Enter the maximum number of vehicles allowed for this custom plan:',
+                  style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: limitController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'e.g. 50',
+                    hintStyle: const TextStyle(color: Colors.white30),
+                    fillColor: Colors.white.withOpacity(0.05),
+                    filled: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final limit = int.tryParse(limitController.text.trim());
+                  if (limit != null && limit > 0) {
+                    Navigator.pop(context, limit);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter a valid positive number')),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Save Limit'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (enteredLimit == null) return; // User cancelled
+      maxVehicles = enteredLimit;
+    }
+
     final updated = await _db.updateOrganization(
       id: org.id,
       name: org.name,
@@ -761,7 +839,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
       phone: org.phone,
       address: org.address,
       subscriptionStatus: newStatus,
-      maxVehicles: org.maxVehicles,
+      maxVehicles: maxVehicles,
       maxDrivers: org.maxDrivers,
       createdAt: org.createdAt,
     );
@@ -770,14 +848,14 @@ class _AdminPortalPageState extends State<AdminPortalPage>
         _auditLogs.insert(0, {
           'time': 'Just now',
           'event':
-              'Subscription for "${org.name}" switched to "${newStatus.toUpperCase()}".',
+              'Subscription for "${org.name}" switched to "${newStatus.toUpperCase()}" with limit $maxVehicles.',
         });
       });
       _loadOrganizations();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Subscription marked ${newStatus.toUpperCase()} successfully.',
+            'Subscription marked ${newStatus.toUpperCase()} (Max: $maxVehicles vehicles) successfully.',
           ),
         ),
       );
@@ -1837,7 +1915,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
   // ==================== SUBSCRIPTIONS AUDIT TAB ====================
   Widget _buildSubscriptionsTab() {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1848,6 +1926,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
             tabs: const [
               Tab(text: 'Active Plan Subscriptions'),
               Tab(text: 'Free Trial Evaluations'),
+              Tab(text: 'Custom Plan Subscriptions'),
               Tab(text: 'Deactivated Subscriptions'),
             ],
           ),
@@ -1856,6 +1935,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
               children: [
                 _buildFilteredSubscriptionList('active'),
                 _buildFilteredSubscriptionList('free_trial'),
+                _buildFilteredSubscriptionList('custom'),
                 _buildFilteredSubscriptionList('inactive'),
               ],
             ),
@@ -1931,6 +2011,15 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                         ),
                         const SizedBox(width: 16),
                         Text(
+                          'Max Vehicles: ${org.maxVehicles}',
+                          style: const TextStyle(
+                            color: Colors.orangeAccent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
                           org.email ?? 'No admin email registered',
                           style: const TextStyle(
                             color: Colors.white38,
@@ -1971,6 +2060,13 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                         child: Text(
                           'Free Trial',
                           style: TextStyle(color: Colors.orange),
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'custom',
+                        child: Text(
+                          'Custom Plan',
+                          style: TextStyle(color: Colors.blueAccent),
                         ),
                       ),
                       DropdownMenuItem(
