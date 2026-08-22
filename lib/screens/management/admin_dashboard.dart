@@ -1835,6 +1835,70 @@ class _AdminDashboardState extends State<AdminDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_totalBuses > maxVehiclesLimit) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3F3),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.redAccent,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Action Required: Fleet Over Plan Limit',
+                          style: TextStyle(
+                            color: Color(0xFF7F1D1D),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Your institution has registered $_totalBuses buses but your current plan is limited to $maxVehiclesLimit. '
+                          'The extra ${_totalBuses - maxVehiclesLimit} buses have been temporarily deactivated and cannot be tracked by drivers. '
+                          'Please delete excess buses or upgrade your plan to reactivate them.',
+                          style: const TextStyle(
+                            color: Color(0xFF991B1B),
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton(
+                    onPressed: _showContactSupportInfo,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    child: const Text(
+                      'Upgrade Now',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           isWeb
               ? Row(
                   children: [
@@ -1843,7 +1907,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         label: 'Total Buses',
                         value: '$_totalBuses / $maxVehiclesLimit',
                         icon: Icons.directions_bus_rounded,
-                        color: AppColors.primary,
+                        color: _totalBuses > maxVehiclesLimit ? Colors.redAccent : AppColors.primary,
                         description: 'Plan limit: $maxVehiclesLimit buses',
                       ),
                     ),
@@ -1889,7 +1953,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             label: 'Total Buses',
                             value: '$_totalBuses / $maxVehiclesLimit',
                             icon: Icons.directions_bus_rounded,
-                            color: AppColors.primary,
+                            color: _totalBuses > maxVehiclesLimit ? Colors.redAccent : AppColors.primary,
                             description: 'Limit: $maxVehiclesLimit buses',
                           ),
                         ),
@@ -2822,32 +2886,92 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildVehicleCardItem(MavioVehicle v) {
+    final allVehicles = _fleet.map((item) => item['vehicle'] as MavioVehicle).toList();
+    allVehicles.sort((a, b) => a.id.compareTo(b.id));
+    final index = allVehicles.indexWhere((x) => x.id == v.id);
+    final limit = _db.currentOrganization?.maxVehicles ?? 15;
+    final isDeactivated = index != -1 && index >= limit;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: isDeactivated ? const Color(0xFFFFF5F5) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border, width: 0.8),
+        side: BorderSide(
+          color: isDeactivated ? Colors.redAccent.withOpacity(0.3) : AppColors.border,
+          width: isDeactivated ? 1.2 : 0.8,
+        ),
       ),
       child: ListTile(
-        leading: const CircleAvatar(
-          backgroundColor: AppColors.primaryLight,
-          child: Icon(Icons.directions_bus_rounded, color: AppColors.primary),
-        ),
-        title: Text(
-          v.name,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(v.regNumber),
-        trailing: Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: v.status == 'LIVE'
-                ? AppColors.success
-                : AppColors.textSecondary.withOpacity(0.5),
-            shape: BoxShape.circle,
+        leading: CircleAvatar(
+          backgroundColor: isDeactivated ? Colors.red[50] : AppColors.primaryLight,
+          child: Icon(
+            Icons.directions_bus_rounded,
+            color: isDeactivated ? Colors.redAccent : AppColors.primary,
           ),
         ),
+        title: Row(
+          children: [
+            Text(
+              v.name,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isDeactivated ? Colors.red[900] : AppColors.textPrimary,
+              ),
+            ),
+            if (isDeactivated) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.red[100],
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Over Plan Limit',
+                  style: TextStyle(
+                    color: Colors.red[900],
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        subtitle: Text(
+          v.regNumber,
+          style: TextStyle(
+            color: isDeactivated ? Colors.red[700]?.withOpacity(0.8) : AppColors.textSecondary,
+          ),
+        ),
+        trailing: isDeactivated
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+                ),
+                child: const Text(
+                  'Deactivated',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              )
+            : Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: v.status == 'LIVE'
+                      ? AppColors.success
+                      : AppColors.textSecondary.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+              ),
       ),
     );
   }

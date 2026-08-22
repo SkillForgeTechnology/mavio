@@ -720,6 +720,49 @@ class SupabaseService {
     final orgId = _currentUserProfile!.orgId;
     final driverId = _currentUserProfile!.id;
 
+    // Check if vehicle is deactivated due to plan limit
+    MavioOrganization? org;
+    if (_useMockMode) {
+      org = _mockOrgs.values.firstWhere((o) => o.id == orgId, orElse: () => currentOrganization!);
+    } else {
+      try {
+        final orgRes = await Supabase.instance.client
+            .from('organizations')
+            .select()
+            .eq('id', orgId)
+            .single();
+        org = MavioOrganization.fromJson(orgRes);
+      } catch (e) {
+        print("Error fetching org for validation: $e");
+      }
+    }
+    final limit = org?.maxVehicles ?? 15;
+
+    List<MavioVehicle> vehicles = [];
+    if (_useMockMode) {
+      vehicles = _mockVehicles.where((v) => v.orgId == orgId).toList();
+      vehicles.sort((a, b) => a.id.compareTo(b.id));
+    } else {
+      try {
+        final res = await Supabase.instance.client
+            .from('vehicles')
+            .select()
+            .eq('org_id', orgId)
+            .order('id', ascending: true);
+        vehicles = (res as List).map((v) => MavioVehicle.fromJson(v)).toList();
+      } catch (e) {
+        print("Error fetching vehicles for validation: $e");
+      }
+    }
+
+    final vehicleIndex = vehicles.indexWhere((v) => v.id == vehicleId);
+    if (vehicleIndex != -1 && vehicleIndex >= limit) {
+      throw Exception(
+        "This bus is temporarily deactivated because your institution is exceeding its plan limit ($limit buses allowed). "
+        "Please ask your administrator to delete other buses or upgrade the subscription plan."
+      );
+    }
+
     if (_useMockMode) {
       // End any other active trips for this driver/vehicle
       _mockTrips.removeWhere((t) => (t.driverId == driverId || t.vehicleId == vehicleId) && t.status == 'ACTIVE');
@@ -1044,11 +1087,11 @@ class SupabaseService {
         final client = Supabase.instance.client;
         final orgId = _currentUserProfile!.orgId;
 
-        // 1. Fetch Vehicles
         final vehiclesRes = await client
             .from('vehicles')
             .select()
-            .eq('org_id', orgId);
+            .eq('org_id', orgId)
+            .order('id', ascending: true);
         final vehicles = (vehiclesRes as List).map((v) => MavioVehicle.fromJson(v)).toList();
 
         // 2. Fetch Active Trips
