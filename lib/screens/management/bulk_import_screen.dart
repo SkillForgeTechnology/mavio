@@ -7,6 +7,7 @@ import 'package:excel/excel.dart' hide Border, BorderStyle;
 import '../../core/theme/theme.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MavioBulkImportScreen extends StatefulWidget {
   final String importType; // 'vehicle' | 'driver' | 'student'
@@ -733,58 +734,174 @@ class _MavioBulkImportScreenState extends State<MavioBulkImportScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           backgroundColor: Colors.white,
-          title: const Text(
-            'Upgrade Plan',
-            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
           ),
+          contentPadding: const EdgeInsets.all(24),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'To upgrade your subscription, please get in touch with our enterprise support team:',
-                style: TextStyle(color: AppColors.textSecondary, height: 1.4),
-              ),
-              const SizedBox(height: 16),
+              // Top Logos Section
               Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.email_outlined, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'support@mavio.io',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
+                  Image.asset('logo.png', height: 45),
+                  const SizedBox(width: 20),
+                  Container(
+                    height: 30,
+                    width: 1.5,
+                    color: AppColors.borderLight,
                   ),
+                  const SizedBox(width: 20),
+                  Image.asset('company-logo.png', height: 40),
                 ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Contact Our Sales & Setup Team',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
               ),
               const SizedBox(height: 12),
+              const Text(
+                'Let us help you configure the real-time student visibility transit system for your institution.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Email Detail
+              _buildContactItem(
+                icon: Icons.email_outlined,
+                title: 'Email Us',
+                value: 'info@skillforgetechnology.app',
+                onTap: () => launchUrl(Uri.parse('mailto:info@skillforgetechnology.app')),
+              ),
+              const SizedBox(height: 12),
+              
+              // Mobile Detail
+              _buildContactItem(
+                icon: Icons.phone_android_outlined,
+                title: 'Mobile / Phone',
+                value: '+91 93455 18760',
+                onTap: () => launchUrl(Uri.parse('tel:+919345518760')),
+              ),
+              const SizedBox(height: 24),
+              
+              // Call & WhatsApp Action Row
               Row(
                 children: [
-                  const Icon(Icons.phone_outlined, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    '+1 (800) 555-0199',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => launchUrl(
+                        Uri.parse('https://wa.me/919345518760?text=Hi%2C%20I\'m%20interested%20in%20Mavio%20Transit%20Service!'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Colors.white),
+                      label: const Text('WhatsApp', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF25D366),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => launchUrl(Uri.parse('tel:+919345518760')),
+                      icon: const Icon(Icons.call_outlined, size: 18, color: Colors.white),
+                      label: const Text('Call Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
-            ),
-          ],
         );
       },
+    );
+  }
+
+  Widget _buildContactItem({
+    required IconData icon,
+    required String title,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.textPrimary.withOpacity(0.04),
+          border: Border.all(color: AppColors.borderLight.withOpacity(0.4)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
