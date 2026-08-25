@@ -183,10 +183,14 @@ BEGIN
         ))
       ));
       
-      -- Update vehicle's total distance in kilometers
-      UPDATE public.vehicles
-      SET total_distance_km = COALESCE(total_distance_km, 0) + (dist_meters / 1000.0)
-      WHERE id = v_id;
+      -- Update vehicle's total distance in kilometers ONLY if accuracy is good (<= 25 meters),
+      -- distance moved is significant (>= 8 meters), and speed is above walking pace (>= 1.5 km/h).
+      -- This filters out stationary GPS drift and desktop jitter.
+      IF NEW.accuracy <= 25.0 AND dist_meters >= 8.0 AND NEW.speed >= 1.5 THEN
+        UPDATE public.vehicles
+        SET total_distance_km = COALESCE(total_distance_km, 0) + (dist_meters / 1000.0)
+        WHERE id = v_id;
+      END IF;
     END IF;
   END IF;
   RETURN NEW;
