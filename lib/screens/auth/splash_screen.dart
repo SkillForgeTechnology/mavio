@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -38,6 +39,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _checkSessionAndNavigate() async {
+    if (!kIsWeb) {
+      bool online = false;
+      try {
+        final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 4));
+        if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+          online = true;
+        }
+      } catch (_) {
+        online = false;
+      }
+      
+      if (!online) {
+        if (!mounted) return;
+        _showNoInternetDialog();
+        return;
+      }
+    }
+
     final auth = Provider.of<AuthProvider>(context, listen: false);
     await auth.initialize();
     
@@ -78,6 +97,48 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         );
       }
     }
+  }
+
+  void _showNoInternetDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.wifi_off_rounded, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Text(
+                'No Internet Connection',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Mavio requires an active internet connection to track buses, view maps, and communicate with security services. Please check your data connection or Wi-Fi and try again.',
+            style: TextStyle(height: 1.4),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _checkSessionAndNavigate();
+              },
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Retry Connection'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
