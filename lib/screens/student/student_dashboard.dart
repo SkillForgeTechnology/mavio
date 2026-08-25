@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -166,9 +167,25 @@ class _HomeTab extends StatelessWidget {
 
   const _HomeTab({required this.studentName, required this.onNavigateToMap});
 
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const r = 6371000; // Earth radius in meters
+    final phi1 = lat1 * math.pi / 180;
+    final phi2 = lat2 * math.pi / 180;
+    final deltaPhi = (lat2 - lat1) * math.pi / 180;
+    final deltaLambda = (lon2 - lon1) * math.pi / 180;
+    
+    final a = math.sin(deltaPhi / 2) * math.sin(deltaPhi / 2) +
+              math.cos(phi1) * math.cos(phi2) *
+              math.sin(deltaLambda / 2) * math.sin(deltaLambda / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return r * c; // in meters
+  }
+
   @override
   Widget build(BuildContext context) {
     final tracking = Provider.of<TrackingProvider>(context);
+    final auth = Provider.of<AuthProvider>(context);
+    final profile = auth.currentProfile;
     final vehicle = tracking.assignedVehicle;
     final isLive = tracking.isTripLive;
     final driverName = tracking.driverName;
@@ -348,6 +365,75 @@ class _HomeTab extends StatelessWidget {
                                         ),
                                       ],
                                     ),
+                                    if (profile?.alertLatitude != null &&
+                                        profile?.alertLongitude != null) ...[
+                                      const SizedBox(height: 6),
+                                      Builder(
+                                        builder: (context) {
+                                          final distM = _calculateDistance(
+                                            tracking.latestLocation!.latitude,
+                                            tracking.latestLocation!.longitude,
+                                            profile!.alertLatitude!,
+                                            profile.alertLongitude!,
+                                          );
+                                          
+                                          double speedKmh = tracking.latestLocation!.speed;
+                                          if (speedKmh < 5.0) speedKmh = 25.0;
+                                          final speedMps = speedKmh / 3.6;
+                                          final etaSeconds = distM / speedMps;
+                                          final etaMinutes = (etaSeconds / 60).round();
+                                          
+                                          final distText = distM >= 1000
+                                              ? '${(distM / 1000.0).toStringAsFixed(2)} km'
+                                              : '${distM.toStringAsFixed(0)} m';
+
+                                          return Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.location_on_rounded,
+                                                    size: 14,
+                                                    color: Colors.orangeAccent,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    'Distance to Stop: $distText',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.orangeAccent,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.access_time_filled_rounded,
+                                                    size: 14,
+                                                    color: AppColors.success,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    etaMinutes <= 0
+                                                        ? 'Arriving now'
+                                                        : 'Arriving in ~ $etaMinutes mins',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppColors.success,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ],
                                   ],
                                 ],
                               ),

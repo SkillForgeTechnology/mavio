@@ -138,6 +138,8 @@ class MavioVehicle {
   final String status; // 'LIVE' | 'STOPPED' | 'OFFLINE'
   final String orgId;
   final String? createdAt;
+  final double totalDistanceKm;
+  final int serviceDueKm;
 
   MavioVehicle({
     required this.id,
@@ -146,6 +148,8 @@ class MavioVehicle {
     required this.status,
     required this.orgId,
     this.createdAt,
+    this.totalDistanceKm = 0.0,
+    this.serviceDueKm = 5000,
   });
 
   factory MavioVehicle.fromJson(Map<String, dynamic> json) {
@@ -156,6 +160,8 @@ class MavioVehicle {
       status: json['status'] as String,
       orgId: json['org_id'] as String,
       createdAt: json['created_at'] as String?,
+      totalDistanceKm: (json['total_distance_km'] as num?)?.toDouble() ?? 0.0,
+      serviceDueKm: json['service_due_km'] as int? ?? 5000,
     );
   }
 }

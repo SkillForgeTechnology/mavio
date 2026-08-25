@@ -141,3 +141,63 @@ CREATE TRIGGER tr_set_default_vehicle_limit_on_plan_change
 BEFORE INSERT OR UPDATE OF subscription_status ON public.organizations
 FOR EACH ROW
 EXECUTE FUNCTION public.set_default_vehicle_limit_on_plan_change();
+
+-- =========================================================================
+-- 5. ODOMETER TRAVEL DISTANCE & MAINTENANCE COLUMNS + TELEMETRY TRIGGER
+-- =========================================================================
+
+-- Add odometer and service columns to vehicles table
+ALTER TABLE public.vehicles
+ADD COLUMN IF NOT EXISTS total_distance_km DOUBLE PRECISION DEFAULT 0.0,
+ADD COLUMN IF NOT EXISTS service_due_km INTEGER DEFAULT 5000;
+
+-- Trigger function to calculate distance using Haversine formula and update odometer
+CREATE OR REPLACE FUNCTION public.track_vehicle_distance()
+RETURNS TRIGGER AS $$
+DECLARE
+  prev_lat DOUBLE PRECISION;
+  prev_lon DOUBLE PRECISION;
+  dist_meters DOUBLE PRECISION := 0;
+  v_id UUID;
+BEGIN
+  -- Get the vehicle ID from the trip
+  SELECT vehicle_id INTO v_id 
+  FROM public.trips 
+  WHERE id = NEW.trip_id;
+
+  IF v_id IS NOT NULL THEN
+    -- Get the previous location update for this trip
+    SELECT latitude, longitude INTO prev_lat, prev_lon
+    FROM public.location_updates
+    WHERE trip_id = NEW.trip_id
+    ORDER BY created_at DESC
+    LIMIT 1;
+
+    IF prev_lat IS NOT NULL AND prev_lon IS NOT NULL THEN
+      -- Calculate distance in meters using Haversine
+      dist_meters := (6371000 * acos(
+        least(1.0, greatest(-1.0, 
+          cos(radians(NEW.latitude)) * cos(radians(prev_lat)) * 
+          cos(radians(prev_lon) - radians(NEW.longitude)) + 
+          sin(radians(NEW.latitude)) * sin(radians(prev_lat))
+        ))
+      ));
+      
+      -- Update vehicle's total distance in kilometers
+      UPDATE public.vehicles
+      SET total_distance_km = COALESCE(total_distance_km, 0) + (dist_meters / 1000.0)
+      WHERE id = v_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop trigger if it already exists
+DROP TRIGGER IF EXISTS tr_track_vehicle_distance ON public.location_updates;
+
+-- Attach trigger BEFORE INSERT on location_updates
+CREATE TRIGGER tr_track_vehicle_distance
+BEFORE INSERT ON public.location_updates
+FOR EACH ROW
+EXECUTE FUNCTION public.track_vehicle_distance();

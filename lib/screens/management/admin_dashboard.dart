@@ -3958,6 +3958,67 @@ class _MavioVehicleDetailsScreenState extends State<MavioVehicleDetailsScreen> {
                     ],
                     const SizedBox(height: 32),
                     Text(
+                      'Usage & Maintenance Status',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildInfoRow(
+                      Icons.speed_outlined,
+                      'Total Distance (Odometer)',
+                      '${_vehicle.totalDistanceKm.toStringAsFixed(1)} km',
+                    ),
+                    const Divider(height: 24),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildInfoRow(
+                          Icons.build_circle_outlined,
+                          'Service Interval Status',
+                          'Due in ${(_vehicle.serviceDueKm - (_vehicle.totalDistanceKm % _vehicle.serviceDueKm)).toStringAsFixed(1)} km',
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 56.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: LinearProgressIndicator(
+                                  value: (_vehicle.totalDistanceKm % _vehicle.serviceDueKm) / _vehicle.serviceDueKm,
+                                  backgroundColor: AppColors.borderLight,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    ((_vehicle.totalDistanceKm % _vehicle.serviceDueKm) / _vehicle.serviceDueKm) > 0.9
+                                        ? Colors.redAccent
+                                        : AppColors.primary,
+                                  ),
+                                  minHeight: 8,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Last Service: ${(_vehicle.totalDistanceKm - (_vehicle.totalDistanceKm % _vehicle.serviceDueKm)).toStringAsFixed(0)} km',
+                                    style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                                  ),
+                                  Text(
+                                    'Next Service: ${(_vehicle.totalDistanceKm - (_vehicle.totalDistanceKm % _vehicle.serviceDueKm) + _vehicle.serviceDueKm).toStringAsFixed(0)} km',
+                                    style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
                       'Assigned Driver Profile',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
