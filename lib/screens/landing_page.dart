@@ -2083,7 +2083,7 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
                 ],
               ),
               const Text(
-                '© 2026 MAVIO by SkillForge Technology. All Rights Reserved.',
+                '© 2026 MAVIO by SkillForge Technologies. All Rights Reserved.',
                 style: TextStyle(color: Colors.white54, fontSize: 12),
               ),
             ],

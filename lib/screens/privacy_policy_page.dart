@@ -74,7 +74,7 @@ class PrivacyPolicyPage extends StatelessWidget {
 
               _buildSectionTitle('1. Introduction'),
               _buildSectionBody(
-                'MAVIO ("the App") is a proprietary product developed and owned by SkillForge Technology. '
+                'MAVIO ("the App") is a proprietary product developed and owned by SkillForge Technologies. '
                 'We respect your privacy and are committed to protecting the personal data of our users, '
                 'including students, drivers, and organization administrators. This Privacy Policy details '
                 'how we collect, use, store, and share your information when using the MAVIO platform.',
@@ -130,7 +130,7 @@ class PrivacyPolicyPage extends StatelessWidget {
 
               _buildSectionTitle('5. Data Sharing & Disclosure'),
               _buildSectionBody(
-                'Your data privacy is our priority. SkillForge Technology does not sell, trade, or share your '
+                'Your data privacy is our priority. SkillForge Technologies does not sell, trade, or share your '
                 'personal information or live location tracks with third-party advertising companies. Data is '
                 'stored securely in encrypted cloud databases on Supabase and is only accessible by administrators '
                 'of your registered organization.',
@@ -149,7 +149,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                 'If you have any questions or concerns regarding this Privacy Policy, please contact our product operations team:',
               ),
               const SizedBox(height: 16),
-              _buildContactItem(Icons.business_rounded, 'SkillForge Technology Support'),
+              _buildContactItem(Icons.business_rounded, 'SkillForge Technologies Support'),
               const SizedBox(height: 8),
               _buildContactItem(Icons.email_rounded, 'support@skillforgetechnology.app'),
               const SizedBox(height: 8),
@@ -160,7 +160,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               const SizedBox(height: 24),
               Center(
                 child: Text(
-                  '© 2026 MAVIO by SkillForge Technology. All Rights Reserved.',
+                  '© 2026 MAVIO by SkillForge Technologies. All Rights Reserved.',
                   style: TextStyle(
                     color: AppColors.textSecondary.withOpacity(0.8),
                     fontSize: 12,
