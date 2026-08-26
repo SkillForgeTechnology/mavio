@@ -261,14 +261,14 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                       const Text(
                                         'A product of ',
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 14,
                                           color: AppColors.textSecondary,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                       Image.asset(
                                         'company-logo.png',
-                                        height: 18,
+                                        height: 32,
                                         fit: BoxFit.contain,
                                       ),
                                     ],
