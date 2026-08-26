@@ -275,7 +275,7 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                   ),
                                   const SizedBox(height: 6),
                                   const Text(
-                                    'v1.0.0',
+                                    'v1.1.0',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: AppColors.textSecondary,
