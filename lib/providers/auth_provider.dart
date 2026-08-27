@@ -121,6 +121,65 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> updatePassword(String newPassword) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await _db.updatePassword(newPassword);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll("Exception: ", "");
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateOrganizationDetails({
+    required String name,
+    required String code,
+    String? phone,
+    String? address,
+  }) async {
+    final org = verifiedOrg;
+    if (org == null) return false;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final updated = await _db.updateOrganization(
+        id: org.id,
+        name: name,
+        code: code,
+        email: org.email,
+        phone: phone,
+        address: address,
+        subscriptionStatus: org.subscriptionStatus,
+        maxVehicles: org.maxVehicles,
+        maxDrivers: org.maxDrivers,
+        createdAt: org.createdAt,
+      );
+      if (updated != null) {
+        _verifiedOrg = updated;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+      _error = "Failed to update organization details.";
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Clear Error
   void clearError() {
     _error = null;

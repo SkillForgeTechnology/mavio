@@ -220,6 +220,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
     final nameCtrl = TextEditingController();
     final codeCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
+    final passwordCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     final addressCtrl = TextEditingController();
     final vehiclesCtrl = TextEditingController(text: '10');
@@ -289,6 +290,10 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                               child: Text('Active Plan'),
                             ),
                             DropdownMenuItem(
+                              value: 'custom',
+                              child: Text('Custom Plan'),
+                            ),
+                            DropdownMenuItem(
                               value: 'inactive',
                               child: Text('Inactive'),
                             ),
@@ -307,6 +312,16 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                     decoration: _dialogInputDecoration(
                       'Admin Contact Email',
                       'admin@stanford.edu',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordCtrl,
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dialogInputDecoration(
+                      'Admin Account Password',
+                      'Minimum 6 characters',
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -383,6 +398,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                         name: name,
                         code: code,
                         email: emailCtrl.text.trim(),
+                        password: passwordCtrl.text.trim(),
                         phone: phoneCtrl.text.trim(),
                         address: addressCtrl.text.trim(),
                         subscriptionStatus: status,
@@ -516,6 +532,10 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                             DropdownMenuItem(
                               value: 'active',
                               child: Text('Active Plan'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'custom',
+                              child: Text('Custom Plan'),
                             ),
                             DropdownMenuItem(
                               value: 'inactive',
@@ -1687,6 +1707,9 @@ class _AdminPortalPageState extends State<AdminPortalPage>
     if (org.subscriptionStatus == 'active') {
       badgeColor = AppColors.success;
       badgeText = 'Active Plan';
+    } else if (org.subscriptionStatus == 'custom') {
+      badgeColor = Colors.purpleAccent;
+      badgeText = 'Custom Plan';
     } else if (org.subscriptionStatus == 'inactive') {
       badgeColor = AppColors.error;
       badgeText = 'Deactivated';

@@ -300,6 +300,7 @@ class SupabaseService {
     required String name,
     required String code,
     String? email,
+    String? password,
     String? phone,
     String? address,
     String? subscriptionStatus,
@@ -326,10 +327,27 @@ class SupabaseService {
         createdAt: DateTime.now().toIso8601String(),
       );
       _mockOrgs[cleanCode] = newOrg;
+
+      // Register the mock profile too!
+      if (email != null && email.isNotEmpty) {
+        final profileId = 'user-management-${DateTime.now().millisecondsSinceEpoch}';
+        final newProfile = MavioProfile(
+          id: profileId,
+          email: email,
+          name: email.split('@')[0].toUpperCase(),
+          role: 'management',
+          orgId: id,
+        );
+        _mockProfiles[profileId] = newProfile;
+      }
+
       return newOrg;
     } else {
       try {
-        final response = await Supabase.instance.client
+        final client = Supabase.instance.client;
+        
+        // 1. Create Organization
+        final response = await client
             .from('organizations')
             .insert({
               'name': name,
@@ -343,7 +361,34 @@ class SupabaseService {
             })
             .select()
             .single();
-        return MavioOrganization.fromJson(response);
+            
+        final createdOrg = MavioOrganization.fromJson(response);
+        
+        // 2. Create Management Admin account if email and password are provided
+        if (email != null && email.isNotEmpty && password != null && password.isNotEmpty) {
+          final authRes = await client.auth.signUp(
+            email: email.trim(),
+            password: password,
+            data: {
+              'role': 'management',
+              'org_id': createdOrg.id,
+            },
+          );
+          
+          final userId = authRes.user?.id;
+          if (userId != null) {
+            final profileData = {
+              'id': userId,
+              'email': email.trim(),
+              'name': email.split('@')[0].toUpperCase(),
+              'role': 'management',
+              'org_id': createdOrg.id,
+            };
+            await client.from('profiles').insert(profileData);
+          }
+        }
+        
+        return createdOrg;
       } catch (e) {
         print("Error creating organization: $e");
         return null;
@@ -584,6 +629,15 @@ class SupabaseService {
       await Supabase.instance.client.auth.signOut();
     }
     clearSession();
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    if (_useMockMode) {
+      return;
+    }
+    await Supabase.instance.client.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
   }
 
   // 4. Fetch Details for Current User

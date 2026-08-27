@@ -1259,6 +1259,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           Icons.manage_accounts_rounded,
                           'Management',
                         ),
+                        const SizedBox(height: 8),
+                        _buildWebSidebarItem(
+                          3,
+                          Icons.business_rounded,
+                          'Profile Settings',
+                        ),
                       ],
                     ),
                   ),
@@ -1342,7 +1348,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 ? 'Operations Dashboard'
                                 : _currentIndex == 1
                                 ? 'Real-Time Fleet Tracking'
-                                : 'Database Management Control',
+                                : _currentIndex == 2
+                                ? 'Database Management Control'
+                                : 'Organization Profile Settings',
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
@@ -1589,6 +1597,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
               activeIcon: Icon(Icons.manage_accounts_rounded),
               label: 'Manage',
             ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.business_outlined),
+              activeIcon: Icon(Icons.business_rounded),
+              label: 'Profile',
+            ),
           ],
         ),
       ),
@@ -1651,6 +1664,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _buildDashboardTab(collegeName),
       _buildMapTab(),
       _buildManagementTab(),
+      _buildProfileTab(auth.verifiedOrg),
     ];
 
     final bool isWeb = MediaQuery.of(context).size.width > 900;
@@ -3689,6 +3703,315 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProfileTab(MavioOrganization? org) {
+    return _OrganizationProfileView(org: org);
+  }
+}
+
+class _OrganizationProfileView extends StatefulWidget {
+  final MavioOrganization? org;
+
+  const _OrganizationProfileView({Key? key, this.org}) : super(key: key);
+
+  @override
+  State<_OrganizationProfileView> createState() => _OrganizationProfileViewState();
+}
+
+class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _codeCtrl;
+  late final TextEditingController _emailCtrl;
+  late final TextEditingController _phoneCtrl;
+  late final TextEditingController _addressCtrl;
+  
+  final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
+
+  final _formKey = GlobalKey<FormState>();
+  final _passFormKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.org?.name ?? '');
+    _codeCtrl = TextEditingController(text: widget.org?.code ?? '');
+    _emailCtrl = TextEditingController(text: widget.org?.email ?? '');
+    _phoneCtrl = TextEditingController(text: widget.org?.phone ?? '');
+    _addressCtrl = TextEditingController(text: widget.org?.address ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _codeCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _addressCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final org = widget.org;
+    if (org == null) {
+      return const Center(
+        child: Text(
+          'No organization details found.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Details Card
+              Card(
+                elevation: 0,
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: AppColors.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.business_rounded, color: AppColors.primary, size: 28),
+                            SizedBox(width: 16),
+                            Text(
+                              'Organization Profile',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _nameCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Organization Name',
+                                  prefixIcon: Icon(Icons.apartment_rounded),
+                                ),
+                                validator: (v) => v!.trim().isEmpty ? 'Enter name' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _codeCtrl,
+                                readOnly: true,
+                                decoration: InputDecoration(
+                                  labelText: 'Organization Code',
+                                  prefixIcon: const Icon(Icons.tag_rounded),
+                                  fillColor: Colors.grey.shade50,
+                                  filled: true,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _emailCtrl,
+                          readOnly: true,
+                          decoration: InputDecoration(
+                            labelText: 'Administrator Email',
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            fillColor: Colors.grey.shade50,
+                            filled: true,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _phoneCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Contact Phone Number',
+                            prefixIcon: Icon(Icons.phone_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _addressCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Physical Address',
+                            prefixIcon: Icon(Icons.location_on_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            if (_formKey.currentState!.validate()) {
+                              final auth = Provider.of<AuthProvider>(context, listen: false);
+                              final success = await auth.updateOrganizationDetails(
+                                name: _nameCtrl.text.trim(),
+                                code: _codeCtrl.text.trim(),
+                                phone: _phoneCtrl.text.trim(),
+                                address: _addressCtrl.text.trim(),
+                              );
+                              if (success && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Organization details updated successfully.'),
+                                    backgroundColor: AppColors.success,
+                                  ),
+                                );
+                              } else if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(auth.error ?? 'Failed to update details.'),
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.save_rounded, size: 18),
+                          label: const Text('Update Profile Details'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // 2. Change Password Card
+              Card(
+                elevation: 0,
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: AppColors.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Form(
+                    key: _passFormKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.lock_outline_rounded, color: AppColors.primary, size: 28),
+                            SizedBox(width: 16),
+                            Text(
+                              'Change Password',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Update your administrator login credential. Choose a strong, secure password.',
+                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: 24),
+                        TextFormField(
+                          controller: _passwordCtrl,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'New Password',
+                            prefixIcon: Icon(Icons.vpn_key_outlined),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Enter new password';
+                            if (v.trim().length < 6) return 'Password must be at least 6 characters';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _confirmPasswordCtrl,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Confirm New Password',
+                            prefixIcon: Icon(Icons.vpn_key_rounded),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Confirm new password';
+                            if (v.trim() != _passwordCtrl.text.trim()) return 'Passwords do not match';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            if (_passFormKey.currentState!.validate()) {
+                              final auth = Provider.of<AuthProvider>(context, listen: false);
+                              final success = await auth.updatePassword(_passwordCtrl.text.trim());
+                              if (success && mounted) {
+                                _passwordCtrl.clear();
+                                _confirmPasswordCtrl.clear();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Password updated successfully.'),
+                                    backgroundColor: AppColors.success,
+                                  ),
+                                );
+                              } else if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(auth.error ?? 'Failed to update password.'),
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                          label: const Text('Save New Password'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
