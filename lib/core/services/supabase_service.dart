@@ -366,7 +366,16 @@ class SupabaseService {
         
         // 2. Create Management Admin account if email and password are provided
         if (email != null && email.isNotEmpty && password != null && password.isNotEmpty) {
-          final authRes = await client.auth.signUp(
+          final tempClient = SupabaseClient(
+            SupabaseKeys.url,
+            SupabaseKeys.anonKey,
+            authOptions: const AuthClientOptions(
+              authFlowType: AuthFlowType.implicit,
+              pkceAsyncStorage: _NoStorage(),
+            ),
+          );
+
+          final authRes = await tempClient.auth.signUp(
             email: email.trim(),
             password: password,
             data: {
@@ -1283,6 +1292,7 @@ class SupabaseService {
           SupabaseKeys.anonKey,
           authOptions: const AuthClientOptions(
             authFlowType: AuthFlowType.implicit,
+            pkceAsyncStorage: _NoStorage(),
           ),
         );
         
@@ -1339,6 +1349,7 @@ class SupabaseService {
           SupabaseKeys.anonKey,
           authOptions: const AuthClientOptions(
             authFlowType: AuthFlowType.implicit,
+            pkceAsyncStorage: _NoStorage(),
           ),
         );
         
@@ -1477,8 +1488,7 @@ class SupabaseService {
           },
         );
       } catch (e) {
-        print("Error syncing driver auth email: $e");
-        rethrow;
+        print("Note: Optional auth record sync skipped: $e");
       }
     }
   }
@@ -1527,8 +1537,7 @@ class SupabaseService {
           },
         );
       } catch (e) {
-        print("Error syncing student auth details: $e");
-        rethrow;
+        print("Note: Optional auth record sync skipped: $e");
       }
     }
   }
@@ -1606,4 +1615,17 @@ class SupabaseService {
       }
     }
   }
+}
+
+class _NoStorage implements GotrueAsyncStorage {
+  const _NoStorage();
+
+  @override
+  Future<String?> getItem({required String key}) async => null;
+
+  @override
+  Future<void> removeItem({required String key}) async {}
+
+  @override
+  Future<void> setItem({required String key, required String value}) async {}
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/theme/theme.dart';
+import '../../core/utils/toast_utils.dart';
 import 'role_select_screen.dart';
 
 class OrgCodeScreen extends StatefulWidget {
@@ -47,13 +48,10 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
         FadeSlidePageRoute(child: const RoleSelectScreen()),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(auth.error ?? 'Invalid organization code'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
+      AppToast.show(
+        context,
+        auth.error ?? 'Invalid organization code',
+        isError: true,
       );
     }
   }
@@ -275,7 +273,7 @@ class _OrgCodeScreenState extends State<OrgCodeScreen> with SingleTickerProvider
                                   ),
                                   const SizedBox(height: 6),
                                   const Text(
-                                    'v1.1.0',
+                                    'v1.3.0',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: AppColors.textSecondary,

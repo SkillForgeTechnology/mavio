@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' hide Border, BorderStyle;
 import '../../core/theme/theme.dart';
+import '../../core/utils/toast_utils.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -217,22 +218,20 @@ class _MavioBulkImportScreenState extends State<MavioBulkImportScreen> {
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error parsing spreadsheet file: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      AppToast.show(
+        context,
+        'Error parsing spreadsheet file: $e',
+        isError: true,
       );
     }
   }
 
   Future<void> _saveImport() async {
     if (_parsedRows.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No validated data to save.'),
-          backgroundColor: AppColors.error,
-        ),
+      AppToast.show(
+        context,
+        'No validated data to save.',
+        isError: true,
       );
       return;
     }
@@ -307,22 +306,18 @@ class _MavioBulkImportScreenState extends State<MavioBulkImportScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Successfully imported ${_parsedRows.length} ${widget.importType}s!',
-          ),
-          backgroundColor: AppColors.success,
-        ),
+      AppToast.show(
+        context,
+        'Successfully imported ${_parsedRows.length} ${widget.importType}s!',
+        isError: false,
       );
       Navigator.pop(context, true); // Return true to indicate reload is needed
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error saving import: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      AppToast.show(
+        context,
+        'Error saving import: $e',
+        isError: true,
       );
     } finally {
       if (mounted) {

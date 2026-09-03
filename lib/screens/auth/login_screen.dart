@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/theme/theme.dart';
+import '../../core/utils/toast_utils.dart';
 import '../student/student_dashboard.dart';
 import '../driver/driver_dashboard.dart';
 import '../management/admin_dashboard.dart';
@@ -71,15 +72,10 @@ class _LoginScreenState extends State<LoginScreen> {
         (route) => false,
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(auth.error ?? 'Authentication failed'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+      AppToast.show(
+        context,
+        auth.error ?? 'Authentication failed',
+        isError: true,
       );
     }
   }
@@ -102,24 +98,17 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account created successfully! Logging in...'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
+      AppToast.show(
+        context,
+        'Account created successfully! Logging in...',
+        isError: false,
       );
       _performLogin();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(auth.error ?? 'Registration failed'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+      AppToast.show(
+        context,
+        auth.error ?? 'Registration failed',
+        isError: true,
       );
     }
   }
@@ -335,41 +324,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 const SizedBox(height: 20),
 
-                                // Use Demo Account for Testing
-                                Center(
-                                  child: TextButton.icon(
-                                    icon: const Icon(
-                                      Icons.auto_awesome_rounded,
-                                      size: 16,
-                                      color: AppColors.primary,
-                                    ),
-                                    label: const Text(
-                                      'Use Demo Account for Testing',
-                                      style: TextStyle(
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        if (widget.role == 'student') {
-                                          _emailController.text = '22ECR114';
-                                          _passwordController.text = '30072005';
-                                        } else if (widget.role == 'driver') {
-                                          _emailController.text =
-                                              'driver@mavio.com';
-                                          _passwordController.text = 'password';
-                                        } else {
-                                          _emailController.text =
-                                              'admin@mavio.com';
-                                          _passwordController.text = 'password';
-                                        }
-                                      });
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
+
 
                                 // Action Buttons
                                 auth.isLoading
@@ -424,64 +379,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 24),
 
-                      // Help Credentials Card
-                      _FadeIn(
-                        delayMs: 300,
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.8),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.5),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primaryLight,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.info_outline_rounded,
-                                  color: AppColors.primary,
-                                  size: 18,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Demo Credentials',
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'User ID: ${_emailController.text}\nPassword: ${_passwordController.text}',
-                                      style: const TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 12,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),

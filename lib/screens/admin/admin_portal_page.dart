@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/theme.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/utils/toast_utils.dart';
 import '../../models/models.dart';
 import 'organization_detail_page.dart';
 
@@ -195,9 +196,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
         _filteredOrganizations = list;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading organizations: $e')),
-      );
+      AppToast.show(context, 'Error loading organizations: $e', isError: true);
     } finally {
       setState(() => _isFetchingOrgs = false);
     }

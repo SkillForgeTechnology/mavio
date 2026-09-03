@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/services/supabase_service.dart';
 import '../core/services/push_notification_service.dart';
+import '../core/utils/toast_utils.dart';
 import '../models/models.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -52,7 +53,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _error = e.toString();
+      _error = AppToast.cleanErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -71,7 +72,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = AppToast.cleanErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -103,7 +104,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _error = e.toString().replaceAll("Exception: ", "");
+      _error = AppToast.cleanErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -131,7 +132,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString().replaceAll("Exception: ", "");
+      _error = AppToast.cleanErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -173,7 +174,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _error = e.toString();
+      _error = AppToast.cleanErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;

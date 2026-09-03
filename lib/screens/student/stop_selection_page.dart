@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/theme/theme.dart';
+import '../../core/utils/toast_utils.dart';
 import '../../models/models.dart';
 import '../../providers/auth_provider.dart';
 
@@ -113,8 +114,10 @@ class _StudentStopSelectionPageState extends State<StudentStopSelectionPage> {
 
         _mapController.move(target, 15.5);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Location permission is required to target current position")),
+        AppToast.show(
+          context,
+          "Location permission is required to target current position",
+          isError: true,
         );
       }
     } catch (e) {
@@ -445,19 +448,17 @@ class _StudentStopSelectionPageState extends State<StudentStopSelectionPage> {
                               // Pop Page back
                               Navigator.of(context).pop();
 
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Stop Alert Location configured successfully!'),
-                                  backgroundColor: AppColors.success,
-                                ),
+                              AppToast.show(
+                                context,
+                                'Stop Alert Location configured successfully!',
+                                isError: false,
                               );
                             } catch (e) {
                               Navigator.of(context).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error saving location: $e'),
-                                  backgroundColor: Colors.redAccent,
-                                ),
+                              AppToast.show(
+                                context,
+                                'Error saving location: $e',
+                                isError: true,
                               );
                             }
                           },

@@ -12,6 +12,7 @@ import '../../providers/auth_provider.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/push_notification_service.dart';
 import '../../core/theme/theme.dart';
+import '../../core/utils/toast_utils.dart';
 import '../../models/models.dart';
 import '../auth/splash_screen.dart';
 
@@ -325,14 +326,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   void _showSnackbar(String msg, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    if (!mounted) return;
+    final isErr = color == AppColors.error || color == Colors.red || color == Colors.redAccent;
+    AppToast.show(context, msg, isError: isErr);
   }
 
   @override

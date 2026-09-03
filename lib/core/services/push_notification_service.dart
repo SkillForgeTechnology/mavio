@@ -19,73 +19,16 @@ class PushNotificationService {
     }
   }
 
-  // Register push subscription observer for verification dialog, triggered on entering the App dashboards
+  // Register push subscription observer for verification, triggered on entering the App dashboards
   static void setupVerificationObserver(BuildContext context) {
     if (kIsWeb) return;
 
     try {
-      // 1. Check current subscription status immediately
-      final currentId = OneSignal.User.pushSubscription.id;
-      if (currentId != null && currentId.isNotEmpty && !currentId.startsWith("local-")) {
-        _showSuccessDialog(context);
-      }
-
-      // 2. Observe changes
-      OneSignal.User.pushSubscription.addObserver((state) {
-        final newId = state.current.id;
-        if (newId != null && newId.isNotEmpty && !newId.startsWith("local-")) {
-          _showSuccessDialog(context);
-        }
-      });
+      // Request push permission silently
+      OneSignal.Notifications.requestPermission(true);
     } catch (e) {
-      print("Error setting up OneSignal observer: $e");
+      print("Error prompting for notification permission: $e");
     }
-  }
-
-  static void _showSuccessDialog(BuildContext context) {
-    if (_dialogShown) return;
-    _dialogShown = true;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext dialogContext) {
-          return AlertDialog(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            title: const Text(
-              "Your OneSignal SDK integration is complete!",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            content: const Text(
-              "You can now send Push Notifications & In-App Messages through OneSignal. Tap below to enable push notifications.",
-              style: TextStyle(fontSize: 14),
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  // Request push permission ONLY on dialog confirmation
-                  OneSignal.Notifications.requestPermission(true);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepOrange,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text("Got it", style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          );
-        },
-      );
-    });
   }
 
   // Update subscription ID to user profile on Supabase

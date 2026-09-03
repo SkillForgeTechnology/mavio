@@ -11,6 +11,7 @@ import '../../providers/auth_provider.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/push_notification_service.dart';
 import '../../core/theme/theme.dart';
+import '../../core/utils/toast_utils.dart';
 import '../../models/models.dart';
 import '../auth/splash_screen.dart';
 import 'package:intl/intl.dart' as intl;
@@ -38,6 +39,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
   String _vehicleSortOption = "name";
   String _driverQuery = "";
   String _studentQuery = "";
+  final TextEditingController _vehicleSearchCtrl = TextEditingController();
+  final TextEditingController _driverSearchCtrl = TextEditingController();
+  final TextEditingController _studentSearchCtrl = TextEditingController();
+
+  void _resetSearchQueries() {
+    _vehicleQuery = "";
+    _driverQuery = "";
+    _studentQuery = "";
+    _vehicleSearchCtrl.clear();
+    _driverSearchCtrl.clear();
+    _studentSearchCtrl.clear();
+  }
 
   Map<String, dynamic>? _selectedMapFleetItem;
   final MapController _mapController = MapController();
@@ -53,12 +66,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   void _showSnackbar(String message, Color backgroundColor) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: backgroundColor,
-      ),
-    );
+    final isErr = backgroundColor == AppColors.error ||
+        backgroundColor == Colors.red ||
+        backgroundColor == Colors.redAccent;
+    AppToast.show(context, message, isError: isErr);
   }
 
   @override
@@ -83,6 +94,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void dispose() {
     _refreshTimer?.cancel();
     _liveLocationSub?.cancel();
+    _vehicleSearchCtrl.dispose();
+    _driverSearchCtrl.dispose();
+    _studentSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -1463,7 +1477,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildWebSidebarItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
     return InkWell(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () {
+        if (_currentIndex != index) {
+          _resetSearchQueries();
+        }
+        setState(() => _currentIndex = index);
+      },
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -1570,7 +1589,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: (index) {
+            if (_currentIndex != index) {
+              _resetSearchQueries();
+            }
+            setState(() => _currentIndex = index);
+          },
           backgroundColor: Colors.white,
           selectedItemColor: AppColors.primary,
           unselectedItemColor: AppColors.textSecondary,
@@ -2771,13 +2795,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
       length: 3,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: const PreferredSize(
-          preferredSize: Size.fromHeight(48),
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
           child: TabBar(
+            onTap: (idx) {
+              setState(() {
+                _resetSearchQueries();
+              });
+            },
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textSecondary,
             indicatorColor: AppColors.primary,
-            tabs: [
+            tabs: const [
               Tab(text: 'Vehicles'),
               Tab(text: 'Drivers'),
               Tab(text: 'Students'),
@@ -2844,6 +2873,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               children: [
                 Expanded(
                   child: TextField(
+                    controller: _vehicleSearchCtrl,
                     onChanged: (val) {
                       setState(() {
                         _vehicleQuery = val;
@@ -2852,6 +2882,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     decoration: InputDecoration(
                       hintText: "Search Vehicles...",
                       prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                      suffixIcon: _vehicleQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18, color: AppColors.textSecondary),
+                              onPressed: () {
+                                setState(() {
+                                  _vehicleQuery = "";
+                                  _vehicleSearchCtrl.clear();
+                                });
+                              },
+                            )
+                          : null,
                       filled: true,
                       fillColor: Colors.white,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -3091,6 +3132,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             child: TextField(
+              controller: _driverSearchCtrl,
               onChanged: (val) {
                 setState(() {
                   _driverQuery = val;
@@ -3099,6 +3141,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
               decoration: InputDecoration(
                 hintText: "Search Drivers...",
                 prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                suffixIcon: _driverQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18, color: AppColors.textSecondary),
+                        onPressed: () {
+                          setState(() {
+                            _driverQuery = "";
+                            _driverSearchCtrl.clear();
+                          });
+                        },
+                      )
+                    : null,
                 filled: true,
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -3324,6 +3377,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             child: TextField(
+              controller: _studentSearchCtrl,
               onChanged: (val) {
                 setState(() {
                   _studentQuery = val;
@@ -3332,6 +3386,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
               decoration: InputDecoration(
                 hintText: "Search by Roll Number, Name, or Email...",
                 prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                suffixIcon: _studentQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18, color: AppColors.textSecondary),
+                        onPressed: () {
+                          setState(() {
+                            _studentQuery = "";
+                            _studentSearchCtrl.clear();
+                          });
+                        },
+                      )
+                    : null,
                 filled: true,
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

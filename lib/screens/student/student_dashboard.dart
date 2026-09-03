@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/tracking_provider.dart';
 import '../../core/theme/theme.dart';
+import '../../core/utils/toast_utils.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/push_notification_service.dart';
 import '../../models/models.dart';
@@ -728,26 +729,20 @@ class _HomeTab extends StatelessWidget {
                               if (await canLaunchUrl(telUri)) {
                                 await launchUrl(telUri);
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      "Cannot launch phone dialer on this device.",
-                                    ),
-                                    backgroundColor: AppColors.error,
-                                  ),
+                                AppToast.show(
+                                  context,
+                                  "Cannot launch phone dialer on this device.",
+                                  isError: true,
                                 );
                               }
                             } catch (e) {
                               print("Error launching dialer: $e");
                             }
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  "No phone number registered for this driver.",
-                                ),
-                                backgroundColor: AppColors.error,
-                              ),
+                            AppToast.show(
+                              context,
+                              "No phone number registered for this driver.",
+                              isError: true,
                             );
                           }
                         },
