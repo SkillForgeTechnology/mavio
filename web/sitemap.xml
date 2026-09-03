@@ -1,44 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <!-- MAVIO Main Public Landing Page -->
   <url>
     <loc>https://mavio.skillforgetechnology.app/</loc>
-    <lastmod>2026-08-22</lastmod>
+    <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://mavio.skillforgetechnology.app/logo.png</image:loc>
+      <image:title>MAVIO - Smart Campus Fleet Management</image:title>
+      <image:caption>Zero-hardware real-time bus tracking and student transit platform by SkillForge Technologies</image:caption>
+    </image:image>
   </url>
   <!-- Deep Link - Features Section -->
   <url>
     <loc>https://mavio.skillforgetechnology.app/#features</loc>
-    <lastmod>2026-08-22</lastmod>
+    <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <!-- Deep Link - Architecture Section -->
   <url>
     <loc>https://mavio.skillforgetechnology.app/#architecture</loc>
-    <lastmod>2026-08-22</lastmod>
+    <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <!-- Deep Link - Pricing Section -->
   <url>
     <loc>https://mavio.skillforgetechnology.app/#pricing</loc>
-    <lastmod>2026-08-22</lastmod>
+    <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <!-- Deep Link - FAQ Section -->
   <url>
     <loc>https://mavio.skillforgetechnology.app/#faq</loc>
-    <lastmod>2026-08-22</lastmod>
+    <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <!-- MAVIO Privacy Policy -->
   <url>
     <loc>https://mavio.skillforgetechnology.app/privacy</loc>
-    <lastmod>2026-08-22</lastmod>
+    <lastmod>2026-09-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

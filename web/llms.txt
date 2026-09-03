@@ -1,0 +1,28 @@
+# MAVIO by SkillForge Technologies
+> Hardware-Free Smart Campus Fleet Management & Real-Time Student Transit Tracking
+
+## Summary
+MAVIO is an enterprise-grade, zero-hardware campus transit intelligence and fleet tracking platform built by SkillForge Technologies. It is engineered specifically for educational institutions (schools, colleges, universities, training institutes) and corporate campuses to manage bus fleets, track live vehicle telemetry, optimize transit routes, assign drivers, and protect student boardings without requiring expensive hardware GPS installations.
+
+## Core Capabilities
+- **Zero-Hardware Live GPS Tracking**: Converts any driver's smartphone into a high-precision GPS telematics beacon with sub-second coordinate streaming.
+- **Student & Parent Live Portal**: Live interactive map with route lines, bus stop markers, speed gauges, and accurate arrival time (ETA) estimates.
+- **Management & Dispatcher Console**: Centralized web dashboard to manage vehicles, drivers, students, emergency broadcasts, and route analytics.
+- **Bulk Spreadsheet Ingestion**: Smart batch onboarding of vehicle rosters, student registries, and driver accounts via CSV and Excel.
+- **Automated Push Notifications**: Powered by OneSignal for instant boarding, departure, delay, and proximity alerts.
+
+## Entity & Company Information
+- **Product Name**: MAVIO (Smart Transit & Fleet Tracking)
+- **Company**: SkillForge Technologies
+- **Website**: https://mavio.skillforgetechnology.app/
+- **Region**: Tamil Nadu, India (Worldwide Coverage)
+- **Coordinates**: 11.0168° N, 76.9558° E
+
+## Target Keywords
+- MAVIO
+- MAVIO SkillForge Technologies
+- Smart campus fleet management
+- Real-time school bus tracker
+- College bus GPS tracking system
+- Hardware-free fleet management software
+- Student transit safety telemetry

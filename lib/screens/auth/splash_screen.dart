@@ -63,14 +63,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (!mounted) return;
 
     if (kIsWeb) {
-      // If the web browser is requesting a deep-link path (like /admin or /privacy),
-      // we bypass the landing page redirect so that the router resolves it correctly.
-      final String path = Uri.base.path;
-      if (path != '/' && path.isNotEmpty) {
-        return;
-      }
-      
-      // Web always lands on the Landing Page first, even if already logged in.
+      // Web always lands on the Landing Page first
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MavioLandingPage()),
       );

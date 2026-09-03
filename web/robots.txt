@@ -1,18 +1,48 @@
-# https://www.robotstxt.org/robotstxt.html
-User-agent: *
+# Robots.txt for MAVIO by SkillForge Technologies
+# https://mavio.skillforgetechnology.app/
 
-# Public sections to index
+User-agent: *
 Allow: /$
 Allow: /index.html
 Allow: /privacy
 Allow: /terms
+Allow: /sitemap.xml
+Allow: /llms.txt
+Allow: /logo.png
+Allow: /company-logo.png
+Allow: /favicon.png
 
-# Disallow indexing private dashboards & login forms to protect credentials and secure traffic
+# Protect private dashboards & authentication routes from public indexing
 Disallow: /admin
+Disallow: /sf-mavio-ad
 Disallow: /login
 Disallow: /dashboard
 Disallow: /student
 Disallow: /driver
 Disallow: /api/
+
+# AI Crawlers & LLM Search Agents
+User-agent: GPTBot
+Allow: /
+Allow: /llms.txt
+
+User-agent: ChatGPT-User
+Allow: /
+Allow: /llms.txt
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /llms.txt
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /llms.txt
+
+User-agent: Google-Extended
+Allow: /
+Allow: /llms.txt
+
+User-agent: Applebot
+Allow: /
 
 Sitemap: https://mavio.skillforgetechnology.app/sitemap.xml

@@ -1,58 +1,302 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" dir="ltr">
 
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
+  <!-- Base href for Flutter routing -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+
+  <!-- Core Primary SEO Meta Tags -->
+  <title>MAVIO | Smart Campus Fleet Management & Live Bus Tracking by SkillForge Technologies</title>
+  <meta name="title" content="MAVIO | Smart Campus Fleet Management & Live Bus Tracking by SkillForge Technologies">
   <meta name="description"
-    content="MAVIO by Skillorge Technology — Premium Campus Smart Fleet Management & Real-Time Student Transit Tracking. Track school and university buses in real-time, optimize transit routing, and secure student boardings.">
+    content="MAVIO by SkillForge Technologies is a zero-hardware smart campus transit and fleet management platform. Real-time GPS bus tracking, intelligent route optimization, driver telematics, and student transit safety for schools, colleges, and universities.">
   <meta name="keywords"
-    content="mavio, Skillorge Technology, fleet tracking, school bus tracker, real time bus gps, student transit system, smart routing, college bus tracking, campus bus telemetry">
-  <meta name="author" content="Skillorge Technology">
+    content="mavio, mavio skillforge technology, skillforge technologies, smart campus fleet management, school bus tracker, real time bus gps tracking, student transit system, zero hardware bus tracking, college bus live location, campus bus telemetry, fleet management software, driver route optimization, school bus attendance app, live transit tracker">
+  <meta name="author" content="SkillForge Technologies">
+  <meta name="publisher" content="SkillForge Technologies">
+  <meta name="copyright" content="SkillForge Technologies">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="theme-color" content="#FF5722">
+  <meta name="msapplication-TileColor" content="#FF5722">
+  <link rel="canonical" href="https://mavio.skillforgetechnology.app/">
+  <link rel="alternate" hreflang="x-default" href="https://mavio.skillforgetechnology.app/">
+  <link rel="alternate" hreflang="en" href="https://mavio.skillforgetechnology.app/">
+  <link rel="alternate" hreflang="en-IN" href="https://mavio.skillforgetechnology.app/">
 
-  <!-- Open Graph / Facebook -->
+  <!-- Dublin Core Metadata (Academic, Library & Enterprise Indexing) -->
+  <meta name="DC.title" content="MAVIO | Smart Campus Fleet Management by SkillForge Technologies">
+  <meta name="DC.creator" content="SkillForge Technologies">
+  <meta name="DC.subject" content="Smart Campus Fleet Management, Bus Tracking, GPS Telemetry, Student Safety">
+  <meta name="DC.description" content="Zero-hardware campus transit intelligence and fleet tracking system.">
+  <meta name="DC.publisher" content="SkillForge Technologies">
+  <meta name="DC.language" content="en">
+  <meta name="DC.coverage" content="Worldwide">
+
+  <!-- Deep GEO / Localized Targeting Meta Tags -->
+  <meta name="geo.region" content="IN-TN">
+  <meta name="geo.placename" content="Tamil Nadu, India">
+  <meta name="geo.position" content="11.0168;76.9558">
+  <meta name="ICBM" content="11.0168, 76.9558">
+  <meta name="target" content="all">
+  <meta name="audience" content="all">
+  <meta name="coverage" content="Worldwide">
+  <meta name="distribution" content="Global">
+  <meta name="rating" content="General">
+  <meta name="revisit-after" content="7 days">
+
+  <!-- Open Graph / Facebook / LinkedIn / WhatsApp -->
   <meta property="og:type" content="website">
+  <meta property="og:site_name" content="MAVIO | SkillForge Technologies">
   <meta property="og:url" content="https://mavio.skillforgetechnology.app/">
-  <meta property="og:title" content="MAVIO | Smart Campus Fleet Management by Skillorge Technology">
+  <meta property="og:title" content="MAVIO | Smart Campus Fleet Management & Live Bus Tracking">
   <meta property="og:description"
-    content="Track campus transit fleets in real-time. Secure GPS routing, automatic driver assigns, and live student tracking dashboards by Skillorge Technology.">
-  <meta property="og:image" content="https://mavio.skillforgetechnology.app/favicon.png">
+    content="Zero-hardware smart campus transit & fleet management by SkillForge Technologies. Real-time GPS bus tracking, route optimization, and student safety.">
+  <meta property="og:image" content="https://mavio.skillforgetechnology.app/logo.png">
+  <meta property="og:image:secure_url" content="https://mavio.skillforgetechnology.app/logo.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:alt" content="MAVIO Smart Campus Fleet Management Platform">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="en_IN">
 
-  <!-- Twitter -->
-  <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://mavio.skillforgetechnology.app/">
-  <meta property="twitter:title" content="MAVIO | Smart Campus Fleet Management by Skillorge Technology">
-  <meta property="twitter:description"
-    content="Track campus transit fleets in real-time. Secure GPS routing, automatic driver assigns, and live student tracking dashboards by Skillorge Technology.">
-  <meta property="twitter:image" content="https://mavio.skillforgetechnology.app/favicon.png">
+  <!-- Twitter / X Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@SkillForgeTech">
+  <meta name="twitter:creator" content="@SkillForgeTech">
+  <meta name="twitter:url" content="https://mavio.skillforgetechnology.app/">
+  <meta name="twitter:title" content="MAVIO | Smart Campus Fleet Management & Live Bus Tracking">
+  <meta name="twitter:description"
+    content="Zero-hardware smart campus transit & fleet management by SkillForge Technologies. Real-time GPS bus tracking, route optimization, and student safety.">
+  <meta name="twitter:image" content="https://mavio.skillforgetechnology.app/logo.png">
+  <meta name="twitter:image:alt" content="MAVIO Smart Fleet Tracking by SkillForge Technologies">
 
-  <!-- iOS meta tags & icons -->
+  <!-- Mobile & PWA Configuration -->
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MAVIO">
+  <meta name="application-name" content="MAVIO">
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png" />
-
-  <title>MAVIO | Smart Campus Fleet Management by Skillorge Technology</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Preconnect and DNS Prefetch for Supercharged Performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="dns-prefetch" href="https://api.onesignal.com">
+
+  <!-- Schema.org JSON-LD Knowledge Graph for Search Engines & AI Agents -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://mavio.skillforgetechnology.app/#organization",
+        "name": "SkillForge Technologies",
+        "legalName": "SkillForge Technologies",
+        "url": "https://mavio.skillforgetechnology.app/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://mavio.skillforgetechnology.app/company-logo.png",
+          "caption": "SkillForge Technologies Logo"
+        },
+        "description": "SkillForge Technologies engineers modern enterprise mobility, IoT telematics, and smart campus transit solutions.",
+        "sameAs": [
+          "https://github.com/SkillForgeTechnology"
+        ],
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "contactType": "customer support",
+          "url": "https://mavio.skillforgetechnology.app/",
+          "availableLanguage": ["English", "Tamil"]
+        }
+      },
+      {
+        "@type": "LocalBusiness",
+        "@id": "https://mavio.skillforgetechnology.app/#localbusiness",
+        "name": "SkillForge Technologies - MAVIO Campus Transit Solutions",
+        "image": "https://mavio.skillforgetechnology.app/logo.png",
+        "url": "https://mavio.skillforgetechnology.app/",
+        "priceRange": "$$",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Coimbatore",
+          "addressRegion": "Tamil Nadu",
+          "postalCode": "641001",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 11.0168,
+          "longitude": 76.9558
+        },
+        "openingHoursSpecification": [
+          {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+            "opens": "08:00",
+            "closes": "19:00"
+          }
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://mavio.skillforgetechnology.app/#website",
+        "url": "https://mavio.skillforgetechnology.app/",
+        "name": "MAVIO",
+        "publisher": {
+          "@id": "https://mavio.skillforgetechnology.app/#organization"
+        },
+        "description": "Official portal for MAVIO smart campus transit and fleet management platform by SkillForge Technologies."
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://mavio.skillforgetechnology.app/#software",
+        "name": "MAVIO - Smart Campus Fleet Management",
+        "url": "https://mavio.skillforgetechnology.app/",
+        "applicationCategory": "BusinessApplication, FleetManagementApplication, TravelApplication",
+        "operatingSystem": "Web, Android, iOS",
+        "browserRequirements": "Requires JavaScript. Requires HTML5.",
+        "creator": {
+          "@id": "https://mavio.skillforgetechnology.app/#organization"
+        },
+        "description": "Zero-hardware smart campus transit & fleet management system. Real-time GPS bus tracking, ETA calculations, driver rosters, spreadsheet ingestion, and student transit safety telemetry.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "name": "Free Trial Plan",
+          "description": "Free trial available with full fleet, driver, and student live tracking."
+        },
+        "featureList": [
+          "Zero-hardware driver GPS beacon tracking",
+          "Real-time student and parent live bus tracking map",
+          "Centralized management control panel",
+          "Automatic route and stop ETA calculation",
+          "Bulk CSV/Excel roster import",
+          "Instant push notification alerts"
+        ]
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": "https://mavio.skillforgetechnology.app/#breadcrumb",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://mavio.skillforgetechnology.app/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Features",
+            "item": "https://mavio.skillforgetechnology.app/#features"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "Fleet Management",
+            "item": "https://mavio.skillforgetechnology.app/#fleet"
+          },
+          {
+            "@type": "ListItem",
+            "position": 4,
+            "name": "Pricing",
+            "item": "https://mavio.skillforgetechnology.app/#pricing"
+          }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://mavio.skillforgetechnology.app/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is MAVIO by SkillForge Technologies?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "MAVIO is a zero-hardware smart campus transit intelligence and fleet tracking platform developed by SkillForge Technologies. It enables educational institutions to track buses in real time, automate driver rosters, compute exact student arrival ETAs, and optimize routes without purchasing expensive GPS black-boxes."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does MAVIO require expensive GPS tracking hardware installed in vehicles?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. MAVIO is 100% hardware-free. It uses the driver's smartphone GPS sensors with intelligent telematics algorithms to stream live vehicle coordinates, calculate speeds, and provide sub-second map updates."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do students and parents track school and college buses?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Students and parents can log in via their institution code on the web portal or mobile app to view their assigned bus's live GPS location on an interactive map, inspect upcoming stops, check driver details, and receive automated arrival notifications."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How can an educational institution or organization start using MAVIO?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Institutions can register for a free trial directly on the MAVIO portal by SkillForge Technologies, upload their vehicle and student rosters via bulk Excel/CSV import, and start live tracking immediately."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    /* CSS to ensure clean crawlable pre-render semantic markup and smooth Flutter transition */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #FAF9F6;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow-x: hidden;
+    }
+
+    #seo-crawlable-prerender {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* Fallback accessible banner visible if JavaScript is disabled */
+    noscript .noscript-banner {
+      display: block;
+      padding: 24px;
+      margin: 20px auto;
+      max-width: 800px;
+      background: #FFFFFF;
+      border: 1px solid #FF5722;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      font-size: 16px;
+      color: #1A1A1A;
+    }
+  </style>
+
   <script>
+    // Unregister legacy service workers to prevent cached chunk conflicts
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function (registrations) {
         for (let registration of registrations) {
@@ -66,14 +310,54 @@
 </head>
 
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <!-- Pre-rendered Semantic DOM for 100% Crawlability & AI Search Agents -->
+  <div id="seo-crawlable-prerender" aria-hidden="true">
+    <header>
+      <h1>MAVIO — Smart Campus Fleet Management & Live Bus Tracking by SkillForge Technologies</h1>
+      <p>Zero-hardware real-time GPS telemetry, student transit safety, and route intelligence.</p>
+    </header>
+    <main>
+      <section id="features">
+        <h2>Features of MAVIO Smart Transit</h2>
+        <ul>
+          <li><strong>Zero-Hardware Bus Tracking:</strong> High-precision GPS streaming directly from driver mobile devices.</li>
+          <li><strong>Live Map Telemetry:</strong> Interactive map showing vehicle speed, route path, bus stops, and live location.</li>
+          <li><strong>Management Control Console:</strong> Complete management of vehicles, drivers, students, organizations, and subscription plans.</li>
+          <li><strong>Student & Parent Safety Portal:</strong> Instant access to assigned vehicle telemetry, driver contacts, and arrival estimates.</li>
+          <li><strong>Bulk Excel / CSV Ingestion:</strong> 1-click batch onboarding of fleets, driver rosters, and student registries.</li>
+          <li><strong>Instant Notification System:</strong> Push alerts for bus departures, arrivals, proximity alerts, and delays.</li>
+        </ul>
+      </section>
+      <section id="about-skillforge">
+        <h2>About SkillForge Technologies</h2>
+        <p>SkillForge Technologies specializes in engineering high-reliability enterprise mobility and campus telematics platforms. MAVIO is proudly designed, developed, and maintained by SkillForge Technologies in Tamil Nadu, India for global deployment.</p>
+      </section>
+      <section id="faq-section">
+        <h2>Frequently Asked Questions (FAQ)</h2>
+        <article>
+          <h3>What is MAVIO?</h3>
+          <p>MAVIO is an enterprise campus fleet tracking and transit intelligence platform by SkillForge Technologies.</p>
+        </article>
+        <article>
+          <h3>Does MAVIO require hardware GPS trackers in buses?</h3>
+          <p>No, MAVIO is completely hardware-free, saving institutions massive installation and maintenance costs.</p>
+        </article>
+      </section>
+    </main>
+    <footer>
+      <p>&copy; 2026 SkillForge Technologies. All rights reserved. MAVIO Smart Campus Transit.</p>
+      <p>Location: Tamil Nadu, India | Worldwide Service</p>
+    </footer>
+  </div>
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <noscript>
+    <div class="noscript-banner">
+      <h2>MAVIO | Smart Campus Fleet Management by SkillForge Technologies</h2>
+      <p>MAVIO provides zero-hardware live campus bus tracking, driver telematics, and student transit management. Please enable JavaScript to access the interactive live portal.</p>
+    </div>
+  </noscript>
+
+  <!-- Flutter Web Bootstrapper -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 
