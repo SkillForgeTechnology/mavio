@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Deletion Request - MAVIO</title>
+  <meta name="description" content="Request account and data deletion for MAVIO Campus Transit Platform by SkillForge Technologies.">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1E3A8A;
+      --primary-dark: #172554;
+      --primary-light: #3B82F6;
+      --accent: #2563EB;
+      --text-main: #0F172A;
+      --text-muted: #475569;
+      --bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --border: #E2E8F0;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.65;
+      padding-bottom: 60px;
+    }
+    header {
+      background: #FFFFFF;
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header-content {
+      max-width: 960px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-main);
+      font-weight: 800;
+      font-size: 20px;
+      letter-spacing: -0.5px;
+    }
+    .brand img {
+      height: 36px;
+      border-radius: 8px;
+    }
+    .nav-links a {
+      text-decoration: none;
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 14px;
+      margin-left: 20px;
+      transition: color 0.2s ease;
+    }
+    .nav-links a:hover {
+      color: var(--accent);
+    }
+    .container {
+      max-width: 860px;
+      margin: 40px auto;
+      padding: 0 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 48px;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+    }
+    @media (max-width: 640px) {
+      .card {
+        padding: 24px 20px;
+      }
+      .container {
+        margin: 20px auto;
+      }
+    }
+    h1 {
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: -0.75px;
+      color: var(--primary-dark);
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .divider {
+      height: 1px;
+      background-color: var(--border);
+      margin: 28px 0;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary-dark);
+      margin-top: 28px;
+      margin-bottom: 16px;
+      letter-spacing: -0.3px;
+    }
+    .step-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+    .step-item {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #EFF6FF;
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-content h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+    .step-content p {
+      font-size: 14.5px;
+      color: var(--text-muted);
+      margin: 0;
+    }
+    .status-box {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 32px;
+      background: #FAFAFA;
+    }
+    .status-item {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .status-item:last-child {
+      margin-bottom: 0;
+    }
+    .status-icon {
+      color: #16A34A;
+      font-weight: bold;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .cta-container {
+      text-align: center;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+    .cta-btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #FFFFFF;
+      font-weight: 600;
+      font-size: 15px;
+      padding: 14px 28px;
+      border-radius: 9999px;
+      text-decoration: none;
+      transition: background 0.2s ease, transform 0.1s ease;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+    .cta-btn:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+    footer {
+      text-align: center;
+      color: #94A3B8;
+      font-size: 13px;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-content">
+      <a href="/" class="brand">
+        <img src="/logo.png" alt="MAVIO Logo" onerror="this.src='/favicon.png'">
+        <span>MAVIO</span>
+      </a>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/privacy">Privacy Policy</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="card">
+      <h1>Delete your Mavio Account & Data</h1>
+      <p class="subtitle">
+        MAVIO is a product of SkillForge Technologies. We provide transparent and accessible mechanisms for users to request account deletion and the permanent erasure of their personal data and transit tracking records.
+      </p>
+
+      <div class="divider"></div>
+
+      <h2>How to request account deletion</h2>
+      <div class="step-list">
+        <div class="step-item">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Contact your Organization or Email Support</h3>
+            <p>Because student and driver accounts are managed in partnership with registered educational institutions or corporate transit fleets, you may request deletion via your institutional administrator or by sending an email directly to <a href="mailto:support@skillforgetechnology.app" style="color: var(--accent);">support@skillforgetechnology.app</a>.</p>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Identity Verification</h3>
+            <p>To protect your account against unauthorized deletion requests, our support team or your organization administrator will verify your registered identifiers (Roll Number, Organization Code, or Email).</p>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Permanent Data Purge</h3>
+            <p>Once identity is confirmed, your user profile, authentication credentials, and all historical location telemetry records are permanently wiped within 48 hours.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2>Data Deletion Summary</h2>
+      <div class="status-box">
+        <div class="status-item">
+          <div class="status-icon">✓</div>
+          <div>
+            <strong style="color: var(--text-main);">Authentication Profile:</strong>
+            <p style="font-size: 14px; color: var(--text-muted); margin-top: 2px;">Your Name, Roll Number, Phone Number, Date of Birth, and Session Tokens are immediately deleted.</p>
+          </div>
+        </div>
+        <div class="status-item">
+          <div class="status-icon">✓</div>
+          <div>
+            <strong style="color: var(--text-main);">Transit & Location Telemetry:</strong>
+            <p style="font-size: 14px; color: var(--text-muted); margin-top: 2px;">All historical GPS points, route assignments, and driver log histories are permanently destroyed.</p>
+          </div>
+        </div>
+        <div class="status-item">
+          <div class="status-icon">✓</div>
+          <div>
+            <strong style="color: var(--text-main);">Retention:</strong>
+            <p style="font-size: 14px; color: var(--text-muted); margin-top: 2px;">Zero personal data is preserved on active production databases once deletion is confirmed.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="cta-container">
+        <p style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 16px;">Submit a Deletion Request via Email</p>
+        <a class="cta-btn" href="mailto:support@skillforgetechnology.app?subject=Mavio%20Account%20Deletion%20Request">
+          Email support@skillforgetechnology.app
+        </a>
+      </div>
+
+    </div>
+
+    <footer>
+      <p>© 2026 MAVIO by SkillForge Technologies. All Rights Reserved.</p>
+    </footer>
+  </main>
+
+</body>
+</html>

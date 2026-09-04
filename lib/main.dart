@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'core/services/background_location_service.dart';
+import 'core/services/supabase_service.dart';
 import 'core/theme/theme.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth/splash_screen.dart';
+import 'screens/auth/org_code_screen.dart';
 import 'screens/landing_page.dart';
 import 'screens/privacy_policy_page.dart';
 import 'screens/account_deletion_page.dart';
@@ -16,12 +18,13 @@ import 'core/services/push_notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
+  await SupabaseService().init();
   await BackgroundLocationService.initialize();
   await PushNotificationService.initialize();
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()..initialize()),
       ],
       child: const MainApp(),
     ),
@@ -51,6 +54,12 @@ class MainApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (_) =>
                   kIsWeb ? const MavioLandingPage() : const SplashScreen(),
+              settings: settings,
+            );
+          case '/org':
+          case '/login':
+            return MaterialPageRoute(
+              builder: (_) => const OrgCodeScreen(),
               settings: settings,
             );
           case '/privacy':

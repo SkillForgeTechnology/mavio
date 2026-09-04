@@ -63,7 +63,7 @@ class AccountDeletionPage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Mavio is a product of SkillForge Technologies. We provide clear, simple mechanisms to delete your user account and all associated transit telemetry tracking logs.',
+                'MAVIO is a product of SkillForge Technologies. We provide transparent and accessible mechanisms for users to request account deletion and the permanent erasure of their personal data and transit tracking records.',
                 style: TextStyle(
                   fontSize: 15,
                   color: AppColors.textSecondary,

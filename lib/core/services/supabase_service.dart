@@ -228,6 +228,9 @@ class SupabaseService {
 
   // 1. Verify Organization Code
   Future<MavioOrganization?> verifyOrgCode(String code) async {
+    if (!_isInitialized) {
+      await init();
+    }
     await Future.delayed(const Duration(milliseconds: 600)); // Simulate latency
     final cleanCode = code.trim().toUpperCase();
 

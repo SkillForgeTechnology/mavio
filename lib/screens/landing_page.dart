@@ -2096,7 +2096,11 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
             children: [
               InkWell(
                 onTap: () {
-                  Navigator.of(context).pushNamed('/privacy');
+                  if (kIsWeb) {
+                    launchUrl(Uri.parse('/privacy'), webOnlyWindowName: '_self');
+                  } else {
+                    Navigator.of(context).pushNamed('/privacy');
+                  }
                 },
                 child: const Text(
                   'Privacy Policy',
@@ -2116,7 +2120,11 @@ class _MavioLandingPageState extends State<MavioLandingPage> {
               const SizedBox(width: 16),
               InkWell(
                 onTap: () {
-                  Navigator.of(context).pushNamed('/delete-account');
+                  if (kIsWeb) {
+                    launchUrl(Uri.parse('/delete-account'), webOnlyWindowName: '_self');
+                  } else {
+                    Navigator.of(context).pushNamed('/delete-account');
+                  }
                 },
                 child: const Text(
                   'Delete Account',
