@@ -160,8 +160,26 @@ class _DriverDashboardState extends State<DriverDashboard> {
       return;
     }
 
-    // 3. Verify Location Permissions
+    // 3. Prominent Disclosure Check for Background Location (Google Play Policy Compliance)
     LocationPermission permission = await Geolocator.checkPermission();
+    PermissionStatus backgroundStatus = PermissionStatus.denied;
+    if (Platform.isAndroid) {
+      backgroundStatus = await Permission.locationAlways.status;
+    }
+
+    if (permission == LocationPermission.denied ||
+        (Platform.isAndroid && backgroundStatus != PermissionStatus.granted)) {
+      final bool userConsented = await _showLocationProminentDisclosureDialog();
+      if (!userConsented) {
+        _showSnackbar(
+          "Location and background tracking permissions are required to start a trip and broadcast live bus updates.",
+          AppColors.warning,
+        );
+        return;
+      }
+    }
+
+    // 4. Verify Foreground Location Permissions
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
@@ -174,7 +192,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
       return;
     }
 
-    // 4. Request Notification Permission for Foreground Service on Android 13+
+    // 5. Request Notification Permission for Foreground Service on Android 13+
     if (Platform.isAndroid) {
       final status = await Permission.notification.status;
       if (status != PermissionStatus.granted) {
@@ -189,9 +207,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
       }
     }
 
-    // 5. Request Background Location Permission on Android 10+
+    // 6. Request Background Location Permission on Android 10+
     if (Platform.isAndroid) {
-      final backgroundStatus = await Permission.locationAlways.status;
       if (backgroundStatus != PermissionStatus.granted) {
         final result = await Permission.locationAlways.request();
         if (result != PermissionStatus.granted) {
@@ -248,6 +265,148 @@ class _DriverDashboardState extends State<DriverDashboard> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<bool> _showLocationProminentDisclosureDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.location_on_rounded,
+                  color: AppColors.primary,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Text(
+                  "Location & Background Access",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "MAVIO collects and uses your location data in the background and foreground to enable real-time bus tracking, route monitoring, and live ETA updates for student riders, even when the app is closed, minimized, or not in use.",
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("• ", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              "Background tracking starts ONLY when you tap 'Start Trip'.",
+                              style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("• ", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              "Tracking STOPS immediately when you tap 'End Trip'.",
+                              style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("• ", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              "Location data is NEVER used for advertising or shared with third parties.",
+                              style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              child: const Text(
+                "Deny",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+              child: const Text(
+                "Agree & Continue",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
   }
 
   void _cleanupLocalTrackingUI() {

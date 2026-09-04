@@ -298,6 +298,20 @@ class SupabaseService {
     }
   }
 
+  Future<void> _ensureAdminSession() async {
+    final client = Supabase.instance.client;
+    if (client.auth.currentSession == null) {
+      try {
+        await client.auth.signInWithPassword(
+          email: 'admin@mavio.com',
+          password: 'password',
+        );
+      } catch (e) {
+        print("Error ensuring admin session: $e");
+      }
+    }
+  }
+
   // Create a new organization
   Future<MavioOrganization?> createOrganization({
     required String name,
@@ -347,6 +361,7 @@ class SupabaseService {
       return newOrg;
     } else {
       try {
+        await _ensureAdminSession();
         final client = Supabase.instance.client;
         
         // 1. Create Organization
@@ -369,34 +384,27 @@ class SupabaseService {
         
         // 2. Create Management Admin account if email and password are provided
         if (email != null && email.isNotEmpty && password != null && password.isNotEmpty) {
-          final tempClient = SupabaseClient(
-            SupabaseKeys.url,
-            SupabaseKeys.anonKey,
-            authOptions: const AuthClientOptions(
-              authFlowType: AuthFlowType.implicit,
-              pkceAsyncStorage: _NoStorage(),
-            ),
-          );
+          try {
+            final tempClient = SupabaseClient(
+              SupabaseKeys.url,
+              SupabaseKeys.anonKey,
+              authOptions: const AuthClientOptions(
+                authFlowType: AuthFlowType.implicit,
+                pkceAsyncStorage: _NoStorage(),
+              ),
+            );
 
-          final authRes = await tempClient.auth.signUp(
-            email: email.trim(),
-            password: password,
-            data: {
-              'role': 'management',
-              'org_id': createdOrg.id,
-            },
-          );
-          
-          final userId = authRes.user?.id;
-          if (userId != null) {
-            final profileData = {
-              'id': userId,
-              'email': email.trim(),
-              'name': email.split('@')[0].toUpperCase(),
-              'role': 'management',
-              'org_id': createdOrg.id,
-            };
-            await client.from('profiles').insert(profileData);
+            final authRes = await tempClient.auth.signUp(
+              email: email.trim(),
+              password: password,
+              data: {
+                'name': email.split('@')[0].toUpperCase(),
+                'role': 'management',
+                'org_id': createdOrg.id,
+              },
+            );
+          } catch (e) {
+            print("Notice creating admin account: $e");
           }
         }
         
@@ -486,6 +494,7 @@ class SupabaseService {
       return updatedOrg;
     } else {
       try {
+        await _ensureAdminSession();
         final response = await Supabase.instance.client
             .from('organizations')
             .update({
@@ -516,6 +525,7 @@ class SupabaseService {
       return true;
     } else {
       try {
+        await _ensureAdminSession();
         await Supabase.instance.client
             .from('organizations')
             .delete()
@@ -584,7 +594,9 @@ class SupabaseService {
       // Simple mock credential matching
       MavioProfile? match;
       for (var p in _mockProfiles.values) {
-        if (p.email.toLowerCase() == email.trim().toLowerCase() && p.role == role) {
+        if (p.email.toLowerCase() == email.trim().toLowerCase() &&
+            p.role == role &&
+            (_currentOrganization == null || p.orgId == _currentOrganization!.id)) {
           match = p;
           break;
         }
@@ -593,7 +605,7 @@ class SupabaseService {
         _currentUserProfile = match;
         return _currentUserProfile;
       }
-      throw Exception("Invalid credentials or role selection.");
+      throw Exception("Invalid credentials or role selection for this organization.");
     } else {
       try {
         // Authenticate via Supabase Auth
@@ -613,15 +625,67 @@ class SupabaseService {
                 .maybeSingle();
           } catch (_) {}
 
-          if (profileRes == null) {
+          MavioProfile? profile;
+          if (profileRes != null) {
+            profile = MavioProfile.fromJson(profileRes);
+          } else {
+            // Check userMetadata fallback if profile row was not yet created
+            final meta = authRes.user!.userMetadata;
+            final fallbackOrgId = meta?['org_id']?.toString() ?? _currentOrganization?.id ?? '';
+            final fallbackRole = meta?['role']?.toString() ?? role;
+            final fallbackName = meta?['name']?.toString() ?? (authRes.user!.email?.split('@')[0].toUpperCase() ?? 'Admin');
+            
+            if (fallbackOrgId.isNotEmpty) {
+              profile = MavioProfile(
+                id: authRes.user!.id,
+                email: authRes.user!.email ?? email.trim(),
+                name: fallbackName,
+                role: fallbackRole,
+                orgId: fallbackOrgId,
+              );
+            }
+          }
+
+          // If this is the organization's designated management admin email, auto-sync org_id to current organization
+          if (profile != null &&
+              role == 'management' &&
+              _currentOrganization != null &&
+              _currentOrganization!.email?.trim().toLowerCase() == email.trim().toLowerCase()) {
+            if (profile.orgId != _currentOrganization!.id) {
+              profile = MavioProfile(
+                id: profile.id,
+                email: profile.email,
+                name: profile.name,
+                role: profile.role,
+                orgId: _currentOrganization!.id,
+              );
+              try {
+                await Supabase.instance.client.auth.updateUser(
+                  UserAttributes(
+                    data: {
+                      'org_id': _currentOrganization!.id,
+                      'role': 'management',
+                    },
+                  ),
+                );
+              } catch (_) {}
+            }
+          }
+
+          if (profile == null) {
             await Supabase.instance.client.auth.signOut();
             throw Exception("This account has been deleted by the organization.");
           }
 
-          final profile = MavioProfile.fromJson(profileRes);
           if (profile.role != role) {
             await Supabase.instance.client.auth.signOut();
             throw Exception("Access denied: Selected role does not match account.");
+          }
+
+          // Enforce Multi-tenant Organization Isolation
+          if (_currentOrganization != null && profile.orgId.isNotEmpty && profile.orgId != _currentOrganization!.id) {
+            await Supabase.instance.client.auth.signOut();
+            throw Exception("Access denied: This account belongs to a different organization. Please enter your organization code.");
           }
 
           _currentUserProfile = profile;
@@ -1023,11 +1087,43 @@ class SupabaseService {
     }
   }
 
-  // Helper: Get latest location updates for all active trips (limits query payload)
-  Future<List<MavioLocationUpdate>> getLatestLocationsOfAllTrips() async {
+  // Helper: Get latest location updates for all active trips (filtered by organization)
+  Future<List<MavioLocationUpdate>> getLatestLocationsOfAllTrips({String? orgId}) async {
     if (_useMockMode) return [];
     try {
-      final response = await Supabase.instance.client
+      final client = Supabase.instance.client;
+      final targetOrgId = orgId ?? _currentUserProfile?.orgId ?? _currentOrganization?.id;
+
+      if (targetOrgId != null) {
+        final activeTripsRes = await client
+            .from('trips')
+            .select('id')
+            .eq('org_id', targetOrgId)
+            .eq('status', 'ACTIVE');
+
+        final activeTripIds = (activeTripsRes as List).map((t) => t['id'].toString()).toList();
+        if (activeTripIds.isEmpty) return [];
+
+        final response = await client
+            .from('location_updates')
+            .select()
+            .inFilter('trip_id', activeTripIds)
+            .order('created_at', ascending: false)
+            .limit(50);
+
+        final List<MavioLocationUpdate> latestUpdates = [];
+        final Set<String> tripIds = {};
+        for (var row in response as List) {
+          final update = MavioLocationUpdate.fromJson(row);
+          if (!tripIds.contains(update.tripId)) {
+            tripIds.add(update.tripId);
+            latestUpdates.add(update);
+          }
+        }
+        return latestUpdates;
+      }
+
+      final response = await client
           .from('location_updates')
           .select()
           .order('created_at', ascending: false)

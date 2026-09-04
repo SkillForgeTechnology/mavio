@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import '../core/services/push_notification_service.dart';
 import '../core/services/supabase_service.dart';
 import '../models/models.dart';
 
@@ -18,6 +20,7 @@ class TrackingProvider extends ChangeNotifier {
   List<LatLng> _tripPath = [];
   StreamSubscription<MavioLocationUpdate>? _locationSub;
   Timer? _tripCheckTimer;
+  final Set<String> _notifiedTripIds = {};
 
   bool get isLoading => _isLoading;
   MavioVehicle? get assignedVehicle => _assignedVehicle;
@@ -112,10 +115,62 @@ class TrackingProvider extends ChangeNotifier {
       if (_tripPath.isEmpty || _tripPath.last != newPoint) {
         _tripPath.add(newPoint);
       }
+
+      // Check proximity alert for student stop radius
+      _checkProximityAlert(tripId, update);
+
       notifyListeners();
     }, onError: (err) {
       print("Error in location stream: $err");
     });
+  }
+
+  void _checkProximityAlert(String tripId, MavioLocationUpdate update) {
+    final profile = _db.currentUserProfile;
+    if (profile == null ||
+        profile.alertLatitude == null ||
+        profile.alertLongitude == null) {
+      return;
+    }
+
+    if (_notifiedTripIds.contains(tripId)) return;
+
+    final distance = Geolocator.distanceBetween(
+      update.latitude,
+      update.longitude,
+      profile.alertLatitude!,
+      profile.alertLongitude!,
+    );
+
+    final radius = (profile.alertRadiusMeters > 0) ? profile.alertRadiusMeters : 500;
+    if (distance <= radius) {
+      _notifiedTripIds.add(tripId);
+
+      final busName = _assignedVehicle?.name ?? 'Your Bus';
+      final distanceStr = distance < 1000
+          ? "${distance.round()}m"
+          : "${(distance / 1000).toStringAsFixed(1)}km";
+
+      final alertTitle = "🚌 Bus Approaching!";
+      final alertBody =
+          "$busName has entered your alert zone ($distanceStr away, ${radius}m radius). Please be ready at your stop!";
+
+      // 1. Show instant Heads-Up Local Notification
+      PushNotificationService.showLocalNotification(
+        title: alertTitle,
+        body: alertBody,
+      );
+
+      // 2. Dispatch OneSignal Push Notification if subscription ID exists
+      if (profile.onesignalId != null && profile.onesignalId!.isNotEmpty) {
+        PushNotificationService.sendPushNotification(
+          subscriptionIds: [profile.onesignalId!],
+          title: alertTitle,
+          body: alertBody,
+          data: {'tripId': tripId, 'busNumber': busName},
+        );
+      }
+    }
   }
 
   void _unsubscribeFromLocationUpdates() {

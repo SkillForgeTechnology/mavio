@@ -1659,6 +1659,12 @@ class _ProfileTabState extends State<_ProfileTab> {
   bool _pushNotificationsEnabled = true;
 
   @override
+  void initState() {
+    super.initState();
+    _pushNotificationsEnabled = PushNotificationService.isPushEnabled();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tracking = Provider.of<TrackingProvider>(context);
     final auth = Provider.of<AuthProvider>(context);
@@ -1956,12 +1962,28 @@ class _ProfileTabState extends State<_ProfileTab> {
                     ),
                     Switch(
                       value: _pushNotificationsEnabled,
-                      activeColor: AppColors.primary,
+                      activeThumbColor: AppColors.primary,
                       activeTrackColor: AppColors.primaryLight,
-                      onChanged: (val) {
+                      onChanged: (val) async {
                         setState(() {
                           _pushNotificationsEnabled = val;
                         });
+                        if (profile != null) {
+                          final result =
+                              await PushNotificationService.setPushNotificationsEnabled(
+                                  val, profile.id);
+                          if (mounted) {
+                            setState(() {
+                              _pushNotificationsEnabled = result;
+                            });
+                            AppToast.show(
+                              context,
+                              val
+                                  ? "Push notifications enabled for bus arrival alerts."
+                                  : "Push notifications disabled for this device.",
+                            );
+                          }
+                        }
                       },
                     ),
                   ],

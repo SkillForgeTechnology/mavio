@@ -11,7 +11,13 @@ class AppToast {
     if (str.contains('Only management can update authentication records')) {
       return 'Access denied: Only management accounts can update credentials.';
     }
-    if (str.contains('Access denied')) {
+    if (str.contains('belongs to a different organization')) {
+      return 'This account belongs to a different organization. Please enter your organization code.';
+    }
+    if (str.contains('Selected role does not match account')) {
+      return 'Selected role does not match this account.';
+    }
+    if (str.contains('permission for this operation') || str.contains('permission denied')) {
       return 'Access denied: You do not have permission for this operation.';
     }
     if (str.contains('Invalid credentials') ||
