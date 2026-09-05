@@ -185,29 +185,8 @@ class PushNotificationService {
     try {
       final url = Uri.parse('https://onesignal.com/api/v1/notifications');
 
-      // 1. Send by OneSignal Subscription IDs if available (direct & unique)
-      if (validSubIds.isNotEmpty) {
-        final payload = {
-          'app_id': appId,
-          'include_subscription_ids': validSubIds,
-          'headings': {'en': title},
-          'contents': {'en': body},
-          'data': data ?? {},
-          'priority': 10,
-          'android_accent_color': 'FF1E3A8A',
-        };
-
-        final response = await http.post(
-          url,
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Authorization': 'Basic $restApiKey',
-          },
-          body: jsonEncode(payload),
-        );
-        print("OneSignal Push sent: ${response.statusCode} - ${response.body}");
-      } else if (validUserIds.isNotEmpty) {
-        // 2. Fallback to External User ID alias only if no subscription IDs are present
+      // 1. Send by External User ID alias (notifies ALL devices logged in for each student)
+      if (validUserIds.isNotEmpty) {
         final payload = {
           'app_id': appId,
           'include_aliases': {'external_id': validUserIds},
@@ -227,7 +206,28 @@ class PushNotificationService {
           },
           body: jsonEncode(payload),
         );
-        print("OneSignal Alias Push sent: ${response.statusCode} - ${response.body}");
+        print("OneSignal Multi-Device Alias Push sent: ${response.statusCode} - ${response.body}");
+      } else if (validSubIds.isNotEmpty) {
+        // 2. Fallback to direct Subscription IDs if user IDs are not provided
+        final payload = {
+          'app_id': appId,
+          'include_subscription_ids': validSubIds,
+          'headings': {'en': title},
+          'contents': {'en': body},
+          'data': data ?? {},
+          'priority': 10,
+          'android_accent_color': 'FF1E3A8A',
+        };
+
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Basic $restApiKey',
+          },
+          body: jsonEncode(payload),
+        );
+        print("OneSignal SubId Push sent: ${response.statusCode} - ${response.body}");
       }
     } catch (e) {
       print("Error sending OneSignal push notification: $e");

@@ -258,29 +258,8 @@ Future<void> _sendBackgroundProximityPush({
   try {
     final url = Uri.parse('https://onesignal.com/api/v1/notifications');
 
-    // 1. Send via OneSignal Subscription IDs if available (direct & unique)
-    if (subIds.isNotEmpty) {
-      final payload = {
-        'app_id': appId,
-        'include_subscription_ids': subIds,
-        'headings': {'en': title},
-        'contents': {'en': body},
-        'data': {'tripId': tripId, 'busNumber': busNumber},
-        'priority': 10,
-        'android_accent_color': 'FF1E3A8A',
-      };
-
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Basic $restApiKey',
-        },
-        body: jsonEncode(payload),
-      );
-      print("MAVIO Background Push: ${response.statusCode}");
-    } else if (userIds.isNotEmpty) {
-      // 2. Fallback to External User ID alias only if no subscription IDs are present
+    // 1. Send via External User ID alias (notifies ALL devices logged in for each student)
+    if (userIds.isNotEmpty) {
       final payload = {
         'app_id': appId,
         'include_aliases': {'external_id': userIds},
@@ -300,7 +279,28 @@ Future<void> _sendBackgroundProximityPush({
         },
         body: jsonEncode(payload),
       );
-      print("MAVIO Background Alias Push: ${response.statusCode}");
+      print("MAVIO Background Multi-Device Push: ${response.statusCode}");
+    } else if (subIds.isNotEmpty) {
+      // 2. Fallback to direct Subscription IDs if user IDs are not provided
+      final payload = {
+        'app_id': appId,
+        'include_subscription_ids': subIds,
+        'headings': {'en': title},
+        'contents': {'en': body},
+        'data': {'tripId': tripId, 'busNumber': busNumber},
+        'priority': 10,
+        'android_accent_color': 'FF1E3A8A',
+      };
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': 'Basic $restApiKey',
+        },
+        body: jsonEncode(payload),
+      );
+      print("MAVIO Background SubId Push: ${response.statusCode}");
     }
   } catch (e) {
     print("MAVIO Background Push error: $e");
