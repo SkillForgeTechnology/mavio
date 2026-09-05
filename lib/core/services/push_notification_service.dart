@@ -21,6 +21,7 @@ class PushNotificationService {
       // 1. Configure OneSignal SDK
       OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
       OneSignal.initialize(appId);
+      OneSignal.Notifications.requestPermission(true);
 
       // 2. Configure Local Notifications for foreground/heads-up alerts
       const AndroidInitializationSettings androidSettings =
@@ -110,8 +111,11 @@ class PushNotificationService {
     if (kIsWeb) return;
 
     try {
+      // Bind user external ID to OneSignal
+      OneSignal.login(userId);
+
       final subscriptionId = OneSignal.User.pushSubscription.id;
-      print("OneSignal: User Subscription ID: $subscriptionId");
+      print("OneSignal: User Subscription ID: $subscriptionId for User: $userId");
       if (subscriptionId != null && subscriptionId.isNotEmpty) {
         await SupabaseService().updateProfileOneSignalId(
           id: userId,
@@ -165,39 +169,102 @@ class PushNotificationService {
     }
   }
 
-  // Send Push Notification to specific OneSignal Subscription IDs via OneSignal REST API
+  // Send Push Notification to specific OneSignal Subscription IDs or External User IDs via OneSignal REST API
   static Future<void> sendPushNotification({
-    required List<String> subscriptionIds,
+    List<String>? subscriptionIds,
+    List<String>? externalUserIds,
     required String title,
     required String body,
     Map<String, dynamic>? data,
   }) async {
-    final validIds = subscriptionIds.where((id) => id.isNotEmpty).toList();
-    if (validIds.isEmpty) return;
+    final validSubIds = subscriptionIds?.where((id) => id.isNotEmpty).toList() ?? [];
+    final validUserIds = externalUserIds?.where((id) => id.isNotEmpty).toList() ?? [];
+
+    if (validSubIds.isEmpty && validUserIds.isEmpty) return;
 
     try {
       final url = Uri.parse('https://onesignal.com/api/v1/notifications');
-      final payload = {
-        'app_id': appId,
-        'include_subscription_ids': validIds,
-        'headings': {'en': title},
-        'contents': {'en': body},
-        'data': data ?? {},
-        'priority': 10,
-        'android_channel_id': 'mavio_bus_alerts',
-      };
 
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Basic $restApiKey',
-        },
-        body: jsonEncode(payload),
-      );
-      print("OneSignal Proximity Push Notification sent: ${response.statusCode}");
+      // 1. Send by OneSignal Subscription IDs if available (direct & unique)
+      if (validSubIds.isNotEmpty) {
+        final payload = {
+          'app_id': appId,
+          'include_subscription_ids': validSubIds,
+          'headings': {'en': title},
+          'contents': {'en': body},
+          'data': data ?? {},
+          'priority': 10,
+          'android_accent_color': 'FF1E3A8A',
+        };
+
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Basic $restApiKey',
+          },
+          body: jsonEncode(payload),
+        );
+        print("OneSignal Push sent: ${response.statusCode} - ${response.body}");
+      } else if (validUserIds.isNotEmpty) {
+        // 2. Fallback to External User ID alias only if no subscription IDs are present
+        final payload = {
+          'app_id': appId,
+          'include_aliases': {'external_id': validUserIds},
+          'target_channel': 'push',
+          'headings': {'en': title},
+          'contents': {'en': body},
+          'data': data ?? {},
+          'priority': 10,
+          'android_accent_color': 'FF1E3A8A',
+        };
+
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Basic $restApiKey',
+          },
+          body: jsonEncode(payload),
+        );
+        print("OneSignal Alias Push sent: ${response.statusCode} - ${response.body}");
+      }
     } catch (e) {
       print("Error sending OneSignal push notification: $e");
+    }
+  }
+
+  // Broadcast "Bus Trip Started!" to all students assigned to a specific bus
+  static Future<void> notifyTripStarted({
+    required String vehicleId,
+    required String vehicleName,
+    required String tripId,
+  }) async {
+    if (kIsWeb) return;
+
+    try {
+      final students = await SupabaseService().getAssignedStudentsForVehicle(vehicleId);
+      final List<String> subIds = [];
+      final List<String> userIds = [];
+
+      for (var s in students) {
+        userIds.add(s.id);
+        if (s.onesignalId != null && s.onesignalId!.isNotEmpty) {
+          subIds.add(s.onesignalId!);
+        }
+      }
+
+      if (subIds.isNotEmpty || userIds.isNotEmpty) {
+        await sendPushNotification(
+          subscriptionIds: subIds,
+          externalUserIds: userIds,
+          title: "🚌 Bus Trip Started!",
+          body: "$vehicleName has started its trip and is on the way. Open MAVIO to track live!",
+          data: {'tripId': tripId, 'busNumber': vehicleName},
+        );
+      }
+    } catch (e) {
+      print("Error broadcasting trip started push notification: $e");
     }
   }
 }

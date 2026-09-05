@@ -19,7 +19,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
   await SupabaseService().init();
-  await BackgroundLocationService.initialize();
   await PushNotificationService.initialize();
   runApp(
     MultiProvider(

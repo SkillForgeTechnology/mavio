@@ -30,8 +30,12 @@ class _StudentDashboardState extends State<StudentDashboard> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _trackingProvider.loadStudentDashboard();
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (auth.currentProfile != null) {
+        await PushNotificationService.syncSubscriptionId(auth.currentProfile!.id);
+      }
       PushNotificationService.setupVerificationObserver(context);
     });
   }
@@ -1455,28 +1459,86 @@ class _AlertsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tracking = Provider.of<TrackingProvider>(context);
+    final auth = Provider.of<AuthProvider>(context);
+    final profile = auth.currentProfile;
     final isLive = tracking.isTripLive;
+    final vehicle = tracking.assignedVehicle;
+    final String busName = vehicle?.name ?? 'Assigned Bus';
+    final activeTrip = tracking.activeTrip;
+    final double? distKm = tracking.distanceToStudentKm;
+    final int? etaMins = tracking.etaMinutes;
 
-    final List<Map<String, dynamic>> notifications = [
-      if (isLive) ...[
-        {
-          'id': 'approaching',
-          'title': 'Bus 03 is approaching your location',
-          'time': '2 min ago',
-          'type': 'approaching',
-          'icon': Icons.directions_bus_rounded,
-          'color': AppColors.primary,
-        },
-        {
-          'id': 'started',
-          'title': 'Bus 03 has started today\'s morning trip',
-          'time': '12 min ago',
-          'type': 'started',
-          'icon': Icons.play_circle_fill_rounded,
-          'color': AppColors.success,
-        },
-      ],
-    ];
+    final List<Map<String, dynamic>> notifications = [];
+
+    if (isLive && activeTrip != null) {
+      final elapsedMins = DateTime.now().difference(activeTrip.startedAt).inMinutes;
+      final timeStr = elapsedMins <= 1 ? 'Just now' : '$elapsedMins min ago';
+
+      // 1. Proximity Alert (if bus is near student's stop)
+      if (profile?.alertLatitude != null && distKm != null) {
+        final distMeters = (distKm * 1000).toInt();
+        final bool inAlertRadius = distMeters <= profile!.alertRadiusMeters;
+
+        if (inAlertRadius) {
+          notifications.add({
+            'id': 'approaching_${activeTrip.id}',
+            'title': '$busName is Approaching Your Stop!',
+            'description': 'Bus is approx ${distMeters}m away (Estimated arrival: ~${etaMins ?? 2} min).',
+            'time': 'Live Now',
+            'type': 'approaching',
+            'icon': Icons.notifications_active_rounded,
+            'color': AppColors.primary,
+          });
+        }
+      }
+
+      // 2. Trip Started Live Alert
+      notifications.add({
+        'id': 'started_${activeTrip.id}',
+        'title': '$busName Trip in Progress',
+        'description': 'Driver started live route tracking. Real-time GPS broadcasting is active.',
+        'time': timeStr,
+        'type': 'started',
+        'icon': Icons.play_circle_fill_rounded,
+        'color': AppColors.success,
+      });
+    }
+
+    // 3. Stop Alert Zone Configuration Status
+    if (profile?.alertLatitude != null) {
+      notifications.add({
+        'id': 'stop_configured',
+        'title': 'Proximity Zone Active (${profile!.alertRadiusMeters}m)',
+        'description': 'Alert trigger is active for your boarding stop. Automatic notification arrives when $busName approaches.',
+        'time': 'Active',
+        'type': 'zone',
+        'icon': Icons.my_location_rounded,
+        'color': const Color(0xFF3B82F6),
+      });
+    } else {
+      notifications.add({
+        'id': 'stop_needed',
+        'title': 'Set Your Boarding Stop Alert',
+        'description': 'Pin your pickup location on the Map or Profile tab to receive proximity alerts.',
+        'time': 'Setup',
+        'type': 'setup',
+        'icon': Icons.add_location_alt_rounded,
+        'color': AppColors.warning,
+      });
+    }
+
+    // 4. Standby / Offline Vehicle State
+    if (!isLive && vehicle != null) {
+      notifications.add({
+        'id': 'bus_standby',
+        'title': '$busName in Standby',
+        'description': 'No active trip at the moment. You will be notified instantly when the driver starts the trip.',
+        'time': 'Standby',
+        'type': 'standby',
+        'icon': Icons.directions_bus_rounded,
+        'color': AppColors.textSecondary,
+      });
+    }
 
     final List<Map<String, dynamic>> activeNotifications = notifications
         .where((n) => !clearedIds.contains(n['id']))
@@ -1611,7 +1673,18 @@ class _AlertsTab extends StatelessWidget {
                                     fontSize: 14,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                if (n['description'] != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    n['description'] as String,
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 8),
                                 Row(
                                   children: [
                                     const Icon(

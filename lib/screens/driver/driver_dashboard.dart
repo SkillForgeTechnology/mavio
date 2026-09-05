@@ -11,6 +11,7 @@ import 'package:intl/intl.dart' as intl;
 import '../../providers/auth_provider.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/push_notification_service.dart';
+import '../../core/services/background_location_service.dart';
 import '../../core/theme/theme.dart';
 import '../../core/utils/toast_utils.dart';
 import '../../models/models.dart';
@@ -232,6 +233,14 @@ class _DriverDashboardState extends State<DriverDashboard> {
       });
 
       _startTracking(trip.id);
+
+      // Broadcast trip started notification to all students assigned to this bus
+      await PushNotificationService.notifyTripStarted(
+        vehicleId: _assignedVehicle!.id,
+        vehicleName: _assignedVehicle!.name,
+        tripId: trip.id,
+      );
+
       _showSnackbar("Trip started successfully!", AppColors.success);
     } catch (e) {
       _showSnackbar(e.toString(), AppColors.error);
@@ -445,16 +454,37 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
     // Start background location service and pass tracking info
     if (!kIsWeb) {
+      await BackgroundLocationService.initialize();
       final backgroundService = FlutterBackgroundService();
       final bool isServiceRunning = await backgroundService.isRunning();
 
       if (!isServiceRunning) {
         await backgroundService.startService();
-        backgroundService.invoke('startTracking', {
-          'tripId': tripId,
-          'vehicleName': _assignedVehicle?.name ?? 'Mavio Bus',
-        });
       }
+
+      List<Map<String, dynamic>> studentList = [];
+      if (_assignedVehicle != null) {
+        try {
+          final students = await _db.getAssignedStudentsForVehicle(_assignedVehicle!.id);
+          studentList = students.map((s) => {
+            'id': s.id,
+            'name': s.name,
+            'onesignal_id': s.onesignalId,
+            'alert_latitude': s.alertLatitude,
+            'alert_longitude': s.alertLongitude,
+            'alert_radius_meters': s.alertRadiusMeters,
+          }).toList();
+        } catch (e) {
+          print("Error pre-loading students for background service: $e");
+        }
+      }
+
+      backgroundService.invoke('startTracking', {
+        'tripId': tripId,
+        'vehicleId': _assignedVehicle?.id,
+        'vehicleName': _assignedVehicle?.name ?? 'Mavio Bus',
+        'students': studentList,
+      });
 
       // Bind UI updates to background telemetry broadcaster
       _backgroundSubscription = backgroundService.on('updateStats').listen((event) {

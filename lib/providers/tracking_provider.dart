@@ -34,6 +34,34 @@ class TrackingProvider extends ChangeNotifier {
 
   bool get isTripLive => _activeTrip != null && _activeTrip!.status == 'ACTIVE';
 
+  double? get distanceToStudentMeters {
+    final profile = _db.currentUserProfile;
+    if (_latestLocation == null ||
+        profile == null ||
+        profile.alertLatitude == null ||
+        profile.alertLongitude == null) {
+      return null;
+    }
+    return Geolocator.distanceBetween(
+      _latestLocation!.latitude,
+      _latestLocation!.longitude,
+      profile.alertLatitude!,
+      profile.alertLongitude!,
+    );
+  }
+
+  double? get distanceToStudentKm =>
+      distanceToStudentMeters != null ? distanceToStudentMeters! / 1000 : null;
+
+  int? get etaMinutes {
+    final dist = distanceToStudentMeters;
+    if (dist == null) return null;
+    final currentSpeedKmH = _latestLocation?.speed ?? 30.0;
+    final effectiveSpeed = currentSpeedKmH > 5 ? currentSpeedKmH : 30.0;
+    final mins = ((dist / 1000) / effectiveSpeed * 60).ceil();
+    return mins < 1 ? 1 : mins;
+  }
+
   // Fetch student dashboard details and set up stream
   Future<void> loadStudentDashboard() async {
     _isLoading = true;
@@ -155,21 +183,11 @@ class TrackingProvider extends ChangeNotifier {
       final alertBody =
           "$busName has entered your alert zone ($distanceStr away, ${radius}m radius). Please be ready at your stop!";
 
-      // 1. Show instant Heads-Up Local Notification
+      // 1. Show instant Heads-Up Local Notification if student is actively looking at app
       PushNotificationService.showLocalNotification(
         title: alertTitle,
         body: alertBody,
       );
-
-      // 2. Dispatch OneSignal Push Notification if subscription ID exists
-      if (profile.onesignalId != null && profile.onesignalId!.isNotEmpty) {
-        PushNotificationService.sendPushNotification(
-          subscriptionIds: [profile.onesignalId!],
-          title: alertTitle,
-          body: alertBody,
-          data: {'tripId': tripId, 'busNumber': busName},
-        );
-      }
     }
   }
 

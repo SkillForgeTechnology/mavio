@@ -1714,6 +1714,22 @@ class SupabaseService {
       }
     }
   }
+
+  // Fetch all students assigned to a specific vehicle
+  Future<List<MavioProfile>> getAssignedStudentsForVehicle(String vehicleId) async {
+    if (_useMockMode) {
+      return _mockProfiles.values
+          .where((p) => p.assignedVehicleId == vehicleId && p.role == 'student')
+          .toList();
+    } else {
+      final res = await Supabase.instance.client
+          .from('profiles')
+          .select()
+          .eq('assigned_vehicle_id', vehicleId)
+          .eq('role', 'student');
+      return (res as List).map((json) => MavioProfile.fromJson(json)).toList();
+    }
+  }
 }
 
 class _NoStorage implements GotrueAsyncStorage {
