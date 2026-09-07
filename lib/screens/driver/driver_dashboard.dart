@@ -15,6 +15,7 @@ import '../../core/services/background_location_service.dart';
 import '../../core/theme/theme.dart';
 import '../../core/utils/toast_utils.dart';
 import '../../models/models.dart';
+import '../../widgets/mavio_org_logo.dart';
 import '../auth/splash_screen.dart';
 
 class DriverDashboard extends StatefulWidget {
@@ -683,13 +684,28 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final profile = Provider.of<AuthProvider>(context).currentProfile;
+    final auth = Provider.of<AuthProvider>(context);
+    final profile = auth.currentProfile;
     final driverName = profile?.name ?? "Driver";
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
-        title: const Text('Driver Console', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Driver Console', style: TextStyle(fontWeight: FontWeight.bold)),
+            if (auth.verifiedOrg?.logoUrl != null &&
+                auth.verifiedOrg!.logoUrl!.trim().isNotEmpty) ...[
+              const SizedBox(width: 10),
+              MavioOrgLogo(
+                logoUrl: auth.verifiedOrg!.logoUrl,
+                size: 32,
+                borderRadius: 8,
+              ),
+            ],
+          ],
+        ),
         backgroundColor: Colors.white,
         centerTitle: false,
         elevation: 0,

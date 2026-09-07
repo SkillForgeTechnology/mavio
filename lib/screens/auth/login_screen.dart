@@ -7,6 +7,7 @@ import '../../core/utils/toast_utils.dart';
 import '../student/student_dashboard.dart';
 import '../driver/driver_dashboard.dart';
 import '../management/admin_dashboard.dart';
+import '../../widgets/mavio_org_logo.dart';
 import 'role_select_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -580,8 +581,8 @@ class _LoginScreenState extends State<LoginScreen>
                 // Mavio App Logo
                 Image.asset(
                   'logo.png',
-                  width: 52,
-                  height: 52,
+                  width: 50,
+                  height: 50,
                   fit: BoxFit.contain,
                   errorBuilder: (_, _, _) => const Icon(
                     Icons.location_on_rounded,
@@ -589,6 +590,22 @@ class _LoginScreenState extends State<LoginScreen>
                     size: 38,
                   ),
                 ),
+                if (Provider.of<AuthProvider>(context, listen: false).verifiedOrg?.logoUrl != null &&
+                    Provider.of<AuthProvider>(context, listen: false).verifiedOrg!.logoUrl!.trim().isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    height: 24,
+                    width: 1.2,
+                    color: Colors.white.withOpacity(0.4),
+                  ),
+                  const SizedBox(width: 8),
+                  MavioOrgLogo(
+                    logoUrl: Provider.of<AuthProvider>(context, listen: false).verifiedOrg!.logoUrl,
+                    size: 42,
+                    borderRadius: 8,
+                    showBorder: false,
+                  ),
+                ],
                 const SizedBox(width: 12),
 
                 // Brand Text

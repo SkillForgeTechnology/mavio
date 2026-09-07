@@ -12,6 +12,7 @@ import '../../core/services/push_notification_service.dart';
 import '../../models/models.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../widgets/mavio_3d_bus_marker.dart';
+import '../../widgets/mavio_org_logo.dart';
 import '../auth/splash_screen.dart';
 import 'stop_selection_page.dart';
 import 'student_complaint_screen.dart';
@@ -242,31 +243,45 @@ class _HomeTab extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // User Avatar outline
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.15),
-                          blurRadius: 10,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (auth.verifiedOrg?.logoUrl != null &&
+                          auth.verifiedOrg!.logoUrl!.trim().isNotEmpty) ...[
+                        MavioOrgLogo(
+                          logoUrl: auth.verifiedOrg!.logoUrl,
+                          size: 44,
+                          borderRadius: 10,
                         ),
+                        const SizedBox(width: 10),
                       ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                      // User Avatar outline
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.15),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),

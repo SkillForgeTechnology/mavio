@@ -1,11 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/theme.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/utils/toast_utils.dart';
 import '../../models/models.dart';
+import '../../widgets/mavio_org_logo.dart';
 import 'organization_detail_page.dart';
 
 class AdminPortalPage extends StatefulWidget {
@@ -225,6 +231,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
     final vehiclesCtrl = TextEditingController(text: '10');
     final driversCtrl = TextEditingController(text: '10');
     String status = 'free_trial';
+    String? selectedLogoUrl;
     bool isSaving = false;
 
     showDialog(
@@ -254,6 +261,12 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                       'College/Organization Name',
                       'e.g. Stanford University',
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildLogoPickerBox(
+                    context: context,
+                    logoUrl: selectedLogoUrl,
+                    onLogoChanged: (url) => setModalState(() => selectedLogoUrl = url),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -400,6 +413,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                         password: passwordCtrl.text.trim(),
                         phone: phoneCtrl.text.trim(),
                         address: addressCtrl.text.trim(),
+                        logoUrl: selectedLogoUrl,
                         subscriptionStatus: status,
                         maxVehicles: status == 'free_trial' ? 25 : (int.tryParse(vehiclesCtrl.text) ?? 25),
                         maxDrivers: status == 'free_trial' ? 999999 : (int.tryParse(driversCtrl.text) ?? 10),
@@ -442,14 +456,17 @@ class _AdminPortalPageState extends State<AdminPortalPage>
               ),
               child: isSaving
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 16,
+                      height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Colors.white,
                       ),
                     )
-                  : const Text('Register Site'),
+                  : const Text(
+                      'Create Organization',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
             ),
           ],
         ),
@@ -458,7 +475,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
   }
 
   // Edit Organization Dialog
-  void _showEditDialog(MavioOrganization org) {
+  void _showEditOrgDialog(MavioOrganization org) {
     final nameCtrl = TextEditingController(text: org.name);
     final codeCtrl = TextEditingController(text: org.code);
     final emailCtrl = TextEditingController(text: org.email ?? '');
@@ -469,6 +486,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
     );
     final driversCtrl = TextEditingController(text: '${org.maxDrivers ?? 10}');
     String status = org.subscriptionStatus ?? 'free_trial';
+    String? selectedLogoUrl = org.logoUrl;
     bool isSaving = false;
 
     showDialog(
@@ -498,6 +516,12 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                       'College/Organization Name',
                       'e.g. Stanford University',
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildLogoPickerBox(
+                    context: context,
+                    logoUrl: selectedLogoUrl,
+                    onLogoChanged: (url) => setModalState(() => selectedLogoUrl = url),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -634,6 +658,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                         email: emailCtrl.text.trim(),
                         phone: phoneCtrl.text.trim(),
                         address: addressCtrl.text.trim(),
+                        logoUrl: selectedLogoUrl,
                         subscriptionStatus: status,
                         maxVehicles: status == 'free_trial' ? 25 : (int.tryParse(vehiclesCtrl.text) ?? 25),
                         maxDrivers: status == 'free_trial' ? 999999 : (int.tryParse(driversCtrl.text) ?? 10),
@@ -673,17 +698,113 @@ class _AdminPortalPageState extends State<AdminPortalPage>
               ),
               child: isSaving
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 16,
+                      height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Colors.white,
                       ),
                     )
-                  : const Text('Save Details'),
+                  : const Text(
+                      'Save Changes',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Logo Picker helper box
+  Widget _buildLogoPickerBox({
+    required BuildContext context,
+    required String? logoUrl,
+    required Function(String?) onLogoChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Row(
+        children: [
+          if (logoUrl != null && logoUrl.isNotEmpty) ...[
+            MavioOrgLogo(logoUrl: logoUrl, size: 44, borderRadius: 10),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Institution Logo (Optional)',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  logoUrl != null && logoUrl.isNotEmpty
+                      ? 'Custom logo selected • Co-brands across app'
+                      : 'Upload PNG/JPG logo (co-brands with Mavio logo)',
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          if (logoUrl != null && logoUrl.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+              tooltip: 'Remove Logo',
+              onPressed: () => onLogoChanged(null),
+            ),
+          TextButton.icon(
+            onPressed: () async {
+              final res = await FilePicker.platform.pickFiles(
+                type: FileType.image,
+                withData: true,
+                allowMultiple: false,
+              );
+              if (res != null && res.files.isNotEmpty) {
+                final file = res.files.first;
+                Uint8List? bytes = file.bytes;
+                if (bytes == null && file.path != null && !kIsWeb) {
+                  final ioFile = File(file.path!);
+                  if (await ioFile.exists()) {
+                    bytes = await ioFile.readAsBytes();
+                  }
+                }
+                if (bytes != null) {
+                  if (bytes.lengthInBytes > 2 * 1024 * 1024) {
+                    AppToast.show(context, "Logo file must be under 2MB.");
+                    return;
+                  }
+                  final ext = (file.extension ?? 'png').toLowerCase();
+                  final mime = (ext == 'jpg' || ext == 'jpeg')
+                      ? 'image/jpeg'
+                      : (ext == 'webp' ? 'image/webp' : 'image/png');
+                  final base64Str = base64Encode(bytes);
+                  final dataUri = 'data:$mime;base64,$base64Str';
+                  onLogoChanged(dataUri);
+                }
+              }
+            },
+            icon: Icon(
+              logoUrl != null && logoUrl.isNotEmpty ? Icons.cached : Icons.upload_file,
+              size: 16,
+              color: AppColors.primary,
+            ),
+            label: Text(
+              logoUrl != null && logoUrl.isNotEmpty ? 'Change' : 'Upload',
+              style: const TextStyle(color: AppColors.primary, fontSize: 12),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1737,30 +1858,34 @@ class _AdminPortalPageState extends State<AdminPortalPage>
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar with initials
+                // Avatar with logo or initials
                 Container(
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primary,
-                        AppColors.primary.withOpacity(0.6),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    gradient: (org.logoUrl != null && org.logoUrl!.trim().isNotEmpty)
+                        ? null
+                        : LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primary.withOpacity(0.6),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   alignment: Alignment.center,
-                  child: Text(
-                    org.name.substring(0, 2).toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: (org.logoUrl != null && org.logoUrl!.trim().isNotEmpty)
+                      ? MavioOrgLogo(logoUrl: org.logoUrl, size: 56, borderRadius: 14)
+                      : Text(
+                          org.name.substring(0, org.name.length >= 2 ? 2 : 1).toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -1852,7 +1977,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                             size: 20,
                           ),
                           tooltip: 'Edit Settings',
-                          onPressed: () => _showEditDialog(org),
+                          onPressed: () => _showEditOrgDialog(org),
                         ),
                         IconButton(
                           icon: const Icon(

@@ -163,6 +163,7 @@ class AuthProvider extends ChangeNotifier {
         email: org.email,
         phone: phone,
         address: address,
+        logoUrl: org.logoUrl,
         subscriptionStatus: org.subscriptionStatus,
         maxVehicles: org.maxVehicles,
         maxDrivers: org.maxDrivers,
@@ -175,6 +176,35 @@ class AuthProvider extends ChangeNotifier {
         return true;
       }
       _error = "Failed to update organization details.";
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = AppToast.cleanErrorMessage(e);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateOrganizationLogo(String? logoUrl) async {
+    final org = verifiedOrg;
+    if (org == null) return false;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final success = await _db.updateOrganizationLogo(
+        orgId: org.id,
+        logoUrl: logoUrl,
+      );
+      if (success) {
+        _verifiedOrg = org.copyWith(logoUrl: logoUrl);
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+      _error = "Failed to update organization logo.";
       _isLoading = false;
       notifyListeners();
       return false;

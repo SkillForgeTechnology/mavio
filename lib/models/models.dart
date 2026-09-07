@@ -5,6 +5,7 @@ class MavioOrganization {
   final String? email;
   final String? phone;
   final String? address;
+  final String? logoUrl;
   final String? subscriptionStatus; // 'active' | 'inactive' | 'free_trial'
   final int? maxVehicles;
   final int? maxDrivers;
@@ -17,6 +18,7 @@ class MavioOrganization {
     this.email,
     this.phone,
     this.address,
+    this.logoUrl,
     this.subscriptionStatus = 'free_trial',
     this.maxVehicles = 10,
     this.maxDrivers = 10,
@@ -31,6 +33,7 @@ class MavioOrganization {
       email: json['email'] as String?,
       phone: json['phone'] as String?,
       address: json['address'] as String?,
+      logoUrl: json['logo_url'] as String?,
       subscriptionStatus: json['subscription_status'] as String? ?? 'free_trial',
       maxVehicles: json['max_vehicles'] as int? ?? 10,
       maxDrivers: json['max_drivers'] as int? ?? 10,
@@ -46,11 +49,40 @@ class MavioOrganization {
       'email': email,
       'phone': phone,
       'address': address,
+      'logo_url': logoUrl,
       'subscription_status': subscriptionStatus,
       'max_vehicles': maxVehicles,
       'max_drivers': maxDrivers,
       'created_at': createdAt,
     };
+  }
+
+  MavioOrganization copyWith({
+    String? id,
+    String? code,
+    String? name,
+    String? email,
+    String? phone,
+    String? address,
+    String? logoUrl,
+    String? subscriptionStatus,
+    int? maxVehicles,
+    int? maxDrivers,
+    String? createdAt,
+  }) {
+    return MavioOrganization(
+      id: id ?? this.id,
+      code: code ?? this.code,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      address: address ?? this.address,
+      logoUrl: logoUrl ?? this.logoUrl,
+      subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
+      maxVehicles: maxVehicles ?? this.maxVehicles,
+      maxDrivers: maxDrivers ?? this.maxDrivers,
+      createdAt: createdAt ?? this.createdAt,
+    );
   }
 }
 

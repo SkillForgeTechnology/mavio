@@ -319,6 +319,7 @@ class SupabaseService {
     String? password,
     String? phone,
     String? address,
+    String? logoUrl,
     String? subscriptionStatus,
     int? maxVehicles,
     int? maxDrivers,
@@ -337,6 +338,7 @@ class SupabaseService {
         email: email,
         phone: phone,
         address: address,
+        logoUrl: logoUrl,
         subscriptionStatus: status,
         maxVehicles: limitVehicles,
         maxDrivers: limitDrivers,
@@ -372,6 +374,7 @@ class SupabaseService {
               'email': email,
               'phone': phone,
               'address': address,
+              'logo_url': logoUrl,
               'subscription_status': status,
               'max_vehicles': limitVehicles,
               'max_drivers': limitDrivers,
@@ -439,14 +442,11 @@ class SupabaseService {
 
         final buses = (busesRes as List).map((x) => MavioVehicle.fromJson(x)).toList();
         final profiles = (profilesRes as List).map((x) => MavioProfile.fromJson(x)).toList();
-
-        final drivers = profiles.where((p) => p.role == 'driver').toList();
-        final students = profiles.where((p) => p.role == 'student').toList();
-
+        
         return {
           'buses': buses,
-          'drivers': drivers,
-          'students': students,
+          'drivers': profiles.where((p) => p.role == 'driver').toList(),
+          'students': profiles.where((p) => p.role == 'student').toList(),
         };
       } catch (e) {
         print("Error fetching org details: $e");
@@ -467,6 +467,7 @@ class SupabaseService {
     String? email,
     String? phone,
     String? address,
+    String? logoUrl,
     String? subscriptionStatus,
     int? maxVehicles,
     int? maxDrivers,
@@ -481,6 +482,7 @@ class SupabaseService {
         email: email,
         phone: phone,
         address: address,
+        logoUrl: logoUrl,
         subscriptionStatus: subscriptionStatus,
         maxVehicles: maxVehicles,
         maxDrivers: maxDrivers,
@@ -489,6 +491,9 @@ class SupabaseService {
       // Clean up old key if code changed
       _mockOrgs.removeWhere((k, v) => v.id == id);
       _mockOrgs[cleanCode] = updatedOrg;
+      if (_currentOrganization?.id == id) {
+        _currentOrganization = updatedOrg;
+      }
       return updatedOrg;
     } else {
       try {
@@ -501,6 +506,7 @@ class SupabaseService {
               'email': email,
               'phone': phone,
               'address': address,
+              'logo_url': logoUrl,
               'subscription_status': subscriptionStatus,
               'max_vehicles': maxVehicles,
               'max_drivers': maxDrivers,
@@ -508,10 +514,50 @@ class SupabaseService {
             .eq('id', id)
             .select()
             .single();
-        return MavioOrganization.fromJson(response);
+        final updated = MavioOrganization.fromJson(response);
+        if (_currentOrganization?.id == id) {
+          _currentOrganization = updated;
+        }
+        return updated;
       } catch (e) {
         print("Error updating organization: $e");
         return null;
+      }
+    }
+  }
+
+  // Update organization logo only
+  Future<bool> updateOrganizationLogo({
+    required String orgId,
+    required String? logoUrl,
+  }) async {
+    if (_useMockMode) {
+      final key = _mockOrgs.keys.firstWhere(
+        (k) => _mockOrgs[k]!.id == orgId,
+        orElse: () => '',
+      );
+      if (key.isNotEmpty) {
+        _mockOrgs[key] = _mockOrgs[key]!.copyWith(logoUrl: logoUrl);
+        if (_currentOrganization?.id == orgId) {
+          _currentOrganization = _mockOrgs[key];
+        }
+        return true;
+      }
+      return false;
+    } else {
+      try {
+        await _ensureAdminSession();
+        await Supabase.instance.client
+            .from('organizations')
+            .update({'logo_url': logoUrl})
+            .eq('id', orgId);
+        if (_currentOrganization?.id == orgId) {
+          _currentOrganization = _currentOrganization!.copyWith(logoUrl: logoUrl);
+        }
+        return true;
+      } catch (e) {
+        print("Error updating organization logo: $e");
+        return false;
       }
     }
   }

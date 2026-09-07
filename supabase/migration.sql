@@ -3,12 +3,16 @@
 -- Run this SQL in your Supabase SQL Editor (https://supabase.com)
 -- =========================================================================
 
--- 1. ADD SELF-SERVICE STOP AND ONESIGNAL COLUMNS TO PROFILES
+-- 1. ADD SELF-SERVICE STOP AND ONESIGNAL COLUMNS TO PROFILES & ORG LOGO
 ALTER TABLE public.profiles 
 ADD COLUMN IF NOT EXISTS alert_latitude double precision,
 ADD COLUMN IF NOT EXISTS alert_longitude double precision,
 ADD COLUMN IF NOT EXISTS alert_radius_meters integer DEFAULT 500,
 ADD COLUMN IF NOT EXISTS onesignal_id text;
+
+-- Add optional logo_url (base64 or URL) to organizations
+ALTER TABLE public.organizations 
+ADD COLUMN IF NOT EXISTS logo_url text;
 
 -- 2. CREATE TRIP ALERTS REGISTRY TABLE TO PREVENT SPAM (ONLY ALERTS ONCE PER TRIP)
 CREATE TABLE IF NOT EXISTS public.trip_alerts (
@@ -276,5 +280,7 @@ EXCEPTION WHEN OTHERS THEN
   NULL;
 END $$;
 
-
-
+-- 9. ORGANIZATION LOGO URL & BRANDING
+-- =========================================================================
+ALTER TABLE public.organizations
+ADD COLUMN IF NOT EXISTS logo_url text;

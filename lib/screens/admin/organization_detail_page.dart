@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/theme.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+import '../../widgets/mavio_org_logo.dart';
 
 class OrganizationDetailPage extends StatefulWidget {
   final MavioOrganization organization;
@@ -150,22 +151,26 @@ class _OrganizationDetailPageState extends State<OrganizationDetailPage>
                             width: 60,
                             height: 60,
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [AppColors.primary, AppColors.primary.withOpacity(0.6)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                              gradient: (org.logoUrl != null && org.logoUrl!.trim().isNotEmpty)
+                                  ? null
+                                  : LinearGradient(
+                                      colors: [AppColors.primary, AppColors.primary.withOpacity(0.6)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             alignment: Alignment.center,
-                            child: Text(
-                              org.name.substring(0, 2).toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            child: (org.logoUrl != null && org.logoUrl!.trim().isNotEmpty)
+                                ? MavioOrgLogo(logoUrl: org.logoUrl, size: 60, borderRadius: 14)
+                                : Text(
+                                    org.name.substring(0, org.name.length >= 2 ? 2 : 1).toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(

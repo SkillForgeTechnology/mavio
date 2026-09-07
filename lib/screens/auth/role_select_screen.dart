@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../widgets/mavio_org_logo.dart';
 import '../../core/theme/theme.dart';
 import 'login_screen.dart';
 
@@ -248,8 +251,8 @@ class _RoleSelectScreenState extends State<RoleSelectScreen>
                 // Mavio App Logo
                 Image.asset(
                   'logo.png',
-                  width: 58,
-                  height: 58,
+                  width: 54,
+                  height: 54,
                   fit: BoxFit.contain,
                   errorBuilder: (_, _, _) => const Icon(
                     Icons.location_on_rounded,
@@ -257,6 +260,22 @@ class _RoleSelectScreenState extends State<RoleSelectScreen>
                     size: 42,
                   ),
                 ),
+                if (Provider.of<AuthProvider>(context, listen: false).verifiedOrg?.logoUrl != null &&
+                    Provider.of<AuthProvider>(context, listen: false).verifiedOrg!.logoUrl!.trim().isNotEmpty) ...[
+                  const SizedBox(width: 10),
+                  Container(
+                    height: 28,
+                    width: 1.2,
+                    color: Colors.white.withOpacity(0.4),
+                  ),
+                  const SizedBox(width: 10),
+                  MavioOrgLogo(
+                    logoUrl: Provider.of<AuthProvider>(context, listen: false).verifiedOrg!.logoUrl,
+                    size: 46,
+                    borderRadius: 10,
+                    showBorder: false,
+                  ),
+                ],
                 const SizedBox(width: 14),
 
                 // Brand Text
