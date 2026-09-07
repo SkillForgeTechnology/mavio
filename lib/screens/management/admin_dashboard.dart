@@ -2010,6 +2010,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
         orgId: auth.verifiedOrg?.id ?? '',
         orgName: collegeName,
         showBackButton: false,
+        onComplaintsUpdated: (count) {
+          if (mounted && _openComplaintsCount != count) {
+            setState(() => _openComplaintsCount = count);
+          }
+        },
       ),
       _buildProfileTab(auth.verifiedOrg),
     ];

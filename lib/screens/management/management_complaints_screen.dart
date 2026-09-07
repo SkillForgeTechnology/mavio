@@ -11,12 +11,14 @@ class ManagementComplaintsScreen extends StatefulWidget {
   final String orgId;
   final String orgName;
   final bool showBackButton;
+  final Function(int openCount)? onComplaintsUpdated;
 
   const ManagementComplaintsScreen({
     super.key,
     required this.orgId,
     this.orgName = 'Mavio Network',
     this.showBackButton = true,
+    this.onComplaintsUpdated,
   });
 
   @override
@@ -44,6 +46,7 @@ class _ManagementComplaintsScreenState extends State<ManagementComplaintsScreen>
           _complaints = list;
           _isLoading = false;
         });
+        widget.onComplaintsUpdated?.call(_openCount);
       }
     } catch (e) {
       if (mounted) {
@@ -332,27 +335,33 @@ class _ManagementComplaintsScreenState extends State<ManagementComplaintsScreen>
                     ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: statusColor.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(statusIcon, size: 14, color: statusColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        statusLabel,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+                InkWell(
+                  onTap: () => _showUpdateStatusDialog(c),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: statusColor.withOpacity(0.4), width: 1.2),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(statusIcon, size: 14, color: statusColor),
+                        const SizedBox(width: 5),
+                        Text(
+                          statusLabel,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_drop_down_rounded, size: 16, color: statusColor),
+                      ],
+                    ),
                   ),
                 ),
               ],
