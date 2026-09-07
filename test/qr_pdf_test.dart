@@ -48,11 +48,20 @@ void main() {
       createdAt: DateTime.now().toIso8601String(),
     );
 
-    // Test payload
-    final payload = QrPdfService.generateBusQrPayload(vehicle: v1, orgId: 'org1');
-    expect(payload, contains('BUS 01'));
-    final parsed = QrPdfService.parseBusQrPayload(payload);
-    expect(parsed?['vehicleId'], equals('v1'));
+    // Test URL payload
+    final urlPayload = QrPdfService.generateBusQrPayload(vehicle: v1, orgId: 'org1');
+    expect(urlPayload, startsWith('https://mavio.skillforgetechnology.app/scan'));
+    expect(urlPayload, contains('vehicleId=v1'));
+    final parsedUrl = QrPdfService.parseBusQrPayload(urlPayload);
+    expect(parsedUrl?['vehicleId'], equals('v1'));
+    expect(parsedUrl?['orgId'], equals('org1'));
+    expect(parsedUrl?['name'], equals('BUS 01'));
+
+    // Test legacy JSON payload backward compatibility
+    final legacyJson = '{"app":"mavio","type":"bus_qr","v":1,"orgId":"org1","vehicleId":"v1","name":"BUS 01","regNumber":"TN 01 AB 1234"}';
+    final parsedLegacy = QrPdfService.parseBusQrPayload(legacyJson);
+    expect(parsedLegacy?['vehicleId'], equals('v1'));
+    expect(parsedLegacy?['name'], equals('BUS 01'));
 
     // Test document generation
     final pdfBytes = await QrPdfService.generateAllBusesPdfDocument(

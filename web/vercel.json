@@ -17,6 +17,14 @@
       "dest": "/delete-account.html"
     },
     {
+      "src": "/scan",
+      "dest": "/scan.html"
+    },
+    {
+      "src": "/scan/",
+      "dest": "/scan.html"
+    },
+    {
       "handle": "filesystem"
     },
     {

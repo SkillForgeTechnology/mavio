@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAVIO Smart Campus Transit - Google Play Store</title>
+  <meta name="description" content="Download MAVIO on Google Play Store for real-time campus bus tracking and driver telematics.">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #FF5722;
+      --primary-dark: #EA580C;
+      --bg: #0B0F19;
+      --card-bg: #151C2C;
+      --text-main: #FFFFFF;
+      --text-muted: #94A3B8;
+      --border: rgba(255, 255, 255, 0.1);
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 40px 32px;
+      max-width: 460px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      animation: fadeIn 0.4s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .logo-container {
+      width: 80px;
+      height: 80px;
+      background: rgba(255, 87, 34, 0.12);
+      border: 1px solid rgba(255, 87, 34, 0.3);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px auto;
+    }
+    .logo-container img {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #FF7043, #FF5722);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p.desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .bus-badge {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px dashed rgba(255, 87, 34, 0.4);
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 28px;
+      display: none;
+    }
+    .bus-badge.active {
+      display: block;
+    }
+    .bus-badge .bus-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: #FF7043;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .bus-badge .bus-reg {
+      font-size: 12px;
+      color: #CBD5E1;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .btn-playstore {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: #FFFFFF;
+      color: #000000;
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      padding: 16px 24px;
+      border-radius: 14px;
+      transition: all 0.2s ease;
+      box-shadow: 0 10px 20px -5px rgba(255, 255, 255, 0.2);
+    }
+    .btn-playstore:hover {
+      background: #F1F5F9;
+      transform: translateY(-2px);
+    }
+    .play-icon {
+      width: 22px;
+      height: 22px;
+    }
+    .redirect-text {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: #64748B;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="logo-container">
+      <img src="/logo.png" alt="MAVIO Logo" onerror="this.src='/favicon.png'">
+    </div>
+
+    <h1><span class="gradient-text">MAVIO</span> Campus Transit</h1>
+    <p class="desc">Real-time GPS bus tracking, driver telematics, and smart student transit management.</p>
+
+    <div id="busDetails" class="bus-badge">
+      <div id="busName" class="bus-name">Vehicle QR Sticker</div>
+      <div id="busReg" class="bus-reg">Live Campus Fleet</div>
+    </div>
+
+    <a id="playStoreBtn" href="https://play.google.com/store/apps/details?id=app.skillforge.mavio" class="btn-playstore">
+      <svg class="play-icon" viewBox="0 0 512 512">
+        <path fill="#4285F4" d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1z"/>
+        <path fill="#34A853" d="M47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0z"/>
+        <path fill="#EA4335" d="M325.3 277.7l60.1 60.1L104.6 499l220.7-221.3z"/>
+        <path fill="#FBBC04" d="M486.7 234.3l-101.3-58.2-60.1 60.1 60.1 60.1 101.3-58.2c16.3-9.4 16.3-24.8 0-33.8z"/>
+      </svg>
+      <span>Get it on Google Play</span>
+    </a>
+
+    <div class="redirect-text">
+      Redirecting to Google Play Store in <span id="countdown">3</span>s...
+    </div>
+  </div>
+
+  <footer>
+    © 2026 SkillForge Technologies. All Rights Reserved.
+  </footer>
+
+  <script>
+    const playStoreUrl = "https://play.google.com/store/apps/details?id=app.skillforge.mavio";
+    
+    // Parse parameters if present
+    const params = new URLSearchParams(window.location.search);
+    const busName = params.get('name');
+    const busReg = params.get('regNumber');
+
+    if (busName) {
+      document.getElementById('busName').textContent = decodeURIComponent(busName);
+      if (busReg) {
+        document.getElementById('busReg').textContent = decodeURIComponent(busReg);
+      }
+      document.getElementById('busDetails').classList.add('active');
+    }
+
+    // Auto redirect after 3 seconds
+    let secondsLeft = 3;
+    const countdownEl = document.getElementById('countdown');
+    const timer = setInterval(() => {
+      secondsLeft--;
+      if (countdownEl) countdownEl.textContent = secondsLeft;
+      if (secondsLeft <= 0) {
+        clearInterval(timer);
+        window.location.href = playStoreUrl;
+      }
+    }, 1000);
+  </script>
+
+</body>
+</html>

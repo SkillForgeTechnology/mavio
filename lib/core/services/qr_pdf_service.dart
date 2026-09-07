@@ -6,26 +6,60 @@ import 'package:printing/printing.dart';
 import '../../models/models.dart';
 
 class QrPdfService {
-  /// Generates a standardized JSON payload string for a vehicle's QR code
+  /// Base landing URL for universal QR scanning (redirects to Play Store on web/external scanners)
+  static const String scanBaseUrl = 'https://mavio.skillforgetechnology.app/scan';
+
+  /// Generates a standardized Universal Link payload string for a vehicle's QR code.
+  /// When scanned outside the app, it opens the web landing page and redirects to Google Play.
+  /// When scanned inside the MAVIO Driver App, it instantly activates driver shift mode.
   static String generateBusQrPayload({
     required MavioVehicle vehicle,
     required String orgId,
   }) {
-    return jsonEncode({
-      'app': 'mavio',
-      'type': 'bus_qr',
-      'v': 1,
-      'orgId': orgId,
-      'vehicleId': vehicle.id,
-      'name': vehicle.name,
-      'regNumber': vehicle.regNumber,
-    });
+    final uri = Uri.parse(scanBaseUrl).replace(
+      queryParameters: {
+        'app': 'mavio',
+        'type': 'bus_qr',
+        'v': '1',
+        'orgId': orgId,
+        'vehicleId': vehicle.id,
+        'name': vehicle.name,
+        'regNumber': vehicle.regNumber,
+      },
+    );
+    return uri.toString();
   }
 
-  /// Parses and validates a scanned QR payload string
+  /// Parses and validates a scanned QR payload string (supports both Universal URL & JSON formats)
   static Map<String, dynamic>? parseBusQrPayload(String rawData) {
+    final trimmed = rawData.trim();
+    if (trimmed.isEmpty) return null;
+
+    // 1. Check if payload is a Universal URL (https://mavio.../scan?...)
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      try {
+        final uri = Uri.parse(trimmed);
+        final params = uri.queryParameters;
+        if (params['app'] == 'mavio' &&
+            params['type'] == 'bus_qr' &&
+            params.containsKey('vehicleId') &&
+            params.containsKey('orgId')) {
+          return {
+            'app': 'mavio',
+            'type': 'bus_qr',
+            'v': int.tryParse(params['v'] ?? '1') ?? 1,
+            'orgId': params['orgId'] ?? '',
+            'vehicleId': params['vehicleId'] ?? '',
+            'name': params['name'] ?? '',
+            'regNumber': params['regNumber'] ?? '',
+          };
+        }
+      } catch (_) {}
+    }
+
+    // 2. Fallback check for legacy JSON payload
     try {
-      final decoded = jsonDecode(rawData.trim());
+      final decoded = jsonDecode(trimmed);
       if (decoded is Map<String, dynamic>) {
         if (decoded['app'] == 'mavio' &&
             decoded['type'] == 'bus_qr' &&
@@ -35,6 +69,7 @@ class QrPdfService {
         }
       }
     } catch (_) {}
+
     return null;
   }
 
