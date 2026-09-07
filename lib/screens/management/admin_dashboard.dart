@@ -20,6 +20,8 @@ import 'bulk_import_screen.dart';
 import 'management_complaints_screen.dart';
 import '../../widgets/mavio_3d_bus_marker.dart';
 import '../../widgets/mavio_org_logo.dart';
+import '../../core/services/qr_pdf_service.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -307,6 +309,345 @@ class _AdminDashboardState extends State<AdminDashboard> {
               },
               style: ElevatedButton.styleFrom(minimumSize: const Size(100, 40)),
               child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Bus Details & Printable QR Dialog
+  void _showBusDetailsQrDialog(MavioVehicle v) {
+    final org = _db.currentOrganization;
+    final orgId = org?.id ?? v.orgId ?? '';
+    final qrPayload = QrPdfService.generateBusQrPayload(vehicle: v, orgId: orgId);
+
+    final allVehicles = _fleet.map((item) => item['vehicle'] as MavioVehicle).toList();
+    allVehicles.sort((a, b) {
+      if (a.createdAt == null) return 1;
+      if (b.createdAt == null) return -1;
+      return a.createdAt!.compareTo(b.createdAt!);
+    });
+    final index = allVehicles.indexWhere((x) => x.id == v.id);
+    final limit = org?.maxVehicles ?? 15;
+    final isDeactivated = index != -1 && index >= limit;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Container(
+            width: MediaQuery.of(ctx).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 440),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with Bus Name & Close
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isDeactivated ? Colors.red[50] : AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.directions_bus_rounded,
+                        color: isDeactivated ? Colors.redAccent : AppColors.primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  v.name,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isDeactivated
+                                      ? Colors.red[100]
+                                      : (v.status == 'LIVE' ? Colors.green[100] : Colors.grey[100]),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isDeactivated
+                                      ? 'Over Limit'
+                                      : (v.status == 'LIVE' ? 'Live' : 'Offline'),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDeactivated
+                                        ? Colors.red[900]
+                                        : (v.status == 'LIVE' ? Colors.green[800] : Colors.grey[700]),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            v.regNumber,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                      onPressed: () => Navigator.pop(ctx),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // QR Code Display Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.borderLight, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      QrImageView(
+                        data: qrPayload,
+                        version: QrVersions.auto,
+                        size: 190,
+                        backgroundColor: Colors.white,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: Color(0xFFEA580C),
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Scan with Mavio Driver App to activate trip',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary.withOpacity(0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    // Print QR Sticker Button
+                    Expanded(
+                      flex: 3,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await QrPdfService.printSingleBusQr(vehicle: v, org: org);
+                        },
+                        icon: const Icon(Icons.print_rounded, size: 18),
+                        label: const Text('Print Sticker'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Edit Bus Button
+                    IconButton.outlined(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _showEditVehicleDialog(v);
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.textPrimary),
+                      tooltip: 'Edit Bus',
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    // Delete Bus Button
+                    IconButton.outlined(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _confirmDeleteVehicle(v);
+                      },
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                      tooltip: 'Delete Bus',
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Edit Vehicle Dialog
+  void _showEditVehicleDialog(MavioVehicle v) {
+    final nameController = TextEditingController(text: v.name);
+    final regController = TextEditingController(text: v.regNumber);
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Edit Vehicle', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.85,
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Bus Name',
+                      prefixIcon: Icon(Icons.directions_bus_outlined, color: AppColors.primary),
+                    ),
+                    validator: (val) => val!.trim().isEmpty ? 'Enter name' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: regController,
+                    decoration: const InputDecoration(
+                      labelText: 'Registration No.',
+                      prefixIcon: Icon(Icons.badge_outlined, color: AppColors.primary),
+                    ),
+                    validator: (val) => val!.trim().isEmpty ? 'Enter registration number' : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(context);
+                setState(() => _isLoading = true);
+                try {
+                  await _db.updateVehicle(v.id, nameController.text.trim(), regController.text.trim());
+                  await _loadAdminData();
+                  AppToast.show(context, 'Vehicle updated successfully');
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Error updating: $e'), backgroundColor: AppColors.error),
+                  );
+                } finally {
+                  if (mounted) setState(() => _isLoading = false);
+                }
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Confirm Delete Vehicle Dialog
+  void _confirmDeleteVehicle(MavioVehicle v) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+              SizedBox(width: 8),
+              Text('Delete Vehicle', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            'Are you sure you want to delete ${v.name} (${v.regNumber})? This will unassign any routes and trips associated with this bus.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(context);
+                setState(() => _isLoading = true);
+                try {
+                  await _db.deleteVehicle(v.id);
+                  await _loadAdminData();
+                  AppToast.show(context, 'Vehicle deleted successfully');
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Error deleting: $e'), backgroundColor: AppColors.error),
+                  );
+                } finally {
+                  if (mounted) setState(() => _isLoading = false);
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+              child: const Text('Delete'),
             ),
           ],
         );
@@ -3332,6 +3673,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
             child: const Icon(Icons.upload_file_rounded),
           ),
           const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'vehicle_print_all_qr',
+            onPressed: () => QrPdfService.printAllBusesQrSheet(
+              vehicles: filteredVehicles,
+              org: _db.currentOrganization,
+            ),
+            backgroundColor: const Color(0xFFEA580C),
+            foregroundColor: Colors.white,
+            tooltip: 'Print All Bus QR Badges (PDF)',
+            child: const Icon(Icons.qr_code_2_rounded),
+          ),
+          const SizedBox(height: 8),
           FloatingActionButton(
             heroTag: 'vehicle_add',
             onPressed: _showAddVehicleDialog,
@@ -3366,76 +3719,92 @@ class _AdminDashboardState extends State<AdminDashboard> {
           width: isDeactivated ? 1.2 : 0.8,
         ),
       ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: isDeactivated ? Colors.red[50] : AppColors.primaryLight,
-          child: Icon(
-            Icons.directions_bus_rounded,
-            color: isDeactivated ? Colors.redAccent : AppColors.primary,
-          ),
-        ),
-        title: Row(
-          children: [
-            Text(
-              v.name,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isDeactivated ? Colors.red[900] : AppColors.textPrimary,
-              ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _showBusDetailsQrDialog(v),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: isDeactivated ? Colors.red[50] : AppColors.primaryLight,
+            child: Icon(
+              Icons.directions_bus_rounded,
+              color: isDeactivated ? Colors.redAccent : AppColors.primary,
             ),
-            if (isDeactivated) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.red[100],
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'Over Plan Limit',
-                  style: TextStyle(
-                    color: Colors.red[900],
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                  ),
+          ),
+          title: Row(
+            children: [
+              Text(
+                v.name,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDeactivated ? Colors.red[900] : AppColors.textPrimary,
                 ),
               ),
+              if (isDeactivated) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red[100],
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Over Plan Limit',
+                    style: TextStyle(
+                      color: Colors.red[900],
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
-        ),
-        subtitle: Text(
-          v.regNumber,
-          style: TextStyle(
-            color: isDeactivated ? Colors.red[700]?.withOpacity(0.8) : AppColors.textSecondary,
+          ),
+          subtitle: Text(
+            v.regNumber,
+            style: TextStyle(
+              color: isDeactivated ? Colors.red[700]?.withOpacity(0.8) : AppColors.textSecondary,
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.qr_code_rounded,
+                size: 20,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              if (isDeactivated)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+                  ),
+                  child: const Text(
+                    'Deactivated',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: v.status == 'LIVE'
+                        ? AppColors.success
+                        : AppColors.textSecondary.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+            ],
           ),
         ),
-        trailing: isDeactivated
-            ? Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
-                ),
-                child: const Text(
-                  'Deactivated',
-                  style: TextStyle(
-                    color: Colors.redAccent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              )
-            : Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: v.status == 'LIVE'
-                      ? AppColors.success
-                      : AppColors.textSecondary.withOpacity(0.5),
-                  shape: BoxShape.circle,
-                ),
-              ),
       ),
     );
   }

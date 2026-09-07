@@ -1426,6 +1426,36 @@ class SupabaseService {
     }
   }
 
+  Future<void> updateVehicle(String vehicleId, String name, String regNumber) async {
+    if (_useMockMode) {
+      final index = _mockVehicles.indexWhere((v) => v.id == vehicleId);
+      if (index != -1) {
+        final old = _mockVehicles[index];
+        _mockVehicles[index] = MavioVehicle(
+          id: old.id,
+          name: name,
+          regNumber: regNumber,
+          status: old.status,
+          orgId: old.orgId,
+          createdAt: old.createdAt,
+        );
+      }
+    } else {
+      await Supabase.instance.client.from('vehicles').update({
+        'name': name,
+        'reg_number': regNumber,
+      }).eq('id', vehicleId);
+    }
+  }
+
+  Future<void> deleteVehicle(String vehicleId) async {
+    if (_useMockMode) {
+      _mockVehicles.removeWhere((v) => v.id == vehicleId);
+    } else {
+      await Supabase.instance.client.from('vehicles').delete().eq('id', vehicleId);
+    }
+  }
+
   String _generateUuid() {
     final random = Random();
     final hexDigits = '0123456789abcdef';

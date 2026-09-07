@@ -17,6 +17,7 @@ import '../../core/utils/toast_utils.dart';
 import '../../models/models.dart';
 import '../../widgets/mavio_org_logo.dart';
 import '../auth/splash_screen.dart';
+import 'bus_qr_scanner_dialog.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -30,6 +31,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   
   bool _isLoading = false;
   MavioVehicle? _assignedVehicle;
+  bool _isTemporaryAssigned = false;
   List<MavioTrip> _tripHistory = [];
   String _thisMonthDuration = "0h 0m";
 
@@ -124,6 +126,138 @@ class _DriverDashboardState extends State<DriverDashboard> {
     });
   }
 
+  Future<void> _openQrScanner() async {
+    final profile = Provider.of<AuthProvider>(context, listen: false).currentProfile;
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BusQrScannerDialog(expectedOrgId: profile?.orgId),
+      ),
+    );
+
+    if (result != null && mounted) {
+      final vehicleId = result['vehicleId'] as String;
+      final name = result['name'] as String? ?? 'BUS';
+      final regNumber = result['regNumber'] as String? ?? '';
+      final orgId = result['orgId'] as String? ?? profile?.orgId;
+
+      setState(() {
+        _assignedVehicle = MavioVehicle(
+          id: vehicleId,
+          name: name,
+          regNumber: regNumber,
+          status: 'OFFLINE',
+          orgId: orgId ?? profile?.orgId ?? '',
+        );
+        _isTemporaryAssigned = true;
+      });
+
+      _showVehicleSwitchedModal(name, regNumber);
+    }
+  }
+
+  void _showVehicleSwitchedModal(String name, String regNumber) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.primary,
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Connected to $name',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                regNumber,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'You are driving this bus for this shift. Live tracking will broadcast to students on this route.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text('Ready'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _startNewTrip();
+                      },
+                      icon: const Icon(Icons.play_circle_fill_rounded, size: 20),
+                      label: const Text('Start Trip Now'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // Request Permission and Start Trip
   void _toggleTrip() async {
     if (_isTripActive) {
@@ -135,7 +269,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
   Future<void> _startNewTrip() async {
     if (_assignedVehicle == null) {
-      _showSnackbar("No vehicle assigned to this driver.", AppColors.error);
+      _showSnackbar("Please scan a bus QR code to select your vehicle.", AppColors.warning);
+      _openQrScanner();
       return;
     }
 
@@ -795,13 +930,13 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppColors.success.withOpacity(0.12),
+                          color: (_isTemporaryAssigned ? const Color(0xFFF97316) : AppColors.success).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text(
-                          'Assigned',
+                        child: Text(
+                          _isTemporaryAssigned ? 'Shift Mode' : (_assignedVehicle != null ? 'Assigned' : 'Unassigned'),
                           style: TextStyle(
-                            color: AppColors.success,
+                            color: _isTemporaryAssigned ? const Color(0xFFEA580C) : (_assignedVehicle != null ? AppColors.success : AppColors.error),
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -817,7 +952,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.border, width: 1),
+                      border: Border.all(
+                        color: _isTemporaryAssigned ? AppColors.primary.withOpacity(0.4) : AppColors.border,
+                        width: _isTemporaryAssigned ? 1.5 : 1,
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -826,23 +964,22 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _assignedVehicle?.name ?? 'BUS --',
-                                style: const TextStyle(
+                                _assignedVehicle?.name ?? 'No Bus Selected',
+                                style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
+                                  color: _assignedVehicle != null ? AppColors.textPrimary : AppColors.textSecondary,
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                _assignedVehicle?.regNumber ?? 'TN -- AB ----',
+                                _assignedVehicle?.regNumber ?? 'Scan a bus QR sticker to begin',
                                 style: const TextStyle(
                                   fontSize: 14,
                                   color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
-
                             ],
                           ),
                         ),
@@ -861,6 +998,32 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       ],
                     ),
                   ),
+
+                  // Scan Bus QR Code Action (visible before starting trip)
+                  if (!_isTripActive) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _openQrScanner,
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                      label: Text(
+                        _isTemporaryAssigned
+                            ? 'Switch Bus (Current: ${_assignedVehicle?.name})'
+                            : (_assignedVehicle == null
+                                ? 'Scan Bus QR Code to Drive'
+                                : 'Scan Bus QR Code (Substitute Mode)'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary, width: 1.5),
+                        backgroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
 
                   // Status Indicators Box Row
