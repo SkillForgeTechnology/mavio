@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import '../../core/services/ola_maps_service.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/theme/theme.dart';
 import '../../core/utils/toast_utils.dart';
@@ -29,6 +30,7 @@ class _StudentStopSelectionPageState extends State<StudentStopSelectionPage> {
   
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
+  final OlaMapsService _olaMaps = OlaMapsService();
   List<dynamic> _searchResults = [];
   bool _isSearching = false;
   Timer? _debounce;
@@ -51,7 +53,7 @@ class _StudentStopSelectionPageState extends State<StudentStopSelectionPage> {
   // Handle Search Input Debouncing
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 600), () {
+    _debounce = Timer(const Duration(milliseconds: 500), () {
       if (query.trim().isNotEmpty) {
         _performSearch(query.trim());
       } else {
@@ -62,7 +64,7 @@ class _StudentStopSelectionPageState extends State<StudentStopSelectionPage> {
     });
   }
 
-  // Multi-Engine Free Geocoding with Local Proximity Bias
+  // High-Accuracy India Places Search (Ola Maps + Photon/OSM Fallback)
   Future<void> _performSearch(String query) async {
     setState(() {
       _isSearching = true;
@@ -75,72 +77,57 @@ class _StudentStopSelectionPageState extends State<StudentStopSelectionPage> {
     final Set<String> seenCoords = {};
 
     try {
-      // 1. Photon Geocoder (Fast, Typo-Tolerant, Location-Biased, 100% Free)
-      final photonUri = Uri.parse(
-        'https://photon.komoot.io/api/?q=${Uri.encodeComponent(query)}&lat=$currentLat&lon=$currentLng&limit=8',
+      // 1. Ola Maps Places Autocomplete (Comprehensive India Transit, Bus Stops, Colleges & Streets)
+      final olaResults = await _olaMaps.searchPlaces(
+        query: query,
+        latitude: currentLat,
+        longitude: currentLng,
       );
-      final photonRes = await http.get(photonUri).timeout(const Duration(seconds: 4));
-      if (photonRes.statusCode == 200) {
-        final data = json.decode(photonRes.body);
-        final features = data['features'] as List? ?? [];
-        for (var f in features) {
-          final props = f['properties'] ?? {};
-          final coords = f['geometry']?['coordinates'] as List? ?? [];
-          if (coords.length >= 2) {
-            final double lon = (coords[0] as num).toDouble();
-            final double lat = (coords[1] as num).toDouble();
-            final coordKey = '${lat.toStringAsFixed(4)},${lon.toStringAsFixed(4)}';
 
-            if (!seenCoords.contains(coordKey)) {
-              seenCoords.add(coordKey);
-
-              final name = props['name'] ?? props['street'] ?? props['city'] ?? query;
-              final List<String> subParts = [];
-              if (props['street'] != null && props['street'] != name) subParts.add(props['street']);
-              if (props['district'] != null) subParts.add(props['district']);
-              if (props['city'] != null && props['city'] != name) subParts.add(props['city']);
-              if (props['state'] != null) subParts.add(props['state']);
-
-              combinedResults.add({
-                'title': name.toString(),
-                'subtitle': subParts.join(', '),
-                'lat': lat,
-                'lon': lon,
-              });
-            }
-          }
+      for (var item in olaResults) {
+        final double lat = item['lat'];
+        final double lon = item['lon'];
+        final coordKey = '${lat.toStringAsFixed(4)},${lon.toStringAsFixed(4)}';
+        if (!seenCoords.contains(coordKey)) {
+          seenCoords.add(coordKey);
+          combinedResults.add(item);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      print("Ola Maps query error: $e");
+    }
 
-    // 2. Nominatim India-Scoped Fallback if Photon gave few results
-    if (combinedResults.length < 5) {
+    // 2. Photon + Nominatim Fallback if needed
+    if (combinedResults.length < 4) {
       try {
-        final nomUri = Uri.parse(
-          'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&countrycodes=in&limit=6&addressdetails=1',
+        final photonUri = Uri.parse(
+          'https://photon.komoot.io/api/?q=${Uri.encodeComponent(query)}&lat=$currentLat&lon=$currentLng&limit=6',
         );
-        final nomRes = await http.get(
-          nomUri,
-          headers: {'User-Agent': 'mavio_transit_app_free/2.0'},
-        ).timeout(const Duration(seconds: 4));
-
-        if (nomRes.statusCode == 200) {
-          final list = json.decode(nomRes.body) as List? ?? [];
-          for (var item in list) {
-            final lat = double.tryParse(item['lat']?.toString() ?? '');
-            final lon = double.tryParse(item['lon']?.toString() ?? '');
-            if (lat != null && lon != null) {
+        final photonRes = await http.get(photonUri).timeout(const Duration(seconds: 4));
+        if (photonRes.statusCode == 200) {
+          final data = json.decode(photonRes.body);
+          final features = data['features'] as List? ?? [];
+          for (var f in features) {
+            final props = f['properties'] ?? {};
+            final coords = f['geometry']?['coordinates'] as List? ?? [];
+            if (coords.length >= 2) {
+              final double lon = (coords[0] as num).toDouble();
+              final double lat = (coords[1] as num).toDouble();
               final coordKey = '${lat.toStringAsFixed(4)},${lon.toStringAsFixed(4)}';
+
               if (!seenCoords.contains(coordKey)) {
                 seenCoords.add(coordKey);
-                final displayName = item['display_name']?.toString() ?? '';
-                final parts = displayName.split(', ');
-                final title = parts.isNotEmpty ? parts.first : query;
-                final subtitle = parts.length > 1 ? parts.sublist(1, parts.length > 4 ? 4 : parts.length).join(', ') : '';
+
+                final name = props['name'] ?? props['street'] ?? props['city'] ?? query;
+                final List<String> subParts = [];
+                if (props['street'] != null && props['street'] != name) subParts.add(props['street']);
+                if (props['district'] != null) subParts.add(props['district']);
+                if (props['city'] != null && props['city'] != name) subParts.add(props['city']);
+                if (props['state'] != null) subParts.add(props['state']);
 
                 combinedResults.add({
-                  'title': title,
-                  'subtitle': subtitle,
+                  'title': name.toString(),
+                  'subtitle': subParts.join(', '),
                   'lat': lat,
                   'lon': lon,
                 });
@@ -150,6 +137,14 @@ class _StudentStopSelectionPageState extends State<StudentStopSelectionPage> {
         }
       } catch (_) {}
     }
+
+    if (mounted) {
+      setState(() {
+        _searchResults = combinedResults;
+        _isSearching = false;
+      });
+    }
+  }
 
     if (mounted) {
       setState(() {
