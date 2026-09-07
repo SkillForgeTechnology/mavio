@@ -189,16 +189,16 @@ class QrPdfService {
 
     return pw.Container(
       margin: const pw.EdgeInsets.all(6),
-      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: pw.BoxDecoration(
         color: PdfColors.white,
         border: pw.Border.all(
           color: PdfColors.orange600,
-          width: 1.2,
+          width: 1.5,
           style: pw.BorderStyle.dashed,
         ),
         borderRadius: const pw.BorderRadius.all(
-          pw.Radius.circular(10),
+          pw.Radius.circular(12),
         ),
       ),
       child: pw.Column(
@@ -212,15 +212,15 @@ class QrPdfService {
                 'MAVIO',
                 style: pw.TextStyle(
                   color: PdfColors.orange700,
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
               if (org != null && org.name.isNotEmpty) ...[
                 pw.Text(
-                  ' | ${org.name.length > 16 ? org.name.substring(0, 16) : org.name}',
+                  ' | ${org.name.length > 20 ? org.name.substring(0, 20) : org.name}',
                   style: pw.TextStyle(
-                    fontSize: 9,
+                    fontSize: 10,
                     fontWeight: pw.FontWeight.bold,
                     color: PdfColors.grey700,
                   ),
@@ -228,48 +228,57 @@ class QrPdfService {
               ],
             ],
           ),
-          pw.SizedBox(height: 4),
+          pw.SizedBox(height: 6),
           pw.Text(
             vehicle.name.toUpperCase(),
             style: pw.TextStyle(
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: pw.FontWeight.bold,
               color: PdfColors.black,
             ),
           ),
-          pw.SizedBox(height: 2),
+          pw.SizedBox(height: 4),
           pw.Container(
             padding: const pw.EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 2,
+              horizontal: 10,
+              vertical: 3,
             ),
             decoration: pw.BoxDecoration(
               color: PdfColors.grey100,
               borderRadius: const pw.BorderRadius.all(
-                pw.Radius.circular(4),
+                pw.Radius.circular(6),
               ),
+              border: pw.Border.all(color: PdfColors.grey400, width: 0.8),
             ),
             child: pw.Text(
               vehicle.regNumber.toUpperCase(),
               style: pw.TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: pw.FontWeight.bold,
                 color: PdfColors.grey800,
               ),
             ),
           ),
-          pw.SizedBox(height: 8),
-          pw.BarcodeWidget(
-            barcode: pw.Barcode.qrCode(),
-            data: qrPayload,
-            width: 130,
-            height: 130,
+          pw.SizedBox(height: 10),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(6),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.white,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+              border: pw.Border.all(color: PdfColors.grey300, width: 0.8),
+            ),
+            child: pw.BarcodeWidget(
+              barcode: pw.Barcode.qrCode(),
+              data: qrPayload,
+              width: 185,
+              height: 185,
+            ),
           ),
-          pw.SizedBox(height: 6),
+          pw.SizedBox(height: 8),
           pw.Text(
             'SCAN VIA DRIVER APP TO START TRIP',
             style: pw.TextStyle(
-              fontSize: 7,
+              fontSize: 8.5,
               fontWeight: pw.FontWeight.bold,
               color: PdfColors.orange800,
             ),
@@ -298,7 +307,7 @@ class QrPdfService {
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(20),
+          margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           build: (pw.Context context) {
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -312,7 +321,7 @@ class QrPdfService {
                         pw.Text(
                           'MAVIO FLEET QR BADGES',
                           style: pw.TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: pw.FontWeight.bold,
                             color: PdfColors.orange700,
                           ),
@@ -321,7 +330,7 @@ class QrPdfService {
                           pw.Text(
                             ' - ${org.name}',
                             style: pw.TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               fontWeight: pw.FontWeight.bold,
                               color: PdfColors.grey800,
                             ),
@@ -332,15 +341,15 @@ class QrPdfService {
                     pw.Text(
                       'Page ${(i / chunkSize).floor() + 1} of ${(vehicles.length / chunkSize).ceil()}',
                       style: const pw.TextStyle(
-                        fontSize: 10,
+                        fontSize: 9.5,
                         color: PdfColors.grey600,
                       ),
                     ),
                   ],
                 ),
-                pw.SizedBox(height: 6),
+                pw.SizedBox(height: 4),
                 pw.Divider(color: PdfColors.grey300, thickness: 0.8),
-                pw.SizedBox(height: 8),
+                pw.SizedBox(height: 6),
 
                 // Row 1 (Item 0 and Item 1)
                 pw.Row(
@@ -363,7 +372,7 @@ class QrPdfService {
                     ),
                   ],
                 ),
-                pw.SizedBox(height: 8),
+                pw.SizedBox(height: 6),
 
                 // Row 2 (Item 2 and Item 3)
                 if (chunk.length > 2)
