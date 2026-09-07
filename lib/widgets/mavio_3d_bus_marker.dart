@@ -74,15 +74,86 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
               },
             ),
 
-          // 2. Headlights & Sleek Google Maps Style 3D Navigation Bus Model
-          Transform.rotate(
-            angle: widget.headingDegrees * (math.pi / 180.0),
-            child: CustomPaint(
-              size: const Size(76, 76),
-              painter: _GoogleMaps3DBusPainter(
-                isMoving: !isStopped,
+          // 2. Directional Heading Cone & Beacon Circle
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              // Directional Vision / Heading Cone
+              Transform.rotate(
+                angle: widget.headingDegrees * (math.pi / 180.0),
+                child: CustomPaint(
+                  size: const Size(64, 64),
+                  painter: _HeadingConePainter(isMoving: !isStopped),
+                ),
               ),
-            ),
+
+              // Elevated Core Circular Beacon with Directional Arrow
+              Transform.rotate(
+                angle: widget.headingDegrees * (math.pi / 180.0),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.18),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFFF97316).withOpacity(0.25),
+                        blurRadius: 14,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFFFB923C),
+                            Color(0xFFEA580C),
+                          ],
+                        ),
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Top Directional Pointer Triangle
+                          Positioned(
+                            top: 2,
+                            child: Transform.rotate(
+                              angle: 0,
+                              child: const Icon(
+                                Icons.arrow_drop_up_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          // Center Bus Icon
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Icon(
+                              Icons.directions_bus_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
           // 3. Floating Premium Glassmorphism Badge
@@ -155,210 +226,41 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
   }
 }
 
-/// High-End Google Maps Style 3D Vector Coach/Bus Painter
-class _GoogleMaps3DBusPainter extends CustomPainter {
+/// Translucent Directional Vision/Heading Arc
+class _HeadingConePainter extends CustomPainter {
   final bool isMoving;
 
-  _GoogleMaps3DBusPainter({
-    required this.isMoving,
-  });
+  _HeadingConePainter({required this.isMoving});
 
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
     final cy = size.height / 2;
 
-    // 1. Dynamic Forward LED Headlight Beams (Illuminates road ahead)
-    final headlightPaint = Paint()
+    final conePaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFFFEF3C7).withOpacity(isMoving ? 0.70 : 0.28),
-          const Color(0xFFFFFBEB).withOpacity(isMoving ? 0.30 : 0.10),
+          const Color(0xFFF97316).withOpacity(isMoving ? 0.40 : 0.20),
+          const Color(0xFFFB923C).withOpacity(isMoving ? 0.18 : 0.08),
           Colors.transparent,
         ],
-        stops: const [0.0, 0.60, 1.0],
-      ).createShader(Rect.fromCircle(center: Offset(cx, cy - 30), radius: 38));
+        stops: const [0.0, 0.65, 1.0],
+      ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: 36));
 
-    final headlightPath = Path()
-      ..moveTo(cx - 9, cy - 22)
-      ..lineTo(cx - 24, cy - 44)
-      ..lineTo(cx + 24, cy - 44)
-      ..lineTo(cx + 9, cy - 22)
+    final conePath = Path()
+      ..moveTo(cx, cy)
+      ..lineTo(cx - 18, cy - 32)
+      ..arcToPoint(
+        Offset(cx + 18, cy - 32),
+        radius: const Radius.circular(22),
+      )
+      ..lineTo(cx, cy)
       ..close();
-    canvas.drawPath(headlightPath, headlightPaint);
 
-    // 2. Realistic 3D Elevated Ground Drop Shadow
-    final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.28)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy + 3.5), width: 24, height: 52),
-        const Radius.circular(10),
-      ),
-      shadowPaint,
-    );
-
-    // 3. Dark Underbody Chassis & Wheels Base
-    final chassisPaint = Paint()..color = const Color(0xFF0F172A);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy + 0.5), width: 24, height: 49),
-        const Radius.circular(8),
-      ),
-      chassisPaint,
-    );
-
-    // 4. Aerodynamic Side Mirrors (Left & Right)
-    final mirrorPaint = Paint()..color = const Color(0xFFEA580C);
-    // Left Mirror
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx - 13.5, cy - 16), width: 3.5, height: 8),
-        const Radius.circular(2),
-      ),
-      mirrorPaint,
-    );
-    // Right Mirror
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx + 13.5, cy - 16), width: 3.5, height: 8),
-        const Radius.circular(2),
-      ),
-      mirrorPaint,
-    );
-
-    // 5. Main Coach Body: Metallic Pearl White with 3D Bevel Lighting
-    final bodyPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFFFFFFFF), // Pure White Front
-          Color(0xFFF1F5F9), // Pearl White Mid
-          Color(0xFFCBD5E1), // 3D Shading Rear
-        ],
-      ).createShader(Rect.fromLTWH(cx - 11, cy - 24, 22, 48));
-
-    final bodyRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy), width: 22, height: 48),
-      const Radius.circular(8),
-    );
-    canvas.drawRRect(bodyRect, bodyPaint);
-
-    // 6. Dynamic Mavio Orange Racing Side Accents
-    final orangeStripePaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFFFB923C),
-          Color(0xFFEA580C),
-          Color(0xFFC2410C),
-        ],
-      ).createShader(Rect.fromLTWH(cx - 11, cy - 14, 22, 36));
-
-    // Left Stripe
-    final leftStripe = Path()
-      ..moveTo(cx - 10.5, cy - 12)
-      ..lineTo(cx - 8.0, cy - 12)
-      ..lineTo(cx - 8.0, cy + 20)
-      ..lineTo(cx - 10.5, cy + 20)
-      ..close();
-    canvas.drawPath(leftStripe, orangeStripePaint);
-
-    // Right Stripe
-    final rightStripe = Path()
-      ..moveTo(cx + 8.0, cy - 12)
-      ..lineTo(cx + 10.5, cy - 12)
-      ..lineTo(cx + 10.5, cy + 20)
-      ..lineTo(cx + 8.0, cy + 20)
-      ..close();
-    canvas.drawPath(rightStripe, orangeStripePaint);
-
-    // 7. Panoramic Curved Windshield (Deep Obsidian Glass with 3D Glare)
-    final windshieldPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFF0F172A),
-          Color(0xFF1E293B),
-        ],
-      ).createShader(Rect.fromLTWH(cx - 9, cy - 22, 18, 10));
-
-    final windshieldRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy - 17), width: 18, height: 9.5),
-      const Radius.circular(5),
-    );
-    canvas.drawRRect(windshieldRect, windshieldPaint);
-
-    // 3D Glass Sun Reflection
-    final glassGlarePaint = Paint()
-      ..color = Colors.white.withOpacity(0.40)
-      ..strokeWidth = 1.2;
-    canvas.drawLine(Offset(cx - 6, cy - 19), Offset(cx + 3, cy - 15), glassGlarePaint);
-
-    // 8. Streamlined Rooftop AC Pod with Orange Winglets
-    final acPodPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Color(0xFFFFFFFF),
-          Color(0xFFE2E8F0),
-        ],
-      ).createShader(Rect.fromLTWH(cx - 5.5, cy - 5, 11, 18));
-
-    final acPodRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy + 3), width: 11, height: 18),
-      const Radius.circular(3.5),
-    );
-    canvas.drawRRect(acPodRect, acPodPaint);
-
-    // AC Center Spine & Dual Vent Fans
-    final fanPaint = Paint()..color = const Color(0xFF94A3B8);
-    canvas.drawCircle(Offset(cx, cy - 1), 2.2, fanPaint);
-    canvas.drawCircle(Offset(cx, cy + 7), 2.2, fanPaint);
-
-    // AC Orange Accent Fin
-    final acFinPaint = Paint()..color = const Color(0xFFEA580C);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy + 3), width: 2.0, height: 14),
-        const Radius.circular(1),
-      ),
-      acFinPaint,
-    );
-
-    // 9. Modern LED Headlight Blades
-    final ledPaint = Paint()
-      ..color = const Color(0xFFFEF08A)
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawLine(Offset(cx - 9, cy - 22), Offset(cx - 4, cy - 23.5), ledPaint);
-    canvas.drawLine(Offset(cx + 9, cy - 22), Offset(cx + 4, cy - 23.5), ledPaint);
-
-    // 10. Rear LED Neon Tail-Light Bar
-    final tailLightPaint = Paint()
-      ..color = const Color(0xFFEF4444)
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawLine(Offset(cx - 8, cy + 23), Offset(cx + 8, cy + 23), tailLightPaint);
-
-    // 11. Crisp Outer Metallic Edge / 3D Bevel
-    final bevelPaint = Paint()
-      ..color = const Color(0xFFCBD5E1)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.9;
-    canvas.drawRRect(bodyRect, bevelPaint);
+    canvas.drawPath(conePath, conePaint);
   }
 
   @override
-  bool shouldRepaint(covariant _GoogleMaps3DBusPainter oldDelegate) {
-    return oldDelegate.isMoving != isMoving;
-  }
+  bool shouldRepaint(covariant _HeadingConePainter oldDelegate) =>
+      oldDelegate.isMoving != isMoving;
 }
