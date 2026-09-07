@@ -146,14 +146,6 @@ class _StudentStopSelectionPageState extends State<StudentStopSelectionPage> {
     }
   }
 
-    if (mounted) {
-      setState(() {
-        _searchResults = combinedResults;
-        _isSearching = false;
-      });
-    }
-  }
-
   // Get current device GPS and center map
   Future<void> _getCurrentLocation() async {
     setState(() {
