@@ -10,6 +10,8 @@ import '../../core/utils/toast_utils.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/push_notification_service.dart';
 import '../../models/models.dart';
+import 'package:geolocator/geolocator.dart';
+import '../../widgets/mavio_3d_bus_marker.dart';
 import '../auth/splash_screen.dart';
 import 'stop_selection_page.dart';
 import 'student_complaint_screen.dart';
@@ -494,34 +496,17 @@ class _HomeTab extends StatelessWidget {
                                           Marker(
                                             point: LatLng(
                                               tracking.latestLocation!.latitude,
-                                              tracking
-                                                  .latestLocation!
-                                                  .longitude,
+                                              tracking.latestLocation!.longitude,
                                             ),
-                                            width: 44,
-                                            height: 44,
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: AppColors.primary,
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: Colors.white,
-                                                  width: 2,
-                                                ),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: AppColors.primary
-                                                        .withOpacity(0.35),
-                                                    blurRadius: 12,
-                                                    spreadRadius: 2,
-                                                  ),
-                                                ],
-                                              ),
-                                              child: const Icon(
-                                                Icons.directions_bus_rounded,
-                                                color: Colors.white,
-                                                size: 20,
-                                              ),
+                                            width: 90,
+                                            height: 90,
+                                            alignment: Alignment.center,
+                                            child: Mavio3DBusMarker(
+                                              busName: tracking.assignedVehicle?.name ?? '',
+                                              speedKmH: tracking.latestLocation!.speed,
+                                              headingDegrees: tracking.latestLocation!.heading,
+                                              isLive: tracking.isTripLive,
+                                              showBadge: false,
                                             ),
                                           ),
                                         ],
@@ -952,12 +937,42 @@ class _MapTab extends StatefulWidget {
   State<_MapTab> createState() => _MapTabState();
 }
 
-class _MapTabState extends State<_MapTab> {
+class _MapTabState extends State<_MapTab> with TickerProviderStateMixin {
   final MapController _mapController = MapController();
   TrackingProvider? _trackingProvider;
   bool _isAutoCenterEnabled = true;
   String _mapLayerStyle =
       'm'; // 'm' = road, 'y' = satellite hybrid, 'p' = terrain
+
+  // Smooth Movement Interpolation Engine
+  late AnimationController _posAnimController;
+  late Animation<double> _posAnim;
+
+  LatLng? _prevPos;
+  LatLng? _targetPos;
+  double _prevHeading = 0.0;
+  double _targetHeading = 0.0;
+  double _prevSpeed = 0.0;
+  double _targetSpeed = 0.0;
+  DateTime? _lastCameraMoveTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _posAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _posAnim = CurvedAnimation(
+      parent: _posAnimController,
+      curve: Curves.easeOutCubic,
+    )..addListener(() {
+        if (mounted) {
+          setState(() {});
+          _maybeFollowCamera();
+        }
+      });
+  }
 
   @override
   void didChangeDependencies() {
@@ -979,30 +994,116 @@ class _MapTabState extends State<_MapTab> {
 
   @override
   void dispose() {
+    _posAnimController.dispose();
     _trackingProvider?.removeListener(_onTrackingUpdate);
     super.dispose();
   }
 
-  void _onTrackingUpdate() {
-    if (_isAutoCenterEnabled &&
-        _trackingProvider != null &&
-        _trackingProvider!.isTripLive &&
-        _trackingProvider!.latestLocation != null) {
-      final loc = _trackingProvider!.latestLocation!;
-      try {
-        double currentZoom = 18.5;
-        try {
-          currentZoom = _mapController.camera.zoom;
-        } catch (_) {}
-        _mapController.move(LatLng(loc.latitude, loc.longitude), currentZoom);
-      } catch (_) {}
+  LatLng _getCurrentInterpolatedPos() {
+    if (_targetPos == null) {
+      final loc = _trackingProvider?.latestLocation;
+      if (loc != null) return LatLng(loc.latitude, loc.longitude);
+      return const LatLng(11.025, 76.98);
     }
+    if (_prevPos == null) {
+      return _targetPos!;
+    }
+    final t = _posAnim.value;
+    final lat = _prevPos!.latitude + (_targetPos!.latitude - _prevPos!.latitude) * t;
+    final lng = _prevPos!.longitude + (_targetPos!.longitude - _prevPos!.longitude) * t;
+    return LatLng(lat, lng);
+  }
+
+  double _getCurrentInterpolatedHeading() {
+    final t = _posAnim.value;
+    // Shortest angular difference for seamless 360 degree rotation
+    double diff = (_targetHeading - _prevHeading) % 360;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    return (_prevHeading + diff * t) % 360;
+  }
+
+  double _getCurrentInterpolatedSpeed() {
+    final t = _posAnim.value;
+    return _prevSpeed + (_targetSpeed - _prevSpeed) * t;
+  }
+
+  void _maybeFollowCamera() {
+    if (!_isAutoCenterEnabled) return;
+    final now = DateTime.now();
+    // Throttle camera updates to ~30ms to prevent browser/canvas jitter
+    if (_lastCameraMoveTime != null &&
+        now.difference(_lastCameraMoveTime!).inMilliseconds < 30) {
+      return;
+    }
+    _lastCameraMoveTime = now;
+    try {
+      final currentPos = _getCurrentInterpolatedPos();
+      double currentZoom = 17.5;
+      try {
+        currentZoom = _mapController.camera.zoom;
+      } catch (_) {}
+      _mapController.move(currentPos, currentZoom);
+    } catch (_) {}
+  }
+
+  void _onTrackingUpdate() {
+    if (_trackingProvider == null || _trackingProvider!.latestLocation == null) return;
+    final loc = _trackingProvider!.latestLocation!;
+    final newPos = LatLng(loc.latitude, loc.longitude);
+
+    // GPS Stationary Filter: if raw speed < 3.0 km/h, clamp to 0.0
+    final rawSpeed = loc.speed;
+    final effectiveSpeed = rawSpeed < 3.0 ? 0.0 : rawSpeed;
+
+    final currentInterpolated = _getCurrentInterpolatedPos();
+
+    if (_targetPos == null) {
+      _prevPos = newPos;
+      _targetPos = newPos;
+      _prevHeading = loc.heading;
+      _targetHeading = loc.heading;
+      _prevSpeed = effectiveSpeed;
+      _targetSpeed = effectiveSpeed;
+      _posAnimController.value = 1.0;
+      _centerOnBus(loc);
+      return;
+    }
+
+    // Measure distance delta from last interpolated position
+    final distMeters = Geolocator.distanceBetween(
+      currentInterpolated.latitude,
+      currentInterpolated.longitude,
+      newPos.latitude,
+      newPos.longitude,
+    );
+
+    // Micro-jitter suppression: if stationary and moved < 2.5m, ignore jitter
+    if (effectiveSpeed == 0.0 && distMeters < 2.5) {
+      _prevSpeed = _getCurrentInterpolatedSpeed();
+      _targetSpeed = 0.0;
+      return;
+    }
+
+    _prevPos = currentInterpolated;
+    _targetPos = newPos;
+    _prevSpeed = _getCurrentInterpolatedSpeed();
+    _targetSpeed = effectiveSpeed;
+
+    // Only update heading if vehicle is moving >= 3.0 km/h (locks direction when stopped)
+    if (effectiveSpeed >= 3.0) {
+      _prevHeading = _getCurrentInterpolatedHeading();
+      _targetHeading = loc.heading;
+    }
+
+    _posAnimController.forward(from: 0.0);
   }
 
   void _centerOnBus(MavioLocationUpdate? loc) {
     if (loc != null) {
       try {
-        _mapController.move(LatLng(loc.latitude, loc.longitude), 17.5);
+        final pos = _getCurrentInterpolatedPos();
+        _mapController.move(pos, 17.5);
       } catch (_) {}
     }
   }
@@ -1129,6 +1230,10 @@ class _MapTabState extends State<_MapTab> {
     final isLive = tracking.isTripLive;
     final latestLoc = tracking.latestLocation;
 
+    final currentPos = _getCurrentInterpolatedPos();
+    final currentHeading = _getCurrentInterpolatedHeading();
+    final currentSpeed = _getCurrentInterpolatedSpeed();
+
     return Scaffold(
       body: Stack(
         children: [
@@ -1136,9 +1241,7 @@ class _MapTabState extends State<_MapTab> {
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: latestLoc != null
-                  ? LatLng(latestLoc.latitude, latestLoc.longitude)
-                  : const LatLng(11.025, 76.98),
+              initialCenter: currentPos,
               initialZoom: 17.5,
               onPositionChanged: (position, hasGesture) {
                 if (hasGesture && _isAutoCenterEnabled) {
@@ -1222,45 +1325,21 @@ class _MapTabState extends State<_MapTab> {
                   ],
                 ),
 
-              // Glowing Bus Marker Layer
+              // 3D Animated Glowing Bus Marker Layer
               MarkerLayer(
                 markers: [
-                  // Active Glowing Bus Marker
                   if (isLive && latestLoc != null)
                     Marker(
-                      point: LatLng(latestLoc.latitude, latestLoc.longitude),
-                      width: 56,
-                      height: 56,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Concentric ripple animations
-                          _GlowingMarkerPulse(),
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 2.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 10,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.directions_bus_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ],
+                      point: currentPos,
+                      width: 120,
+                      height: 120,
+                      alignment: Alignment.center,
+                      child: Mavio3DBusMarker(
+                        busName: tracking.assignedVehicle?.name ?? 'BUS',
+                        speedKmH: currentSpeed,
+                        headingDegrees: currentHeading,
+                        isLive: isLive,
+                        showBadge: true,
                       ),
                     ),
                 ],

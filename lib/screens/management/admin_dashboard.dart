@@ -18,6 +18,7 @@ import '../auth/splash_screen.dart';
 import 'package:intl/intl.dart' as intl;
 import 'bulk_import_screen.dart';
 import 'management_complaints_screen.dart';
+import '../../widgets/mavio_3d_bus_marker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -2686,72 +2687,55 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final isSelected =
           _selectedMapFleetItem != null &&
           (_selectedMapFleetItem!['vehicle'] as MavioVehicle).id == v.id;
+      final double speed = isLive && activeTrip != null
+          ? (_liveVehicleSpeeds[activeTrip.id] ?? 0.0)
+          : 0.0;
 
       markers.add(
         Marker(
           point: markerPos,
-          width: isLive ? 52 : 40,
-          height: isLive ? 52 : 40,
-          child: Tooltip(
-            message: v.name,
-            preferBelow: false,
-            decoration: BoxDecoration(
-              color: AppColors.textPrimary.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            textStyle: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedMapFleetItem = item;
-                });
-                _mapController.move(markerPos, 14.0);
-              },
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  if (isLive)
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  Container(
-                    width: isLive ? 38 : 30,
-                    height: isLive ? 38 : 30,
+          width: isLive ? 110 : 44,
+          height: isLive ? 110 : 44,
+          alignment: Alignment.center,
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedMapFleetItem = item;
+              });
+              _mapController.move(markerPos, 15.0);
+            },
+            child: isLive
+                ? Mavio3DBusMarker(
+                    busName: v.name,
+                    speedKmH: speed,
+                    headingDegrees: 0.0,
+                    isLive: true,
+                    showBadge: true,
+                  )
+                : Container(
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
-                      color: isLive
-                          ? AppColors.primary
-                          : AppColors.textSecondary.withOpacity(0.8),
+                      color: AppColors.textSecondary.withOpacity(0.85),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: isSelected ? Colors.amber[600]! : Colors.white,
-                        width: isSelected ? 3.0 : (isLive ? 2.5 : 1.5),
+                        width: isSelected ? 3.0 : 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: (isLive ? AppColors.primary : Colors.black)
-                              .withOpacity(0.2),
+                          color: Colors.black.withOpacity(0.15),
                           blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.directions_bus_rounded,
                       color: Colors.white,
-                      size: isLive ? 18 : 14,
+                      size: 16,
                     ),
                   ),
-                ],
-              ),
-            ),
           ),
         ),
       );
