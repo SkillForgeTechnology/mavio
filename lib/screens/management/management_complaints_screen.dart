@@ -10,11 +10,13 @@ import '../../models/models.dart';
 class ManagementComplaintsScreen extends StatefulWidget {
   final String orgId;
   final String orgName;
+  final bool showBackButton;
 
   const ManagementComplaintsScreen({
     super.key,
     required this.orgId,
     this.orgName = 'Mavio Network',
+    this.showBackButton = true,
   });
 
   @override
@@ -99,10 +101,13 @@ class _ManagementComplaintsScreenState extends State<ManagementComplaintsScreen>
             ),
           ],
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: widget.showBackButton,
+        leading: widget.showBackButton
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary, size: 20),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),

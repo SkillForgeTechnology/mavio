@@ -34,6 +34,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   bool _isLoading = false;
   int _totalBuses = 0;
   int _activeNow = 0;
+  int _openComplaintsCount = 0;
   List<Map<String, dynamic>> _fleet = [];
   List<MavioProfile> _drivers = [];
   List<MavioProfile> _students = [];
@@ -130,12 +131,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final studentsData = List<MavioProfile>.from(data['students']);
       studentsData.sort((a, b) => _naturalCompare(a.name, b.name));
 
+      int openComplaints = 0;
+      final org = _db.currentOrganization;
+      if (org != null && org.id.isNotEmpty) {
+        try {
+          final complaints = await _db.getOrganizationComplaints(org.id);
+          openComplaints = complaints.where((c) => c.status.toUpperCase() == 'OPEN').length;
+        } catch (_) {}
+      }
+
       setState(() {
         _totalBuses = data['totalBuses'] as int;
         _activeNow = data['activeNow'] as int;
         _fleet = fleetData;
         _drivers = driversData;
         _students = studentsData;
+        _openComplaintsCount = openComplaints;
       });
     } catch (e) {
       print("Admin Refresh Error: $e");
@@ -1523,6 +1534,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         const SizedBox(height: 8),
                         _buildWebSidebarItem(
                           3,
+                          Icons.support_agent_rounded,
+                          'Helpdesk',
+                          badgeCount: _openComplaintsCount,
+                          showOrangeDot: _openComplaintsCount > 0,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildWebSidebarItem(
+                          4,
                           Icons.business_rounded,
                           'Profile Settings',
                         ),
@@ -1721,7 +1740,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildWebSidebarItem(int index, IconData icon, String label) {
+  Widget _buildWebSidebarItem(
+    int index,
+    IconData icon,
+    String label, {
+    int badgeCount = 0,
+    bool showOrangeDot = false,
+  }) {
     final isSelected = _currentIndex == index;
     return InkWell(
       onTap: () {
@@ -1756,8 +1781,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 fontSize: 14,
               ),
             ),
-            if (isSelected) ...[
-              const Spacer(),
+            if (badgeCount > 0 || showOrangeDot) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEA580C),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFEA580C).withOpacity(0.4),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  badgeCount > 0 ? '$badgeCount' : '●',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+            const Spacer(),
+            if (isSelected)
               Container(
                 width: 6,
                 height: 6,
@@ -1766,7 +1816,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   shape: BoxShape.circle,
                 ),
               ),
-            ],
           ],
         ),
       ),
@@ -1808,26 +1857,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         centerTitle: false,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.support_agent_rounded,
-              color: Color(0xFFDC2626),
-            ),
-            tooltip: 'Grievances & Helpdesk',
-            onPressed: () {
-              final auth = Provider.of<AuthProvider>(context, listen: false);
-              final orgId = auth.verifiedOrg?.id ?? '';
-              final orgName = auth.verifiedOrg?.name ?? 'Mavio Network';
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ManagementComplaintsScreen(
-                    orgId: orgId,
-                    orgName: orgName,
-                  ),
-                ),
-              );
-            },
-          ),
           IconButton(
             icon: const Icon(
               Icons.logout_rounded,
@@ -1872,23 +1901,44 @@ class _AdminDashboardState extends State<AdminDashboard> {
           unselectedLabelStyle: const TextStyle(fontSize: 11),
           type: BottomNavigationBarType.fixed,
           elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.dashboard_outlined),
               activeIcon: Icon(Icons.dashboard_rounded),
               label: 'Dashboard',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.map_outlined),
               activeIcon: Icon(Icons.map_rounded),
-              label: 'Map Tracker',
+              label: 'Map',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.manage_accounts_outlined),
               activeIcon: Icon(Icons.manage_accounts_rounded),
               label: 'Manage',
             ),
             BottomNavigationBarItem(
+              icon: Badge(
+                isLabelVisible: _openComplaintsCount > 0,
+                backgroundColor: const Color(0xFFEA580C),
+                label: Text(
+                  '$_openComplaintsCount',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+                child: const Icon(Icons.support_agent_outlined),
+              ),
+              activeIcon: Badge(
+                isLabelVisible: _openComplaintsCount > 0,
+                backgroundColor: const Color(0xFFEA580C),
+                label: Text(
+                  '$_openComplaintsCount',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+                child: const Icon(Icons.support_agent_rounded),
+              ),
+              label: 'Helpdesk',
+            ),
+            const BottomNavigationBarItem(
               icon: Icon(Icons.business_outlined),
               activeIcon: Icon(Icons.business_rounded),
               label: 'Profile',
@@ -1955,6 +2005,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _buildDashboardTab(collegeName),
       _buildMapTab(),
       _buildManagementTab(),
+      ManagementComplaintsScreen(
+        orgId: auth.verifiedOrg?.id ?? '',
+        orgName: collegeName,
+        showBackButton: false,
+      ),
       _buildProfileTab(auth.verifiedOrg),
     ];
 
@@ -2306,94 +2361,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                   ],
                 ),
-          const SizedBox(height: 24),
-
-          // Helpdesk & Grievances Quick Access Card
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.borderLight, width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF2F2),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFFECACA)),
-                  ),
-                  child: const Icon(
-                    Icons.support_agent_rounded,
-                    color: Color(0xFFDC2626),
-                    size: 26,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Student Helpdesk & Complaints',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      SizedBox(height: 3),
-                      Text(
-                        'Review anonymous student grievance tickets, check proof attachments & reply with resolution notes.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    final auth = Provider.of<AuthProvider>(context, listen: false);
-                    final orgId = auth.verifiedOrg?.id ?? '';
-                    final orgName = auth.verifiedOrg?.name ?? 'Mavio Network';
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ManagementComplaintsScreen(
-                          orgId: orgId,
-                          orgName: orgName,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                  label: const Text('View Complaints'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDC2626),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
