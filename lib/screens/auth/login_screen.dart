@@ -53,6 +53,9 @@ class _LoginScreenState extends State<LoginScreen>
     String emailInput = _emailController.text.trim();
     if (widget.role == 'student' && !emailInput.contains('@')) {
       emailInput = '$emailInput@mavio.student';
+    } else if (widget.role == 'driver' && !emailInput.contains('@')) {
+      final cleanDigits = emailInput.replaceAll(RegExp(r'[^\d]'), '');
+      emailInput = '$cleanDigits@mavio.driver';
     }
 
     final success = await auth.login(

@@ -588,52 +588,17 @@ class SupabaseService {
 
   // 2. Sign In
   Future<MavioProfile?> login(String email, String password, String role) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-
     String authEmail = email.trim();
 
     // Special handling for Driver Mobile Number login
     if (role == 'driver') {
       final cleanDigits = authEmail.replaceAll(RegExp(r'[^\d]'), '');
       if (!authEmail.contains('@') && cleanDigits.isNotEmpty) {
-        if (_useMockMode) {
-          for (var p in _mockProfiles.values) {
-            if (p.role == 'driver' &&
-                p.phone != null &&
-                p.phone!.replaceAll(RegExp(r'[^\d]'), '') == cleanDigits) {
-              authEmail = p.email;
-              break;
-            }
-          }
-        } else {
-          try {
-            final res = await Supabase.instance.client
-                .from('profiles')
-                .select('email, phone, dob')
-                .eq('role', 'driver');
-            if (res is List) {
-              for (var row in res) {
-                final pPhone = row['phone']?.toString().replaceAll(RegExp(r'[^\d]'), '') ?? '';
-                if (pPhone == cleanDigits ||
-                    (pPhone.length >= 10 && cleanDigits.endsWith(pPhone)) ||
-                    (cleanDigits.length >= 10 && pPhone.endsWith(cleanDigits))) {
-                  if (row['email'] != null && row['email'].toString().isNotEmpty) {
-                    authEmail = row['email'].toString();
-                    break;
-                  }
-                }
-              }
-            }
-            if (!authEmail.contains('@')) {
-              authEmail = '$cleanDigits@mavio.driver';
-            }
-          } catch (e) {
-            print("Driver lookup by phone: $e");
-            if (!authEmail.contains('@')) {
-              authEmail = '$cleanDigits@mavio.driver';
-            }
-          }
-        }
+        authEmail = '$cleanDigits@mavio.driver';
+      }
+    } else if (role == 'student') {
+      if (!authEmail.contains('@') && authEmail.isNotEmpty) {
+        authEmail = '$authEmail@mavio.student';
       }
     }
 
