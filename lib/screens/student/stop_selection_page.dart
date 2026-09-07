@@ -62,28 +62,98 @@ class _StudentStopSelectionPageState extends State<StudentStopSelectionPage> {
     });
   }
 
-  // Query OpenStreetMap Nominatim Geocoding API
+  // Multi-Engine Free Geocoding with Local Proximity Bias
   Future<void> _performSearch(String query) async {
     setState(() {
       _isSearching = true;
     });
 
-    try {
-      final response = await http.get(
-        Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5'),
-        headers: {'User-Agent': 'mavio_app_intel'},
-      );
+    final currentLat = _selectedLat ?? 11.0168; // Default Tamil Nadu / Coimbatore
+    final currentLng = _selectedLng ?? 76.9558;
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          _searchResults = data;
-        });
+    final List<Map<String, dynamic>> combinedResults = [];
+    final Set<String> seenCoords = {};
+
+    try {
+      // 1. Photon Geocoder (Fast, Typo-Tolerant, Location-Biased, 100% Free)
+      final photonUri = Uri.parse(
+        'https://photon.komoot.io/api/?q=${Uri.encodeComponent(query)}&lat=$currentLat&lon=$currentLng&limit=8',
+      );
+      final photonRes = await http.get(photonUri).timeout(const Duration(seconds: 4));
+      if (photonRes.statusCode == 200) {
+        final data = json.decode(photonRes.body);
+        final features = data['features'] as List? ?? [];
+        for (var f in features) {
+          final props = f['properties'] ?? {};
+          final coords = f['geometry']?['coordinates'] as List? ?? [];
+          if (coords.length >= 2) {
+            final double lon = (coords[0] as num).toDouble();
+            final double lat = (coords[1] as num).toDouble();
+            final coordKey = '${lat.toStringAsFixed(4)},${lon.toStringAsFixed(4)}';
+
+            if (!seenCoords.contains(coordKey)) {
+              seenCoords.add(coordKey);
+
+              final name = props['name'] ?? props['street'] ?? props['city'] ?? query;
+              final List<String> subParts = [];
+              if (props['street'] != null && props['street'] != name) subParts.add(props['street']);
+              if (props['district'] != null) subParts.add(props['district']);
+              if (props['city'] != null && props['city'] != name) subParts.add(props['city']);
+              if (props['state'] != null) subParts.add(props['state']);
+
+              combinedResults.add({
+                'title': name.toString(),
+                'subtitle': subParts.join(', '),
+                'lat': lat,
+                'lon': lon,
+              });
+            }
+          }
+        }
       }
-    } catch (e) {
-      print("Geocoding lookup failed: $e");
-    } finally {
+    } catch (_) {}
+
+    // 2. Nominatim India-Scoped Fallback if Photon gave few results
+    if (combinedResults.length < 5) {
+      try {
+        final nomUri = Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&countrycodes=in&limit=6&addressdetails=1',
+        );
+        final nomRes = await http.get(
+          nomUri,
+          headers: {'User-Agent': 'mavio_transit_app_free/2.0'},
+        ).timeout(const Duration(seconds: 4));
+
+        if (nomRes.statusCode == 200) {
+          final list = json.decode(nomRes.body) as List? ?? [];
+          for (var item in list) {
+            final lat = double.tryParse(item['lat']?.toString() ?? '');
+            final lon = double.tryParse(item['lon']?.toString() ?? '');
+            if (lat != null && lon != null) {
+              final coordKey = '${lat.toStringAsFixed(4)},${lon.toStringAsFixed(4)}';
+              if (!seenCoords.contains(coordKey)) {
+                seenCoords.add(coordKey);
+                final displayName = item['display_name']?.toString() ?? '';
+                final parts = displayName.split(', ');
+                final title = parts.isNotEmpty ? parts.first : query;
+                final subtitle = parts.length > 1 ? parts.sublist(1, parts.length > 4 ? 4 : parts.length).join(', ') : '';
+
+                combinedResults.add({
+                  'title': title,
+                  'subtitle': subtitle,
+                  'lat': lat,
+                  'lon': lon,
+                });
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (mounted) {
       setState(() {
+        _searchResults = combinedResults;
         _isSearching = false;
       });
     }
@@ -272,26 +342,35 @@ class _StudentStopSelectionPageState extends State<StudentStopSelectionPage> {
                         separatorBuilder: (context, index) => const Divider(height: 1),
                         itemBuilder: (context, index) {
                           final item = _searchResults[index];
-                          final name = item['display_name'];
-                          final lat = double.parse(item['lat']);
-                          final lon = double.parse(item['lon']);
+                          final title = item['title']?.toString() ?? 'Location';
+                          final subtitle = item['subtitle']?.toString() ?? '';
+                          final lat = (item['lat'] as num).toDouble();
+                          final lon = (item['lon'] as num).toDouble();
 
                           return ListTile(
                             dense: true,
-                            leading: const Icon(Icons.pin_drop_outlined, color: AppColors.primary),
+                            leading: const Icon(Icons.location_on_outlined, color: AppColors.primary, size: 20),
                             title: Text(
-                              name,
-                              maxLines: 2,
+                              title,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                             ),
+                            subtitle: subtitle.isNotEmpty
+                                ? Text(
+                                    subtitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                  )
+                                : null,
                             onTap: () {
                               final target = LatLng(lat, lon);
                               setState(() {
                                 _selectedLat = lat;
                                 _selectedLng = lon;
                                 _searchResults.clear();
-                                _searchController.text = name;
+                                _searchController.text = subtitle.isNotEmpty ? '$title, $subtitle' : title;
                                 FocusScope.of(context).unfocus();
                               });
                               _mapController.move(target, 16.0);
