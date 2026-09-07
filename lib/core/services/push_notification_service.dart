@@ -114,10 +114,22 @@ class PushNotificationService {
 
     try {
       _currentLoggedInUserId = userId;
-      // 1. Opt in to push subscription on this device
+      // 1. Log in user to OneSignal SDK
+      OneSignal.login(userId);
+
+      // 2. Opt in to push subscription on this device
       OneSignal.User.pushSubscription.optIn();
 
-      final subscriptionId = OneSignal.User.pushSubscription.id;
+      // 3. Obtain current subscription token (with retry if registering asynchronously)
+      var subscriptionId = OneSignal.User.pushSubscription.id;
+      if (subscriptionId == null || subscriptionId.isEmpty) {
+        for (int i = 0; i < 5; i++) {
+          await Future.delayed(const Duration(milliseconds: 800));
+          subscriptionId = OneSignal.User.pushSubscription.id;
+          if (subscriptionId != null && subscriptionId.isNotEmpty) break;
+        }
+      }
+
       print("OneSignal: Active Device Token: $subscriptionId for User: $userId");
       if (subscriptionId != null && subscriptionId.isNotEmpty) {
         await SupabaseService().addProfileOneSignalToken(
@@ -132,6 +144,7 @@ class PushNotificationService {
         if (_currentLoggedInUserId != userId) return;
         final newId = state.current.id;
         if (newId != null && newId.isNotEmpty && areNotificationsGloballyEnabled) {
+          print("OneSignal: Push token updated from observer: $newId for User: $userId");
           await SupabaseService().addProfileOneSignalToken(
             id: userId,
             token: newId,
@@ -228,6 +241,7 @@ class PushNotificationService {
       final payload = {
         'app_id': appId,
         'include_subscription_ids': validSubIds,
+        'include_player_ids': validSubIds,
         'headings': {'en': title},
         'contents': {'en': body},
         'data': data ?? {},

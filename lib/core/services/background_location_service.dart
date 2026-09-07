@@ -316,6 +316,7 @@ Future<void> _sendBackgroundProximityPush({
     final payload = {
       'app_id': appId,
       'include_subscription_ids': validSubIds,
+      'include_player_ids': validSubIds,
       'headings': {'en': title},
       'contents': {'en': body},
       'data': {'tripId': tripId, 'busNumber': busNumber},
