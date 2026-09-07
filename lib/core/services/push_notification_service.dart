@@ -21,7 +21,6 @@ class PushNotificationService {
       // 1. Configure OneSignal SDK
       OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
       OneSignal.initialize(appId);
-      OneSignal.Notifications.requestPermission(true);
 
       // 2. Configure Local Notifications for foreground/heads-up alerts
       const AndroidInitializationSettings androidSettings =
@@ -114,10 +113,14 @@ class PushNotificationService {
 
     try {
       _currentLoggedInUserId = userId;
-      // 1. Log in user to OneSignal SDK
+
+      // 1. Request notification permission ONLY after user is logged in
+      await OneSignal.Notifications.requestPermission(true);
+
+      // 2. Log in user to OneSignal SDK
       OneSignal.login(userId);
 
-      // 2. Opt in to push subscription on this device
+      // 3. Opt in to push subscription on this device
       OneSignal.User.pushSubscription.optIn();
 
       // 3. Obtain current subscription token (with retry if registering asynchronously)
