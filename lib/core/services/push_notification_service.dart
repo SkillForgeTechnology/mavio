@@ -215,9 +215,10 @@ class PushNotificationService {
     }
   }
 
-  // Send Push Notification strictly to active subscription device tokens (Multi-Device & User Sync)
+  // Send Push Notification to active user profiles & multi-device subscriptions
   static Future<void> sendPushNotification({
     required List<String> subscriptionIds,
+    List<String>? externalUserIds,
     required String title,
     required String body,
     Map<String, dynamic>? data,
@@ -233,34 +234,63 @@ class PushNotificationService {
         .toSet()
         .toList();
 
-    if (validSubIds.isEmpty) {
-      print("OneSignal: No active device tokens found for assigned students. Skipping push broadcast.");
+    final validUserIds = (externalUserIds ?? [])
+        .where((id) => id.trim().isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (validSubIds.isEmpty && validUserIds.isEmpty) {
+      print("OneSignal: No active targets found. Skipping push broadcast.");
       return;
     }
 
     try {
       final url = Uri.parse('https://onesignal.com/api/v1/notifications');
 
-      final payload = {
-        'app_id': appId,
-        'include_subscription_ids': validSubIds,
-        'include_player_ids': validSubIds,
-        'headings': {'en': title},
-        'contents': {'en': body},
-        'data': data ?? {},
-        'priority': 10,
-        'android_accent_color': 'FF1E3A8A',
-      };
+      // 1. Primary broadcast via external_id aliases (targets all active logged-in devices under these students)
+      if (validUserIds.isNotEmpty) {
+        final payload = {
+          'app_id': appId,
+          'include_aliases': {'external_id': validUserIds},
+          'target_channel': 'push',
+          'headings': {'en': title},
+          'contents': {'en': body},
+          'data': data ?? {},
+          'priority': 10,
+          'android_accent_color': 'FF1E3A8A',
+        };
 
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Basic $restApiKey',
-        },
-        body: jsonEncode(payload),
-      );
-      print("OneSignal Push Broadcast sent to ${validSubIds.length} active devices: ${response.statusCode} - ${response.body}");
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Basic $restApiKey',
+          },
+          body: jsonEncode(payload),
+        );
+        print("OneSignal Multi-Device Alias Push sent to ${validUserIds.length} users: ${response.statusCode} - ${response.body}");
+      } else if (validSubIds.isNotEmpty) {
+        final payload = {
+          'app_id': appId,
+          'include_subscription_ids': validSubIds,
+          'include_player_ids': validSubIds,
+          'headings': {'en': title},
+          'contents': {'en': body},
+          'data': data ?? {},
+          'priority': 10,
+          'android_accent_color': 'FF1E3A8A',
+        };
+
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Basic $restApiKey',
+          },
+          body: jsonEncode(payload),
+        );
+        print("OneSignal Subscription Push sent to ${validSubIds.length} active devices: ${response.statusCode} - ${response.body}");
+      }
     } catch (e) {
       print("Error sending OneSignal push notification: $e");
     }
@@ -277,6 +307,7 @@ class PushNotificationService {
     try {
       final students = await SupabaseService().getAssignedStudentsForVehicle(vehicleId);
       final List<String> subIds = [];
+      final List<String> userIds = [];
 
       for (var s in students) {
         // ONLY target students who are actively logged in with a non-null onesignal_id
@@ -286,12 +317,16 @@ class PushNotificationService {
               .map((t) => t.trim())
               .where((t) => t.isNotEmpty);
           subIds.addAll(tokens);
+          userIds.add(s.id);
         }
       }
 
-      if (subIds.isNotEmpty) {
+      print("OneSignal: Found ${subIds.length} active device tokens and ${userIds.length} users for vehicle $vehicleId ($vehicleName)");
+
+      if (subIds.isNotEmpty || userIds.isNotEmpty) {
         await sendPushNotification(
           subscriptionIds: subIds,
+          externalUserIds: userIds,
           title: "🚌 Bus Trip Started!",
           body: "$vehicleName has started its trip and is on the way. Open MAVIO to track live!",
           data: {'tripId': tripId, 'busNumber': vehicleName},
