@@ -130,6 +130,25 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   Future<void> _openQrScanner() async {
+    // Check and request camera permission with Google Play compliant prominent disclosure
+    final status = await Permission.camera.status;
+    if (!status.isGranted) {
+      final consented = await _showCameraProminentDisclosureDialog();
+      if (!consented) return;
+
+      final req = await Permission.camera.request();
+      if (!req.isGranted) {
+        if (!mounted) return;
+        _showPermissionSettingsDialog(
+          title: "Camera Permission Required",
+          message: "Camera access is needed to scan the bus QR code. Please enable camera permission in App Settings.",
+          icon: Icons.camera_alt_rounded,
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
     final profile = Provider.of<AuthProvider>(context, listen: false).currentProfile;
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
@@ -532,6 +551,135 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           Expanded(
                             child: Text(
                               "Location data is NEVER used for advertising or shared with third parties.",
+                              style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              child: const Text(
+                "Deny",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+              child: const Text(
+                "Agree & Continue",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<bool> _showCameraProminentDisclosureDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.camera_alt_rounded,
+                  color: AppColors.primary,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Text(
+                  "Camera Access for Bus QR",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "MAVIO uses your camera only to scan the bus QR code and start the trip. Camera images are processed locally on your device and are not stored, recorded, or shared.",
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("• ", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              "Camera is active ONLY while the QR scanner is open.",
+                              style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("• ", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              "No photos, videos, or optical recordings are saved or uploaded.",
                               style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
                             ),
                           ),

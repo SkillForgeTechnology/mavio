@@ -3626,6 +3626,38 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                   ),
                 ),
+                if (isWeb) ...[
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      if (filteredVehicles.isEmpty) {
+                        AppToast.show(context, 'No vehicles found to print QR stickers.', isError: true);
+                        return;
+                      }
+                      AppToast.show(context, 'Generating printable QR badges for ${filteredVehicles.length} buses...');
+                      try {
+                        await QrPdfService.printAllBusesQrSheet(
+                          vehicles: filteredVehicles,
+                          org: _db.currentOrganization,
+                        );
+                      } catch (e) {
+                        if (context.mounted) {
+                          AppToast.show(context, 'Failed to print QR badges: $e', isError: true);
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                    label: const Text('Print All QR Badges'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEA580C),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -3675,10 +3707,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
           const SizedBox(height: 8),
           FloatingActionButton.small(
             heroTag: 'vehicle_print_all_qr',
-            onPressed: () => QrPdfService.printAllBusesQrSheet(
-              vehicles: filteredVehicles,
-              org: _db.currentOrganization,
-            ),
+            onPressed: () async {
+              if (filteredVehicles.isEmpty) {
+                AppToast.show(context, 'No vehicles found to print QR stickers.', isError: true);
+                return;
+              }
+              AppToast.show(context, 'Generating printable QR badges for ${filteredVehicles.length} buses...');
+              try {
+                await QrPdfService.printAllBusesQrSheet(
+                  vehicles: filteredVehicles,
+                  org: _db.currentOrganization,
+                );
+              } catch (e) {
+                if (context.mounted) {
+                  AppToast.show(context, 'Failed to print QR badges: $e', isError: true);
+                }
+              }
+            },
             backgroundColor: const Color(0xFFEA580C),
             foregroundColor: Colors.white,
             tooltip: 'Print All Bus QR Badges (PDF)',
@@ -4620,134 +4665,206 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                       ),
                       const SizedBox(height: 24),
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8F9FA),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: AppColors.borderLight),
                         ),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (org.logoUrl != null && org.logoUrl!.trim().isNotEmpty) ...[
-                              MavioOrgLogo(
-                                logoUrl: org.logoUrl,
-                                size: 68,
-                                borderRadius: 12,
-                              ),
-                              const SizedBox(width: 20),
-                            ],
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
-                                        ? 'Active Institution Logo'
-                                        : 'No Custom Logo Set',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
-                                        ? 'Your logo is active and displayed alongside Mavio logo across all app interfaces.'
-                                        : 'Only the standard Mavio logo is currently displayed. Upload your institution logo to enable dual co-branding.',
-                                    style: const TextStyle(
-                                      fontSize: 12.5,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            if (org.logoUrl != null && org.logoUrl!.trim().isNotEmpty) ...[
-                              OutlinedButton.icon(
-                                onPressed: () async {
-                                  final success = await auth.updateOrganizationLogo(null);
-                                  if (success && mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Logo removed successfully. Defaulting to Mavio branding.'),
-                                        backgroundColor: AppColors.success,
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Logo Preview or Placeholder Box
+                                Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: AppColors.borderLight),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.04),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
                                       ),
-                                    );
-                                  }
-                                },
-                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
-                                label: const Text('Remove Logo', style: TextStyle(color: Colors.redAccent)),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: Colors.redAccent),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    ],
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
+                                      ? MavioOrgLogo(
+                                          logoUrl: org.logoUrl,
+                                          size: 64,
+                                          borderRadius: 12,
+                                          showBorder: false,
+                                        )
+                                      : const Icon(
+                                          Icons.account_balance_rounded,
+                                          size: 32,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                ),
+                                const SizedBox(width: 20),
+                                // Title, Badge, and Description
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Wrap(
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        spacing: 10,
+                                        runSpacing: 6,
+                                        children: [
+                                          Text(
+                                            org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
+                                                ? 'Active Institution Logo'
+                                                : 'No Custom Logo Set',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
+                                                  ? AppColors.success.withValues(alpha: 0.1)
+                                                  : Colors.grey.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(
+                                                color: org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
+                                                    ? AppColors.success.withValues(alpha: 0.3)
+                                                    : Colors.grey.withValues(alpha: 0.3),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
+                                                  ? 'Dual Co-Branding Active'
+                                                  : 'Mavio Default Branding',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
+                                                    ? AppColors.success
+                                                    : AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
+                                            ? 'Your institution logo is active and displayed alongside the Mavio logo across all portal screens, driver apps, and student dashboards.'
+                                            : 'Only the standard Mavio logo is currently displayed. Upload a square/transparent PNG/JPG logo under 500 KB to activate instant dual co-branding.',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppColors.textSecondary,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                            ],
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                final res = await FilePicker.platform.pickFiles(
-                                  type: FileType.custom,
-                                  allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
-                                  withData: true,
-                                  allowMultiple: false,
-                                );
-                                if (res != null && res.files.isNotEmpty) {
-                                  final file = res.files.first;
-                                  Uint8List? bytes = file.bytes;
-                                  if (bytes == null && file.path != null && !kIsWeb) {
-                                    final ioFile = io.File(file.path!);
-                                    if (await ioFile.exists()) {
-                                      bytes = await ioFile.readAsBytes();
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            const Divider(height: 1, color: AppColors.borderLight),
+                            const SizedBox(height: 16),
+                            // Action Buttons Row
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                if (org.logoUrl != null && org.logoUrl!.trim().isNotEmpty) ...[
+                                  OutlinedButton.icon(
+                                    onPressed: () async {
+                                      final success = await auth.updateOrganizationLogo(null);
+                                      if (success && mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Logo removed. Defaulting to Mavio branding.'),
+                                            backgroundColor: AppColors.success,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                                    label: const Text('Remove Logo', style: TextStyle(color: Colors.redAccent)),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: Colors.redAccent),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final res = await FilePicker.platform.pickFiles(
+                                      type: FileType.custom,
+                                      allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
+                                      withData: true,
+                                      allowMultiple: false,
+                                    );
+                                    if (res != null && res.files.isNotEmpty) {
+                                      final file = res.files.first;
+                                      Uint8List? bytes = file.bytes;
+                                      if (bytes == null && file.path != null && !kIsWeb) {
+                                        final ioFile = io.File(file.path!);
+                                        if (await ioFile.exists()) {
+                                          bytes = await ioFile.readAsBytes();
+                                        }
+                                      }
+                                      if (bytes != null) {
+                                        if (bytes.lengthInBytes > 500 * 1024) {
+                                          AppToast.show(
+                                            context,
+                                            "Logo image must be under 500 KB (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB chosen). Please select a smaller or compressed logo.",
+                                            isError: true,
+                                          );
+                                          return;
+                                        }
+                                        final ext = (file.extension ?? 'png').toLowerCase();
+                                        final mime = (ext == 'jpg' || ext == 'jpeg')
+                                            ? 'image/jpeg'
+                                            : (ext == 'webp' ? 'image/webp' : 'image/png');
+                                        final base64Str = base64Encode(bytes);
+                                        final dataUri = 'data:$mime;base64,$base64Str';
+                                        
+                                        final success = await auth.updateOrganizationLogo(dataUri);
+                                        if (success && mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Institution logo updated successfully!'),
+                                              backgroundColor: AppColors.success,
+                                            ),
+                                          );
+                                        }
+                                      }
                                     }
-                                  }
-                                  if (bytes != null) {
-                                    if (bytes.lengthInBytes > 500 * 1024) {
-                                      AppToast.show(
-                                        context,
-                                        "Logo image must be under 500 KB (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB chosen). Please select a smaller or compressed logo.",
-                                        isError: true,
-                                      );
-                                      return;
-                                    }
-                                    final ext = (file.extension ?? 'png').toLowerCase();
-                                    final mime = (ext == 'jpg' || ext == 'jpeg')
-                                        ? 'image/jpeg'
-                                        : (ext == 'webp' ? 'image/webp' : 'image/png');
-                                    final base64Str = base64Encode(bytes);
-                                    final dataUri = 'data:$mime;base64,$base64Str';
-                                    
-                                    final success = await auth.updateOrganizationLogo(dataUri);
-                                    if (success && mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Institution logo updated successfully!'),
-                                          backgroundColor: AppColors.success,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                }
-                              },
-                              icon: const Icon(Icons.upload_file_rounded, size: 18),
-                              label: Text(
-                                org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
-                                    ? 'Change Logo'
-                                    : 'Upload Logo',
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  },
+                                  icon: const Icon(Icons.upload_file_rounded, size: 18),
+                                  label: Text(
+                                    org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
+                                        ? 'Change Logo'
+                                        : 'Upload Logo',
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                           ],
                         ),

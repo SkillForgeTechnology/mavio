@@ -137,9 +137,7 @@ class QrPdfService {
                       border: pw.Border.all(color: PdfColors.grey300),
                     ),
                     child: pw.BarcodeWidget(
-                      barcode: pw.Barcode.qrCode(
-                        errorCorrectLevel: pw.BarcodeQRCorrectionLevel.high,
-                      ),
+                      barcode: pw.Barcode.qrCode(),
                       data: qrPayload,
                       width: 170,
                       height: 170,
@@ -178,17 +176,118 @@ class QrPdfService {
     );
   }
 
-  /// Prints or exports a multi-bus batch printable sticker sheet
-  static Future<void> printAllBusesQrSheet({
+  /// Helper to build a single vehicle cut-out sticker badge for batch printing
+  static pw.Widget _buildBatchBadge({
+    required MavioVehicle vehicle,
+    required String orgId,
+    required MavioOrganization? org,
+  }) {
+    final qrPayload = generateBusQrPayload(
+      vehicle: vehicle,
+      orgId: orgId,
+    );
+
+    return pw.Container(
+      margin: const pw.EdgeInsets.all(6),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.white,
+        border: pw.Border.all(
+          color: PdfColors.orange600,
+          width: 1.2,
+          style: pw.BorderStyle.dashed,
+        ),
+        borderRadius: const pw.BorderRadius.all(
+          pw.Radius.circular(10),
+        ),
+      ),
+      child: pw.Column(
+        mainAxisSize: pw.MainAxisSize.min,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.center,
+            children: [
+              pw.Text(
+                'MAVIO',
+                style: pw.TextStyle(
+                  color: PdfColors.orange700,
+                  fontSize: 11,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              if (org != null && org.name.isNotEmpty) ...[
+                pw.Text(
+                  ' | ${org.name.length > 16 ? org.name.substring(0, 16) : org.name}',
+                  style: pw.TextStyle(
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.grey700,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            vehicle.name.toUpperCase(),
+            style: pw.TextStyle(
+              fontSize: 16,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.black,
+            ),
+          ),
+          pw.SizedBox(height: 2),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 2,
+            ),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              borderRadius: const pw.BorderRadius.all(
+                pw.Radius.circular(4),
+              ),
+            ),
+            child: pw.Text(
+              vehicle.regNumber.toUpperCase(),
+              style: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.grey800,
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.BarcodeWidget(
+            barcode: pw.Barcode.qrCode(),
+            data: qrPayload,
+            width: 130,
+            height: 130,
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            'SCAN VIA DRIVER APP TO START TRIP',
+            style: pw.TextStyle(
+              fontSize: 7,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.orange800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Generates the raw PDF Document bytes for batch QR printing
+  static Future<Uint8List> generateAllBusesPdfDocument({
     required List<MavioVehicle> vehicles,
     required MavioOrganization? org,
   }) async {
-    if (vehicles.isEmpty) return;
-
     final pdf = pw.Document();
-    final orgId = org?.id ?? vehicles.first.orgId ?? '';
+    final orgId = org?.id ?? (vehicles.isNotEmpty ? vehicles.first.orgId ?? '' : '');
 
-    // Split into chunks of 4 cards per A4 page (2x2 grid)
+    // Split into chunks of 4 cards per A4 page (2 columns x 2 rows)
     const chunkSize = 4;
     for (var i = 0; i < vehicles.length; i += chunkSize) {
       final chunk = vehicles.sublist(
@@ -202,6 +301,7 @@ class QrPdfService {
           margin: const pw.EdgeInsets.all(20),
           build: (pw.Context context) {
             return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 // Sheet Header
                 pw.Row(
@@ -238,118 +338,55 @@ class QrPdfService {
                     ),
                   ],
                 ),
+                pw.SizedBox(height: 6),
+                pw.Divider(color: PdfColors.grey300, thickness: 0.8),
                 pw.SizedBox(height: 8),
-                pw.Divider(color: PdfColors.grey300),
-                pw.SizedBox(height: 12),
 
-                // 2x2 Grid of Cut-out Vehicle Badges
-                pw.Expanded(
-                  child: pw.GridView(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.82,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                    children: chunk.map((v) {
-                      final qrPayload = generateBusQrPayload(
-                        vehicle: v,
+                // Row 1 (Item 0 and Item 1)
+                pw.Row(
+                  children: [
+                    pw.Expanded(
+                      child: _buildBatchBadge(
+                        vehicle: chunk[0],
                         orgId: orgId,
-                      );
-
-                      return pw.Container(
-                        padding: const pw.EdgeInsets.all(12),
-                        decoration: pw.BoxDecoration(
-                          color: PdfColors.white,
-                          border: pw.Border.all(
-                            color: PdfColors.orange600,
-                            width: 1.5,
-                            style: pw.BorderStyle.dashed,
-                          ),
-                          borderRadius: const pw.BorderRadius.all(
-                            pw.Radius.circular(10),
-                          ),
-                        ),
-                        child: pw.Column(
-                          mainAxisAlignment:
-                              pw.MainAxisAlignment.spaceEvenly,
-                          crossAxisAlignment: pw.CrossAxisAlignment.center,
-                          children: [
-                            pw.Row(
-                              mainAxisAlignment: pw.MainAxisAlignment.center,
-                              children: [
-                                pw.Text(
-                                  'MAVIO',
-                                  style: pw.TextStyle(
-                                    color: PdfColors.orange700,
-                                    fontSize: 11,
-                                    fontWeight: pw.FontWeight.bold,
-                                  ),
-                                ),
-                                if (org != null && org.name.isNotEmpty) ...[
-                                  pw.Text(
-                                    ' | ${org.name.length > 18 ? org.name.substring(0, 18) : org.name}',
-                                    style: pw.TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: pw.FontWeight.bold,
-                                      color: PdfColors.grey700,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            pw.SizedBox(height: 2),
-                            pw.Text(
-                              v.name.toUpperCase(),
-                              style: pw.TextStyle(
-                                fontSize: 16,
-                                fontWeight: pw.FontWeight.bold,
-                                color: PdfColors.black,
-                              ),
-                            ),
-                            pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: pw.BoxDecoration(
-                                color: PdfColors.grey100,
-                                borderRadius: const pw.BorderRadius.all(
-                                  pw.Radius.circular(4),
-                                ),
-                              ),
-                              child: pw.Text(
-                                v.regNumber.toUpperCase(),
-                                style: pw.TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: PdfColors.grey800,
-                                ),
-                              ),
-                            ),
-                            pw.SizedBox(height: 4),
-                            pw.BarcodeWidget(
-                              barcode: pw.Barcode.qrCode(
-                                errorCorrectLevel:
-                                    pw.BarcodeQRCorrectionLevel.medium,
-                              ),
-                              data: qrPayload,
-                              width: 120,
-                              height: 120,
-                            ),
-                            pw.SizedBox(height: 4),
-                            pw.Text(
-                              'SCAN VIA DRIVER APP TO START TRIP',
-                              style: pw.TextStyle(
-                                fontSize: 6.5,
-                                fontWeight: pw.FontWeight.bold,
-                                color: PdfColors.orange800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                        org: org,
+                      ),
+                    ),
+                    pw.Expanded(
+                      child: chunk.length > 1
+                          ? _buildBatchBadge(
+                              vehicle: chunk[1],
+                              orgId: orgId,
+                              org: org,
+                            )
+                          : pw.SizedBox(),
+                    ),
+                  ],
                 ),
+                pw.SizedBox(height: 8),
+
+                // Row 2 (Item 2 and Item 3)
+                if (chunk.length > 2)
+                  pw.Row(
+                    children: [
+                      pw.Expanded(
+                        child: _buildBatchBadge(
+                          vehicle: chunk[2],
+                          orgId: orgId,
+                          org: org,
+                        ),
+                      ),
+                      pw.Expanded(
+                        child: chunk.length > 3
+                            ? _buildBatchBadge(
+                                vehicle: chunk[3],
+                                orgId: orgId,
+                                org: org,
+                              )
+                            : pw.SizedBox(),
+                      ),
+                    ],
+                  ),
               ],
             );
           },
@@ -357,10 +394,26 @@ class QrPdfService {
       );
     }
 
+    return pdf.save();
+  }
+
+  /// Prints or exports a multi-bus batch printable sticker sheet
+  static Future<void> printAllBusesQrSheet({
+    required List<MavioVehicle> vehicles,
+    required MavioOrganization? org,
+  }) async {
+    if (vehicles.isEmpty) return;
+
+    final bytes = await generateAllBusesPdfDocument(
+      vehicles: vehicles,
+      org: org,
+    );
+
+    final safeOrgName = org?.name.replaceAll(' ', '_') ?? 'Badges';
+
     await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-      name:
-          'Mavio_Fleet_QR_${org?.name.replaceAll(' ', '_') ?? 'Badges'}.pdf',
+      onLayout: (PdfPageFormat format) async => bytes,
+      name: 'Mavio_Fleet_QR_$safeOrgName.pdf',
     );
   }
 }

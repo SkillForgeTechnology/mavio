@@ -62,7 +62,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Last Updated: August 19, 2026',
+                'Last Updated: September 7, 2026',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w500,
@@ -95,7 +95,22 @@ class PrivacyPolicyPage extends StatelessWidget {
                 'The App requests location access to display the student\'s location relative to the live bus on the map. Student location data is processed locally on the device and is never uploaded to our servers.',
               ),
 
-              _buildSectionTitle('3. Personal and Account Data We Collect'),
+              _buildSectionTitle('3. Camera Permission & QR Code Scanning'),
+              _buildSectionBody(
+                'MAVIO requests camera access for the following specific and limited functionality:',
+              ),
+              const SizedBox(height: 16),
+              _buildBulletItem(
+                'Vehicle QR Code Scanning for Drivers',
+                'The App uses the camera exclusively to scan physical QR code stickers on bus dashboards. This enables drivers to quickly verify vehicle identity, take over temporary shifts, and activate live tracking for that vehicle.',
+              ),
+              const SizedBox(height: 12),
+              _buildBulletItem(
+                'On-Device Processing & Privacy',
+                'Camera frames are processed in real time entirely on your device for QR barcode recognition. No photos, videos, or visual feeds are ever recorded, captured, saved, or uploaded to our servers or third parties. Camera access is used only while the scanner interface is actively open on the screen.',
+              ),
+
+              _buildSectionTitle('4. Personal and Account Data We Collect'),
               _buildSectionBody(
                 'We collect personal data required to authenticate user accounts and manage transit assignments:',
               ),
@@ -115,7 +130,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                 'Speed metrics, location updates, transmission times, and upload counts.',
               ),
 
-              _buildSectionTitle('4. How We Use Your Information'),
+              _buildSectionTitle('5. How We Use Your Information'),
               _buildSectionBody(
                 'We use the collected information for transit orchestration and system operations:',
               ),
@@ -128,7 +143,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               const SizedBox(height: 8),
               _buildSimpleBulletItem('To ensure the stability, performance, and security of the platform.'),
 
-              _buildSectionTitle('5. Data Sharing & Disclosure'),
+              _buildSectionTitle('6. Data Sharing & Disclosure'),
               _buildSectionBody(
                 'Your data privacy is our priority. SkillForge Technologies does not sell, trade, or share your '
                 'personal information or live location tracks with third-party advertising companies. Data is '
@@ -136,7 +151,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                 'of your registered organization.',
               ),
 
-              _buildSectionTitle('6. Data Security and Deletion'),
+              _buildSectionTitle('7. Data Security and Deletion'),
               _buildSectionBody(
                 'We implement industry-standard encryption protocols (SSL/TLS) for data in transit and database-level '
                 'encryption at rest. If an administrator deletes a profile, all linked location updates and authentication '
@@ -144,7 +159,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                 'deletion at any time by contacting their organization or emailing support@skillforgetechnology.app.',
               ),
 
-              _buildSectionTitle('7. Contact and Inquiries'),
+              _buildSectionTitle('8. Contact and Inquiries'),
               _buildSectionBody(
                 'If you have any questions or concerns regarding this Privacy Policy, please contact our product operations team:',
               ),
