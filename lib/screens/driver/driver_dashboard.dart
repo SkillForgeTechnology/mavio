@@ -31,6 +31,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   
   bool _isLoading = false;
   MavioVehicle? _assignedVehicle;
+  MavioVehicle? _defaultVehicle;
   bool _isTemporaryAssigned = false;
   List<MavioTrip> _tripHistory = [];
   String _thisMonthDuration = "0h 0m";
@@ -77,7 +78,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
         // Mock / Fetch vehicle and route details
         final data = await _db.getStudentDashboardData(); // driver shares similar metadata lookup
         setState(() {
-          _assignedVehicle = data['vehicle'] as MavioVehicle?;
+          _defaultVehicle = data['vehicle'] as MavioVehicle?;
+          _assignedVehicle = _defaultVehicle;
+          _isTemporaryAssigned = false;
 
           _activeTrip = data['activeTrip'] as MavioTrip?;
           _isTripActive = _activeTrip != null;
@@ -1007,10 +1010,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
                       label: Text(
                         _isTemporaryAssigned
-                            ? 'Switch Bus (Current: ${_assignedVehicle?.name})'
+                            ? 'Switch to Another Bus'
                             : (_assignedVehicle == null
                                 ? 'Scan Bus QR Code to Drive'
-                                : 'Scan Bus QR Code (Substitute Mode)'),
+                                : 'Scan Bus QR Code (Shift / Substitute)'),
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                       style: OutlinedButton.styleFrom(
@@ -1023,6 +1026,31 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         ),
                       ),
                     ),
+                    if (_isTemporaryAssigned && _defaultVehicle != null) ...[
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _assignedVehicle = _defaultVehicle;
+                            _isTemporaryAssigned = false;
+                          });
+                          _showSnackbar(
+                            "Reverted back to your default assigned bus (${_defaultVehicle?.name}).",
+                            AppColors.success,
+                          );
+                        },
+                        icon: const Icon(Icons.restore_rounded, size: 18, color: AppColors.textSecondary),
+                        label: Text(
+                          'Revert to my default bus (${_defaultVehicle?.name})',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                   const SizedBox(height: 24),
 
