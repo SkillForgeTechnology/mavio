@@ -1854,6 +1854,145 @@ class SupabaseService {
       return (res as List).map((json) => MavioProfile.fromJson(json)).toList();
     }
   }
+
+  final List<MavioComplaint> _mockComplaints = [];
+
+  // Submit Complaint
+  Future<MavioComplaint> submitComplaint({
+    required String orgId,
+    required String studentId,
+    String? busId,
+    required String busName,
+    required String busRegNumber,
+    required String driverName,
+    required String category,
+    required String title,
+    required String description,
+    String? imageProof,
+  }) async {
+    final complaintId = _generateUuid();
+    final newComplaint = MavioComplaint(
+      id: complaintId,
+      orgId: orgId,
+      studentId: studentId,
+      busId: busId,
+      busName: busName,
+      busRegNumber: busRegNumber,
+      driverName: driverName,
+      category: category,
+      title: title,
+      description: description,
+      imageProof: imageProof,
+      status: 'OPEN',
+      createdAt: DateTime.now(),
+    );
+
+    if (_useMockMode) {
+      _mockComplaints.insert(0, newComplaint);
+      return newComplaint;
+    } else {
+      try {
+        final client = Supabase.instance.client;
+        final res = await client.from('complaints').insert({
+          'id': complaintId,
+          'org_id': orgId,
+          'student_id': studentId,
+          'bus_id': busId,
+          'bus_name': busName,
+          'bus_reg_number': busRegNumber,
+          'driver_name': driverName,
+          'category': category,
+          'title': title,
+          'description': description,
+          'image_proof': imageProof,
+          'status': 'OPEN',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        }).select().single();
+        return MavioComplaint.fromJson(res);
+      } catch (e) {
+        print("Error submitting complaint to Supabase: $e");
+        _mockComplaints.insert(0, newComplaint);
+        return newComplaint;
+      }
+    }
+  }
+
+  // Get Complaints for a Student
+  Future<List<MavioComplaint>> getStudentComplaints(String studentId) async {
+    if (_useMockMode) {
+      return _mockComplaints.where((c) => c.studentId == studentId).toList();
+    } else {
+      try {
+        final client = Supabase.instance.client;
+        final res = await client
+            .from('complaints')
+            .select()
+            .eq('student_id', studentId)
+            .order('created_at', ascending: false);
+        return (res as List).map((json) => MavioComplaint.fromJson(json)).toList();
+      } catch (e) {
+        print("Error fetching student complaints: $e");
+        return _mockComplaints.where((c) => c.studentId == studentId).toList();
+      }
+    }
+  }
+
+  // Get All Complaints for Organization (Anonymous to Management)
+  Future<List<MavioComplaint>> getOrganizationComplaints(String orgId) async {
+    if (_useMockMode) {
+      return _mockComplaints.where((c) => c.orgId == orgId).toList();
+    } else {
+      try {
+        final client = Supabase.instance.client;
+        final res = await client
+            .from('complaints')
+            .select()
+            .eq('org_id', orgId)
+            .order('created_at', ascending: false);
+        return (res as List).map((json) => MavioComplaint.fromJson(json)).toList();
+      } catch (e) {
+        print("Error fetching organization complaints: $e");
+        return _mockComplaints.where((c) => c.orgId == orgId).toList();
+      }
+    }
+  }
+
+  // Update Complaint Status & Notes (Management Helpdesk)
+  Future<void> updateComplaintStatus({
+    required String complaintId,
+    required String newStatus,
+    String? adminNotes,
+  }) async {
+    if (_useMockMode) {
+      final index = _mockComplaints.indexWhere((c) => c.id == complaintId);
+      if (index != -1) {
+        _mockComplaints[index] = _mockComplaints[index].copyWith(
+          status: newStatus,
+          adminNotes: adminNotes,
+          updatedAt: DateTime.now(),
+        );
+      }
+    } else {
+      try {
+        final client = Supabase.instance.client;
+        await client.from('complaints').update({
+          'status': newStatus,
+          'admin_notes': adminNotes,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }).eq('id', complaintId);
+      } catch (e) {
+        print("Error updating complaint status in Supabase: $e");
+        final index = _mockComplaints.indexWhere((c) => c.id == complaintId);
+        if (index != -1) {
+          _mockComplaints[index] = _mockComplaints[index].copyWith(
+            status: newStatus,
+            adminNotes: adminNotes,
+            updatedAt: DateTime.now(),
+          );
+        }
+      }
+    }
+  }
 }
 
 class _NoStorage implements GotrueAsyncStorage {

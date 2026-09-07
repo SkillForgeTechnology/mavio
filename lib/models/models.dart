@@ -242,3 +242,107 @@ class MavioLocationUpdate {
     );
   }
 }
+
+class MavioComplaint {
+  final String id;
+  final String orgId;
+  final String studentId;
+  final String? busId;
+  final String busName;
+  final String busRegNumber;
+  final String driverName;
+  final String category;
+  final String title;
+  final String description;
+  final String? imageProof;
+  final String status; // 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'
+  final String? adminNotes;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+
+  MavioComplaint({
+    required this.id,
+    required this.orgId,
+    required this.studentId,
+    this.busId,
+    required this.busName,
+    required this.busRegNumber,
+    required this.driverName,
+    required this.category,
+    required this.title,
+    required this.description,
+    this.imageProof,
+    this.status = 'OPEN',
+    this.adminNotes,
+    required this.createdAt,
+    this.updatedAt,
+  });
+
+  factory MavioComplaint.fromJson(Map<String, dynamic> json) {
+    return MavioComplaint(
+      id: json['id']?.toString() ?? '',
+      orgId: json['org_id']?.toString() ?? '',
+      studentId: json['student_id']?.toString() ?? '',
+      busId: json['bus_id']?.toString(),
+      busName: json['bus_name']?.toString() ?? 'Unassigned Bus',
+      busRegNumber: json['bus_reg_number']?.toString() ?? 'N/A',
+      driverName: json['driver_name']?.toString() ?? 'Unassigned Driver',
+      category: json['category']?.toString() ?? 'General',
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      imageProof: json['image_proof']?.toString(),
+      status: json['status']?.toString() ?? 'OPEN',
+      adminNotes: json['admin_notes']?.toString(),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'].toString()).toLocal()
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'].toString()).toLocal()
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'org_id': orgId,
+      'student_id': studentId,
+      'bus_id': busId,
+      'bus_name': busName,
+      'bus_reg_number': busRegNumber,
+      'driver_name': driverName,
+      'category': category,
+      'title': title,
+      'description': description,
+      'image_proof': imageProof,
+      'status': status,
+      'admin_notes': adminNotes,
+      'created_at': createdAt.toUtc().toIso8601String(),
+      'updated_at': updatedAt?.toUtc().toIso8601String(),
+    };
+  }
+
+  MavioComplaint copyWith({
+    String? status,
+    String? adminNotes,
+    DateTime? updatedAt,
+  }) {
+    return MavioComplaint(
+      id: id,
+      orgId: orgId,
+      studentId: studentId,
+      busId: busId,
+      busName: busName,
+      busRegNumber: busRegNumber,
+      driverName: driverName,
+      category: category,
+      title: title,
+      description: description,
+      imageProof: imageProof,
+      status: status ?? this.status,
+      adminNotes: adminNotes ?? this.adminNotes,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}

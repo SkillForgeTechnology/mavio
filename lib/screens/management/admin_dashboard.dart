@@ -17,6 +17,7 @@ import '../../models/models.dart';
 import '../auth/splash_screen.dart';
 import 'package:intl/intl.dart' as intl;
 import 'bulk_import_screen.dart';
+import 'management_complaints_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -1809,6 +1810,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
         actions: [
           IconButton(
             icon: const Icon(
+              Icons.support_agent_rounded,
+              color: Color(0xFFDC2626),
+            ),
+            tooltip: 'Grievances & Helpdesk',
+            onPressed: () {
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+              final orgId = auth.verifiedOrg?.id ?? '';
+              final orgName = auth.verifiedOrg?.name ?? 'Mavio Network';
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ManagementComplaintsScreen(
+                    orgId: orgId,
+                    orgName: orgName,
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(
               Icons.logout_rounded,
               color: AppColors.textPrimary,
             ),
@@ -2285,7 +2306,94 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                   ],
                 ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
+
+          // Helpdesk & Grievances Quick Access Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.borderLight, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: const Icon(
+                    Icons.support_agent_rounded,
+                    color: Color(0xFFDC2626),
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Student Helpdesk & Complaints',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'Review anonymous student grievance tickets, check proof attachments & reply with resolution notes.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    final auth = Provider.of<AuthProvider>(context, listen: false);
+                    final orgId = auth.verifiedOrg?.id ?? '';
+                    final orgName = auth.verifiedOrg?.name ?? 'Mavio Network';
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ManagementComplaintsScreen(
+                          orgId: orgId,
+                          orgName: orgName,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('View Complaints'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

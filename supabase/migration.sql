@@ -205,3 +205,29 @@ CREATE TRIGGER tr_track_vehicle_distance
 BEFORE INSERT ON public.location_updates
 FOR EACH ROW
 EXECUTE FUNCTION public.track_vehicle_distance();
+
+-- =========================================================================
+-- 6. GRIEVANCES & HELPDESK COMPLAINTS TABLE (ANONYMOUS TO MANAGEMENT)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.complaints (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL,
+  student_id UUID NOT NULL,
+  bus_id UUID,
+  bus_name TEXT NOT NULL DEFAULT 'General Bus',
+  bus_reg_number TEXT NOT NULL DEFAULT 'N/A',
+  driver_name TEXT NOT NULL DEFAULT 'Not Assigned',
+  category TEXT NOT NULL DEFAULT 'General',
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  image_proof TEXT,
+  status TEXT NOT NULL DEFAULT 'OPEN', -- 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'
+  admin_notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+  updated_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_complaints_org ON public.complaints(org_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_student ON public.complaints(student_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON public.complaints(status);
+

@@ -12,6 +12,7 @@ import '../../core/services/push_notification_service.dart';
 import '../../models/models.dart';
 import '../auth/splash_screen.dart';
 import 'stop_selection_page.dart';
+import 'student_complaint_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class StudentDashboard extends StatefulWidget {
@@ -1988,6 +1989,108 @@ class _ProfileTabState extends State<_ProfileTab> {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        minimumSize: const Size(0, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 4. Grievances & Helpdesk Section
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Helpdesk & Grievances',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.borderLight, width: 1.5),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFFECACA)),
+                          ),
+                          child: const Icon(
+                            Icons.support_agent_rounded,
+                            color: Color(0xFFDC2626),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Register Complaint / Feedback',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Report bus delays, driver behavior, safety, or route issues. Your profile is strictly anonymous to management.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        if (profile != null) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => StudentComplaintScreen(
+                                profile: profile,
+                                vehicle: vehicle,
+                                driverName: tracking.driverName,
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.rate_review_rounded, size: 18),
+                      label: const Text(
+                        'Register Complaint & Track Status',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFDC2626),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         minimumSize: const Size(0, 48),
