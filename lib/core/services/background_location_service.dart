@@ -38,6 +38,9 @@ void onStart(ServiceInstance service) async {
   String? vehicleId;
   String? vehicleName;
   int uploadCount = 0;
+  double lastSpeed = 0.0;
+  double? lastLat;
+  double? lastLng;
   final List<_StudentProximityTarget> studentTargets = [];
 
   if (service is AndroidServiceInstance) {
@@ -49,21 +52,67 @@ void onStart(ServiceInstance service) async {
     });
   }
 
+  service.on('getStats').listen((event) {
+    service.invoke('updateStats', {
+      'speed': lastSpeed,
+      'uploads': uploadCount,
+      'latitude': lastLat,
+      'longitude': lastLng,
+      'isTracking': tripId != null && gpsSub != null,
+      'tripId': tripId,
+    });
+  });
+
   service.on('stopService').listen((event) {
     gpsSub?.cancel();
+    gpsSub = null;
     studentTargets.clear();
+    tripId = null;
+    uploadCount = 0;
     service.stopSelf();
   });
 
   service.on('startTracking').listen((event) async {
+    final incomingTripId = event?['tripId'] as String?;
+    if (incomingTripId == null) return;
+
+    // If this exact trip is ALREADY tracking in background, do NOT restart or reset uploadCount
+    if (tripId == incomingTripId && gpsSub != null) {
+      print("MAVIO Background: Trip $tripId is already actively running. Retaining uploadCount: $uploadCount");
+      service.invoke('updateStats', {
+        'speed': lastSpeed,
+        'uploads': uploadCount,
+        'latitude': lastLat,
+        'longitude': lastLng,
+        'isTracking': true,
+        'tripId': tripId,
+      });
+      return;
+    }
+
     gpsSub?.cancel();
     studentTargets.clear();
-    tripId = event?['tripId'] as String?;
+    tripId = incomingTripId;
     vehicleId = event?['vehicleId'] as String?;
     vehicleName = event?['vehicleName'] as String?;
-    uploadCount = 0;
 
-    if (tripId == null) return;
+    // If initial count is passed from database/UI, start from that count
+    final initialUploads = event?['initialUploads'] as int?;
+    if (initialUploads != null && initialUploads > 0) {
+      uploadCount = initialUploads;
+    } else {
+      // Query existing rows count from DB to ensure seamless continuation
+      try {
+        final countRes = await client
+            .from('location_updates')
+            .select('id')
+            .eq('trip_id', tripId!)
+            .count(CountOption.exact);
+        uploadCount = countRes.count;
+      } catch (_) {
+        uploadCount = 0;
+      }
+    }
 
     // Load all students assigned to this vehicle with active stop alerts
     final List<dynamic>? passedStudents = event?['students'] as List<dynamic>?;
@@ -152,12 +201,16 @@ void onStart(ServiceInstance service) async {
       if (tripId == null) return;
 
       try {
+        lastSpeed = position.speed * 3.6;
+        lastLat = position.latitude;
+        lastLng = position.longitude;
+
         // Push update directly to DB from background isolate
         await client.from('location_updates').insert({
           'trip_id': tripId!,
           'latitude': position.latitude,
           'longitude': position.longitude,
-          'speed': position.speed * 3.6, // convert m/s to km/h
+          'speed': lastSpeed, // convert m/s to km/h
           'heading': position.heading,
           'accuracy': position.accuracy,
         });
@@ -198,17 +251,19 @@ void onStart(ServiceInstance service) async {
           if (await service.isForegroundService()) {
             service.setForegroundNotificationInfo(
               title: "MAVIO: ${vehicleName ?? 'Bus'} is Live",
-              content: "Speed: ${(position.speed * 3.6).toStringAsFixed(1)} km/h • Uploads: $uploadCount",
+              content: "Speed: ${lastSpeed.toStringAsFixed(1)} km/h • Uploads: $uploadCount",
             );
           }
         }
 
         // Broadcast stats back to UI
         service.invoke('updateStats', {
-          'speed': position.speed * 3.6,
+          'speed': lastSpeed,
           'uploads': uploadCount,
           'latitude': position.latitude,
           'longitude': position.longitude,
+          'isTracking': true,
+          'tripId': tripId,
         });
 
       } catch (e) {

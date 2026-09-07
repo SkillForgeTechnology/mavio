@@ -1073,6 +1073,22 @@ class SupabaseService {
     return null;
   }
 
+  // Helper: Get total count of uploaded pings for a trip
+  Future<int> getTripLocationCount(String tripId) async {
+    if (_useMockMode) return 0;
+    try {
+      final response = await Supabase.instance.client
+          .from('location_updates')
+          .select('id')
+          .eq('trip_id', tripId)
+          .count(CountOption.exact);
+      return response.count;
+    } catch (e) {
+      print("Error getting trip location count: $e");
+      return 0;
+    }
+  }
+
   // Helper: Get list of historical coordinates for a trip (ascending order)
   Future<List<Map<String, double>>> getTripPathCoordinates(String tripId) async {
     if (_useMockMode) return [];

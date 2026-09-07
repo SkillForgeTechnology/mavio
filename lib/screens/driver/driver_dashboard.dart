@@ -579,18 +579,24 @@ class _DriverDashboardState extends State<DriverDashboard> {
   void _startTracking(String tripId) async {
     _cleanupLocalTrackingUI(); // Ensure cleanup of local variables only
 
-    // Calculate elapsed duration if resuming from an active session
+    // Calculate elapsed duration & existing uploaded pings if resuming from an active session
     int initialSeconds = 0;
+    int initialPings = 0;
     if (_activeTrip != null) {
       initialSeconds = DateTime.now().difference(_activeTrip!.startedAt).inSeconds;
       if (initialSeconds < 0) initialSeconds = 0;
+      try {
+        initialPings = await _db.getTripLocationCount(_activeTrip!.id);
+      } catch (_) {}
     }
 
-    setState(() {
-      _currentSpeed = 0.0;
-      _pingsSent = 0;
-      _tripSeconds = initialSeconds;
-    });
+    if (mounted) {
+      setState(() {
+        _currentSpeed = 0.0;
+        _pingsSent = initialPings;
+        _tripSeconds = initialSeconds;
+      });
+    }
 
     _tripDurationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
@@ -609,6 +615,20 @@ class _DriverDashboardState extends State<DriverDashboard> {
       if (!isServiceRunning) {
         await backgroundService.startService();
       }
+
+      // Bind UI updates to background telemetry broadcaster FIRST
+      _backgroundSubscription = backgroundService.on('updateStats').listen((event) {
+        if (mounted) {
+          setState(() {
+            _isGpsOn = true;
+            _currentSpeed = (event?['speed'] as num?)?.toDouble() ?? 0.0;
+            final uploads = event?['uploads'] as int?;
+            if (uploads != null && uploads >= _pingsSent) {
+              _pingsSent = uploads;
+            }
+          });
+        }
+      });
 
       List<Map<String, dynamic>> studentList = [];
       if (_assignedVehicle != null) {
@@ -632,18 +652,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
         'vehicleId': _assignedVehicle?.id,
         'vehicleName': _assignedVehicle?.name ?? 'Mavio Bus',
         'students': studentList,
+        'initialUploads': initialPings,
       });
 
-      // Bind UI updates to background telemetry broadcaster
-      _backgroundSubscription = backgroundService.on('updateStats').listen((event) {
-        if (mounted) {
-          setState(() {
-            _isGpsOn = true;
-            _currentSpeed = (event?['speed'] as num?)?.toDouble() ?? 0.0;
-            _pingsSent = event?['uploads'] as int? ?? 0;
-          });
-        }
-      });
+      // Request immediate current stats from background service
+      backgroundService.invoke('getStats');
     }
   }
 
