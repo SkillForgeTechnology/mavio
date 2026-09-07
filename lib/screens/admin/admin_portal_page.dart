@@ -751,7 +751,7 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                 Text(
                   logoUrl != null && logoUrl.isNotEmpty
                       ? 'Custom logo selected • Co-brands across app'
-                      : 'Upload PNG/JPG logo (co-brands with Mavio logo)',
+                      : 'Upload PNG/JPG logo (Max 500 KB • Transparent PNG recommended)',
                   style: const TextStyle(color: Colors.white54, fontSize: 11),
                 ),
               ],
@@ -766,7 +766,8 @@ class _AdminPortalPageState extends State<AdminPortalPage>
           TextButton.icon(
             onPressed: () async {
               final res = await FilePicker.platform.pickFiles(
-                type: FileType.image,
+                type: FileType.custom,
+                allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
                 withData: true,
                 allowMultiple: false,
               );
@@ -780,8 +781,12 @@ class _AdminPortalPageState extends State<AdminPortalPage>
                   }
                 }
                 if (bytes != null) {
-                  if (bytes.lengthInBytes > 2 * 1024 * 1024) {
-                    AppToast.show(context, "Logo file must be under 2MB.");
+                  if (bytes.lengthInBytes > 500 * 1024) {
+                    AppToast.show(
+                      context,
+                      "Logo image must be under 500 KB (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB chosen). Please select a smaller or compressed logo.",
+                      isError: true,
+                    );
                     return;
                   }
                   final ext = (file.extension ?? 'png').toLowerCase();

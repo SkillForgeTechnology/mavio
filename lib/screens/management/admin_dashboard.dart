@@ -4323,7 +4323,8 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                             ElevatedButton.icon(
                               onPressed: () async {
                                 final res = await FilePicker.platform.pickFiles(
-                                  type: FileType.image,
+                                  type: FileType.custom,
+                                  allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
                                   withData: true,
                                   allowMultiple: false,
                                 );
@@ -4337,8 +4338,12 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                                     }
                                   }
                                   if (bytes != null) {
-                                    if (bytes.lengthInBytes > 2 * 1024 * 1024) {
-                                      AppToast.show(context, "Logo file must be under 2MB.");
+                                    if (bytes.lengthInBytes > 500 * 1024) {
+                                      AppToast.show(
+                                        context,
+                                        "Logo image must be under 500 KB (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB chosen). Please select a smaller or compressed logo.",
+                                        isError: true,
+                                      );
                                       return;
                                     }
                                     final ext = (file.extension ?? 'png').toLowerCase();
