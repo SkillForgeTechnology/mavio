@@ -974,7 +974,7 @@ class _MapTabState extends State<_MapTab> with TickerProviderStateMixin {
   String _mapLayerStyle =
       'm'; // 'm' = road, 'y' = satellite hybrid, 'p' = terrain
 
-  // Smooth Movement Interpolation Engine
+  // Ultra-Smooth Movement Interpolation Engine (Google Maps / Uber glide style)
   late AnimationController _posAnimController;
   late Animation<double> _posAnim;
 
@@ -984,22 +984,23 @@ class _MapTabState extends State<_MapTab> with TickerProviderStateMixin {
   double _targetHeading = 0.0;
   double _prevSpeed = 0.0;
   double _targetSpeed = 0.0;
-  DateTime? _lastCameraMoveTime;
+  DateTime? _lastGpsTime;
 
   @override
   void initState() {
     super.initState();
+    // 2000ms duration matching real-time GPS cadence for continuous glide
     _posAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 2000),
     );
     _posAnim = CurvedAnimation(
       parent: _posAnimController,
-      curve: Curves.easeOutCubic,
+      curve: Curves.linear,
     )..addListener(() {
         if (mounted) {
           setState(() {});
-          _maybeFollowCamera();
+          // Note: Camera is NOT moved on every frame tick to keep map tiles rock-solid and eliminate all vibration
         }
       });
   }
@@ -1058,25 +1059,6 @@ class _MapTabState extends State<_MapTab> with TickerProviderStateMixin {
     return _prevSpeed + (_targetSpeed - _prevSpeed) * t;
   }
 
-  void _maybeFollowCamera() {
-    if (!_isAutoCenterEnabled) return;
-    final now = DateTime.now();
-    // Throttle camera updates to ~30ms to prevent browser/canvas jitter
-    if (_lastCameraMoveTime != null &&
-        now.difference(_lastCameraMoveTime!).inMilliseconds < 30) {
-      return;
-    }
-    _lastCameraMoveTime = now;
-    try {
-      final currentPos = _getCurrentInterpolatedPos();
-      double currentZoom = 17.5;
-      try {
-        currentZoom = _mapController.camera.zoom;
-      } catch (_) {}
-      _mapController.move(currentPos, currentZoom);
-    } catch (_) {}
-  }
-
   void _onTrackingUpdate() {
     if (_trackingProvider == null || _trackingProvider!.latestLocation == null) return;
     final loc = _trackingProvider!.latestLocation!;
@@ -1115,6 +1097,16 @@ class _MapTabState extends State<_MapTab> with TickerProviderStateMixin {
       return;
     }
 
+    // Adaptive timing: match animation length to real GPS broadcast interval
+    final now = DateTime.now();
+    if (_lastGpsTime != null) {
+      final elapsedMs = now.difference(_lastGpsTime!).inMilliseconds;
+      _posAnimController.duration = Duration(
+        milliseconds: elapsedMs.clamp(1200, 3000),
+      );
+    }
+    _lastGpsTime = now;
+
     _prevPos = currentInterpolated;
     _targetPos = newPos;
     _prevSpeed = _getCurrentInterpolatedSpeed();
@@ -1127,13 +1119,44 @@ class _MapTabState extends State<_MapTab> with TickerProviderStateMixin {
     }
 
     _posAnimController.forward(from: 0.0);
+
+    // Gentle camera follow on GPS packet: if auto-center is active, pan camera without frame jitter
+    if (_isAutoCenterEnabled) {
+      _maybeGentlyFollow(newPos);
+    }
+  }
+
+  void _maybeGentlyFollow(LatLng target) {
+    try {
+      final currentCenter = _mapController.camera.center;
+      final distFromCenter = Geolocator.distanceBetween(
+        currentCenter.latitude,
+        currentCenter.longitude,
+        target.latitude,
+        target.longitude,
+      );
+
+      // Deadband: Only re-center camera if bus is more than 35m from map center
+      // or at gentle ~2s GPS packet interval. This keeps the background tile canvas rock solid!
+      if (distFromCenter > 35) {
+        double currentZoom = 17.5;
+        try {
+          currentZoom = _mapController.camera.zoom;
+        } catch (_) {}
+        _mapController.move(target, currentZoom);
+      }
+    } catch (_) {}
   }
 
   void _centerOnBus(MavioLocationUpdate? loc) {
     if (loc != null) {
       try {
         final pos = _getCurrentInterpolatedPos();
-        _mapController.move(pos, 17.5);
+        double currentZoom = 17.5;
+        try {
+          currentZoom = _mapController.camera.zoom;
+        } catch (_) {}
+        _mapController.move(pos, currentZoom);
       } catch (_) {}
     }
   }
