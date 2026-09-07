@@ -108,35 +108,33 @@ class PushNotificationService {
 
   static String? _currentLoggedInUserId;
 
-  // Update subscription ID to user profile on Supabase
+  // Update subscription ID to user profile on Supabase (multi-device support)
   static Future<void> syncSubscriptionId(String userId) async {
     if (kIsWeb) return;
 
     try {
       _currentLoggedInUserId = userId;
-      // 1. Opt in to push subscription
+      // 1. Opt in to push subscription on this device
       OneSignal.User.pushSubscription.optIn();
-      // 2. Bind user external ID to OneSignal
-      OneSignal.login(userId);
 
       final subscriptionId = OneSignal.User.pushSubscription.id;
-      print("OneSignal: User Subscription ID: $subscriptionId for User: $userId");
+      print("OneSignal: Active Device Token: $subscriptionId for User: $userId");
       if (subscriptionId != null && subscriptionId.isNotEmpty) {
-        await SupabaseService().updateProfileOneSignalId(
+        await SupabaseService().addProfileOneSignalToken(
           id: userId,
-          onesignalId: subscriptionId,
+          token: subscriptionId,
         );
       }
 
-      // Automatically sync subscription ID if it changes later
+      // Automatically sync if subscription token rotates later
       OneSignal.User.pushSubscription.addObserver((state) async {
         // Strict guard: Only sync if this user is still the active logged-in user
         if (_currentLoggedInUserId != userId) return;
         final newId = state.current.id;
         if (newId != null && newId.isNotEmpty && areNotificationsGloballyEnabled) {
-          await SupabaseService().updateProfileOneSignalId(
+          await SupabaseService().addProfileOneSignalToken(
             id: userId,
-            onesignalId: newId,
+            token: newId,
           );
         }
       });
@@ -145,20 +143,22 @@ class PushNotificationService {
     }
   }
 
-  // Clear OneSignal session & Supabase subscription ID on logout
+  // Clear OneSignal session & delete device token from Supabase on logout
   static Future<void> clearPushOnLogout(String userId) async {
     if (kIsWeb) return;
     try {
-      print("OneSignal: Clearing push notification session for User: $userId");
+      print("OneSignal: Removing device push token on logout for User: $userId");
       _currentLoggedInUserId = null;
 
-      // 1. Clear subscription ID from Supabase profiles table
-      await SupabaseService().updateProfileOneSignalId(
+      final currentDeviceId = OneSignal.User.pushSubscription.id;
+
+      // 1. Remove this specific device's token from Supabase multi-device tokens list
+      await SupabaseService().removeProfileOneSignalToken(
         id: userId,
-        onesignalId: null,
+        token: currentDeviceId,
       );
 
-      // 2. Opt out push subscription on device so this phone stops receiving pushes
+      // 2. Opt out push subscription on device so this phone stops receiving any pushes
       OneSignal.User.pushSubscription.optOut();
 
       // 3. Unbind external ID from OneSignal SDK
@@ -199,10 +199,9 @@ class PushNotificationService {
     }
   }
 
-  // Send Push Notification via OneSignal REST API (Multi-Device & User Sync)
+  // Send Push Notification strictly to active subscription device tokens (Multi-Device & User Sync)
   static Future<void> sendPushNotification({
-    List<String>? subscriptionIds,
-    List<String>? externalUserIds,
+    required List<String> subscriptionIds,
     required String title,
     required String body,
     Map<String, dynamic>? data,
@@ -213,65 +212,38 @@ class PushNotificationService {
       return;
     }
 
-    final validSubIds = (subscriptionIds ?? [])
+    final validSubIds = subscriptionIds
         .where((id) => id.trim().isNotEmpty)
         .toSet()
         .toList();
 
-    final validUserIds = (externalUserIds ?? [])
-        .where((id) => id.trim().isNotEmpty)
-        .toSet()
-        .toList();
-
-    if (validSubIds.isEmpty && validUserIds.isEmpty) return;
+    if (validSubIds.isEmpty) {
+      print("OneSignal: No active device tokens found for assigned students. Skipping push broadcast.");
+      return;
+    }
 
     try {
       final url = Uri.parse('https://onesignal.com/api/v1/notifications');
 
-      // 1. Send by External User ID alias (notifies all active logged in devices for each student)
-      if (validUserIds.isNotEmpty) {
-        final payload = {
-          'app_id': appId,
-          'include_aliases': {'external_id': validUserIds},
-          'target_channel': 'push',
-          'headings': {'en': title},
-          'contents': {'en': body},
-          'data': data ?? {},
-          'priority': 10,
-          'android_accent_color': 'FF1E3A8A',
-        };
+      final payload = {
+        'app_id': appId,
+        'include_subscription_ids': validSubIds,
+        'headings': {'en': title},
+        'contents': {'en': body},
+        'data': data ?? {},
+        'priority': 10,
+        'android_accent_color': 'FF1E3A8A',
+      };
 
-        final response = await http.post(
-          url,
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Authorization': 'Basic $restApiKey',
-          },
-          body: jsonEncode(payload),
-        );
-        print("OneSignal Multi-Device Alias Push sent: ${response.statusCode} - ${response.body}");
-      } else if (validSubIds.isNotEmpty) {
-        // 2. Fallback to direct Subscription IDs if user IDs are not provided
-        final payload = {
-          'app_id': appId,
-          'include_subscription_ids': validSubIds,
-          'headings': {'en': title},
-          'contents': {'en': body},
-          'data': data ?? {},
-          'priority': 10,
-          'android_accent_color': 'FF1E3A8A',
-        };
-
-        final response = await http.post(
-          url,
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Authorization': 'Basic $restApiKey',
-          },
-          body: jsonEncode(payload),
-        );
-        print("OneSignal SubId Push sent: ${response.statusCode} - ${response.body}");
-      }
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': 'Basic $restApiKey',
+        },
+        body: jsonEncode(payload),
+      );
+      print("OneSignal Push Broadcast sent to ${validSubIds.length} active devices: ${response.statusCode} - ${response.body}");
     } catch (e) {
       print("Error sending OneSignal push notification: $e");
     }
@@ -288,20 +260,21 @@ class PushNotificationService {
     try {
       final students = await SupabaseService().getAssignedStudentsForVehicle(vehicleId);
       final List<String> subIds = [];
-      final List<String> userIds = [];
 
       for (var s in students) {
         // ONLY target students who are actively logged in with a non-null onesignal_id
         if (s.onesignalId != null && s.onesignalId!.trim().isNotEmpty) {
-          subIds.add(s.onesignalId!.trim());
-          userIds.add(s.id);
+          final tokens = s.onesignalId!
+              .split(',')
+              .map((t) => t.trim())
+              .where((t) => t.isNotEmpty);
+          subIds.addAll(tokens);
         }
       }
 
-      if (subIds.isNotEmpty || userIds.isNotEmpty) {
+      if (subIds.isNotEmpty) {
         await sendPushNotification(
           subscriptionIds: subIds,
-          externalUserIds: userIds,
           title: "🚌 Bus Trip Started!",
           body: "$vehicleName has started its trip and is on the way. Open MAVIO to track live!",
           data: {'tripId': tripId, 'busNumber': vehicleName},

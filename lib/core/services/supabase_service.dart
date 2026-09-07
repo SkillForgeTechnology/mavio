@@ -1906,6 +1906,118 @@ class SupabaseService {
     }
   }
 
+  // Add a device token to student's multi-device tokens list
+  Future<void> addProfileOneSignalToken({
+    required String id,
+    required String token,
+  }) async {
+    if (token.trim().isEmpty) return;
+    final cleanToken = token.trim();
+
+    if (_useMockMode) {
+      final s = _mockProfiles[id];
+      if (s != null) {
+        final existing = (s.onesignalId ?? '')
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toSet();
+        existing.add(cleanToken);
+        final joined = existing.join(',');
+        final updated = s.copyWith(onesignalId: joined);
+        _mockProfiles[id] = updated;
+        if (_currentUserProfile?.id == id) {
+          _currentUserProfile = updated;
+        }
+      }
+    } else {
+      try {
+        final res = await Supabase.instance.client
+            .from('profiles')
+            .select('onesignal_id')
+            .eq('id', id)
+            .maybeSingle();
+        final existingStr = res?['onesignal_id'] as String? ?? '';
+        final existing = existingStr
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toSet();
+        existing.add(cleanToken);
+        final joined = existing.join(',');
+
+        await Supabase.instance.client.from('profiles').update({
+          'onesignal_id': joined,
+        }).eq('id', id);
+
+        if (_currentUserProfile?.id == id) {
+          _currentUserProfile = _currentUserProfile?.copyWith(onesignalId: joined);
+        }
+      } catch (e) {
+        print("Error adding OneSignal token to profile: $e");
+      }
+    }
+  }
+
+  // Remove a specific device token from student's multi-device tokens list on logout
+  Future<void> removeProfileOneSignalToken({
+    required String id,
+    String? token,
+  }) async {
+    if (_useMockMode) {
+      final s = _mockProfiles[id];
+      if (s != null) {
+        if (token == null || token.trim().isEmpty) {
+          final updated = s.copyWith(onesignalId: null);
+          _mockProfiles[id] = updated;
+          if (_currentUserProfile?.id == id) _currentUserProfile = updated;
+        } else {
+          final cleanToken = token.trim();
+          final existing = (s.onesignalId ?? '')
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty && e != cleanToken)
+              .toSet();
+          final joined = existing.isEmpty ? null : existing.join(',');
+          final updated = s.copyWith(onesignalId: joined);
+          _mockProfiles[id] = updated;
+          if (_currentUserProfile?.id == id) _currentUserProfile = updated;
+        }
+      }
+    } else {
+      try {
+        if (token == null || token.trim().isEmpty) {
+          await Supabase.instance.client.from('profiles').update({
+            'onesignal_id': null,
+          }).eq('id', id);
+        } else {
+          final cleanToken = token.trim();
+          final res = await Supabase.instance.client
+              .from('profiles')
+              .select('onesignal_id')
+              .eq('id', id)
+              .maybeSingle();
+          final existingStr = res?['onesignal_id'] as String? ?? '';
+          final existing = existingStr
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty && e != cleanToken)
+              .toSet();
+          final joined = existing.isEmpty ? null : existing.join(',');
+
+          await Supabase.instance.client.from('profiles').update({
+            'onesignal_id': joined,
+          }).eq('id', id);
+        }
+        if (_currentUserProfile?.id == id) {
+          _currentUserProfile = _currentUserProfile?.copyWith(onesignalId: null);
+        }
+      } catch (e) {
+        print("Error removing OneSignal token from profile: $e");
+      }
+    }
+  }
+
   // Update student's OneSignal subscription ID
   Future<void> updateProfileOneSignalId({
     required String id,

@@ -237,15 +237,22 @@ void onStart(ServiceInstance service) async {
                   ? "${distance.round()}m"
                   : "${(distance / 1000).toStringAsFixed(1)}km";
 
-              _sendBackgroundProximityPush(
-                subscriptionIds: target.onesignalId != null ? [target.onesignalId!] : null,
-                externalUserIds: [target.id],
-                title: "🚌 Bus Approaching!",
-                body:
-                    "${vehicleName ?? 'Your school bus'} is approaching your stop ($distText away). Please be ready!",
-                tripId: tripId!,
-                busNumber: vehicleName ?? 'Mavio Bus',
-              );
+              final tokens = (target.onesignalId ?? '')
+                  .split(',')
+                  .map((t) => t.trim())
+                  .where((t) => t.isNotEmpty)
+                  .toList();
+
+              if (tokens.isNotEmpty) {
+                _sendBackgroundProximityPush(
+                  subscriptionIds: tokens,
+                  title: "🚌 Bus Approaching!",
+                  body:
+                      "${vehicleName ?? 'Your school bus'} is approaching your stop ($distText away). Please be ready!",
+                  tripId: tripId!,
+                  busNumber: vehicleName ?? 'Mavio Bus',
+                );
+              }
             }
           }
         }
@@ -254,27 +261,15 @@ void onStart(ServiceInstance service) async {
         if (service is AndroidServiceInstance) {
           if (await service.isForegroundService()) {
             service.setForegroundNotificationInfo(
-              title: "MAVIO: ${vehicleName ?? 'Bus'} is Live",
-              content: "Speed: ${lastSpeed.toStringAsFixed(1)} km/h • Uploads: $uploadCount",
+              title: "MAVIO Driver: Live Trip Active",
+              content:
+                  "${vehicleName ?? 'Bus'} | Speed: ${lastSpeed.toStringAsFixed(1)} km/h | Pushed $uploadCount points",
             );
           }
         }
-
-        // Broadcast stats back to UI
-        service.invoke('updateStats', {
-          'speed': lastSpeed,
-          'uploads': uploadCount,
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'isTracking': true,
-          'tripId': tripId,
-        });
-
       } catch (e) {
-        print("Background upload error: $e");
+        print("MAVIO Background GPS processing error: $e");
       }
-    }, onError: (err) {
-      print("Background GPS stream error: $err");
     });
   });
 }
@@ -299,8 +294,7 @@ class _StudentProximityTarget {
 }
 
 Future<void> _sendBackgroundProximityPush({
-  List<String>? subscriptionIds,
-  List<String>? externalUserIds,
+  required List<String> subscriptionIds,
   required String title,
   required String body,
   required String tripId,
@@ -309,58 +303,35 @@ Future<void> _sendBackgroundProximityPush({
   const String appId = "2633169a-2c5f-4856-bfd3-12361105dc17";
   const String restApiKey = String.fromEnvironment('ONESIGNAL_REST_API_KEY');
 
-  final subIds = subscriptionIds?.where((id) => id.isNotEmpty).toList() ?? [];
-  final userIds = externalUserIds?.where((id) => id.isNotEmpty).toList() ?? [];
+  final validSubIds = subscriptionIds
+      .where((id) => id.trim().isNotEmpty)
+      .toSet()
+      .toList();
 
-  if (subIds.isEmpty && userIds.isEmpty) return;
+  if (validSubIds.isEmpty) return;
 
   try {
     final url = Uri.parse('https://onesignal.com/api/v1/notifications');
 
-    // 1. Send via External User ID alias (notifies ALL devices logged in for each student)
-    if (userIds.isNotEmpty) {
-      final payload = {
-        'app_id': appId,
-        'include_aliases': {'external_id': userIds},
-        'target_channel': 'push',
-        'headings': {'en': title},
-        'contents': {'en': body},
-        'data': {'tripId': tripId, 'busNumber': busNumber},
-        'priority': 10,
-        'android_accent_color': 'FF1E3A8A',
-      };
+    final payload = {
+      'app_id': appId,
+      'include_subscription_ids': validSubIds,
+      'headings': {'en': title},
+      'contents': {'en': body},
+      'data': {'tripId': tripId, 'busNumber': busNumber},
+      'priority': 10,
+      'android_accent_color': 'FF1E3A8A',
+    };
 
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Basic $restApiKey',
-        },
-        body: jsonEncode(payload),
-      );
-      print("MAVIO Background Multi-Device Push: ${response.statusCode}");
-    } else if (subIds.isNotEmpty) {
-      // 2. Fallback to direct Subscription IDs if user IDs are not provided
-      final payload = {
-        'app_id': appId,
-        'include_subscription_ids': subIds,
-        'headings': {'en': title},
-        'contents': {'en': body},
-        'data': {'tripId': tripId, 'busNumber': busNumber},
-        'priority': 10,
-        'android_accent_color': 'FF1E3A8A',
-      };
-
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Basic $restApiKey',
-        },
-        body: jsonEncode(payload),
-      );
-      print("MAVIO Background SubId Push: ${response.statusCode}");
-    }
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': 'Basic $restApiKey',
+      },
+      body: jsonEncode(payload),
+    );
+    print("MAVIO Background Push to ${validSubIds.length} devices: ${response.statusCode}");
   } catch (e) {
     print("MAVIO Background Push error: $e");
   }
