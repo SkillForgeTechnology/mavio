@@ -138,6 +138,23 @@ class PushNotificationService {
     }
   }
 
+  // Clear OneSignal session & Supabase subscription ID on logout
+  static Future<void> clearPushOnLogout(String userId) async {
+    if (kIsWeb) return;
+    try {
+      print("OneSignal: Clearing push notification session for User: $userId");
+      // 1. Clear subscription ID from Supabase profiles table
+      await SupabaseService().updateProfileOneSignalId(
+        id: userId,
+        onesignalId: null,
+      );
+      // 2. Unbind external ID from OneSignal SDK so device stops receiving user alerts
+      OneSignal.logout();
+    } catch (e) {
+      print("Error clearing OneSignal push on logout: $e");
+    }
+  }
+
   // Show instant heads-up local notification on device
   static Future<void> showLocalNotification({
     required String title,

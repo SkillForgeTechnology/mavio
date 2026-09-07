@@ -269,12 +269,16 @@ class _MavioBulkImportScreenState extends State<MavioBulkImportScreen> {
               }
             }
           }
+          final mobile = (row['Mobile Number'] ?? row['Phone'] ?? '').trim();
+          final email = (row['Email'] ?? '').trim();
+          final pinOrPassword = (row['Password'] ?? row['PIN'] ?? '').trim();
           await widget.db.addDriver(
             row['Name']!,
-            row['Email']!,
-            row['Password']!,
+            email,
+            pinOrPassword.isNotEmpty ? pinOrPassword : null,
             vId,
-            phone: row['Mobile Number'],
+            phone: mobile.isNotEmpty ? mobile : null,
+            pin: (pinOrPassword.length == 6 && int.tryParse(pinOrPassword) != null) ? pinOrPassword : null,
           );
         }
       } else if (widget.importType == 'student') {

@@ -115,6 +115,11 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _isLoading = true;
     notifyListeners();
+    if (_currentProfile != null) {
+      await PushNotificationService.clearPushOnLogout(_currentProfile!.id).catchError((e) {
+        print("Error clearing push notification on logout: $e");
+      });
+    }
     await _db.logout();
     _currentProfile = null;
     _verifiedOrg = null;

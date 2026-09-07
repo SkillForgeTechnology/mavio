@@ -64,6 +64,7 @@ class MavioProfile {
   final String? phone;
   final String? rollNumber;
   final String? dob;
+  final String? pin;
   final double? alertLatitude;
   final double? alertLongitude;
   final int alertRadiusMeters;
@@ -79,6 +80,7 @@ class MavioProfile {
     this.phone,
     this.rollNumber,
     this.dob,
+    this.pin,
     this.alertLatitude,
     this.alertLongitude,
     this.alertRadiusMeters = 500,
@@ -96,6 +98,7 @@ class MavioProfile {
       phone: json['phone'] as String?,
       rollNumber: json['roll_number'] as String?,
       dob: json['dob'] as String?,
+      pin: json['login_pin'] as String? ?? json['pin'] as String? ?? json['dob'] as String?,
       alertLatitude: json['alert_latitude'] != null ? (json['alert_latitude'] as num).toDouble() : null,
       alertLongitude: json['alert_longitude'] != null ? (json['alert_longitude'] as num).toDouble() : null,
       alertRadiusMeters: json['alert_radius_meters'] as int? ?? 500,
@@ -108,6 +111,7 @@ class MavioProfile {
     String? phone,
     String? rollNumber,
     String? dob,
+    String? pin,
     double? alertLatitude,
     double? alertLongitude,
     int? alertRadiusMeters,
@@ -123,6 +127,7 @@ class MavioProfile {
       phone: phone ?? this.phone,
       rollNumber: rollNumber ?? this.rollNumber,
       dob: dob ?? this.dob,
+      pin: pin ?? this.pin,
       alertLatitude: alertLatitude ?? this.alertLatitude,
       alertLongitude: alertLongitude ?? this.alertLongitude,
       alertRadiusMeters: alertRadiusMeters ?? this.alertRadiusMeters,

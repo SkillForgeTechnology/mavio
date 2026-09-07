@@ -590,18 +590,66 @@ class SupabaseService {
   Future<MavioProfile?> login(String email, String password, String role) async {
     await Future.delayed(const Duration(milliseconds: 800));
 
+    String authEmail = email.trim();
+
+    // Special handling for Driver Mobile Number login
+    if (role == 'driver') {
+      final cleanDigits = authEmail.replaceAll(RegExp(r'[^\d]'), '');
+      if (!authEmail.contains('@') && cleanDigits.isNotEmpty) {
+        if (_useMockMode) {
+          for (var p in _mockProfiles.values) {
+            if (p.role == 'driver' &&
+                p.phone != null &&
+                p.phone!.replaceAll(RegExp(r'[^\d]'), '') == cleanDigits) {
+              authEmail = p.email;
+              break;
+            }
+          }
+        } else {
+          try {
+            final res = await Supabase.instance.client
+                .from('profiles')
+                .select('email, phone, dob')
+                .eq('role', 'driver');
+            if (res is List) {
+              for (var row in res) {
+                final pPhone = row['phone']?.toString().replaceAll(RegExp(r'[^\d]'), '') ?? '';
+                if (pPhone == cleanDigits ||
+                    (pPhone.length >= 10 && cleanDigits.endsWith(pPhone)) ||
+                    (cleanDigits.length >= 10 && pPhone.endsWith(cleanDigits))) {
+                  if (row['email'] != null && row['email'].toString().isNotEmpty) {
+                    authEmail = row['email'].toString();
+                    break;
+                  }
+                }
+              }
+            }
+            if (!authEmail.contains('@')) {
+              authEmail = '$cleanDigits@mavio.driver';
+            }
+          } catch (e) {
+            print("Driver lookup by phone: $e");
+            if (!authEmail.contains('@')) {
+              authEmail = '$cleanDigits@mavio.driver';
+            }
+          }
+        }
+      }
+    }
+
     if (_useMockMode) {
       // Simple mock credential matching
       MavioProfile? match;
       for (var p in _mockProfiles.values) {
-        if (p.email.toLowerCase() == email.trim().toLowerCase() &&
+        if ((p.email.toLowerCase() == authEmail.toLowerCase() ||
+             (p.phone != null && p.phone!.replaceAll(RegExp(r'[^\d]'), '') == authEmail.replaceAll(RegExp(r'[^\d]'), ''))) &&
             p.role == role &&
             (_currentOrganization == null || p.orgId == _currentOrganization!.id)) {
           match = p;
           break;
         }
       }
-      if (match != null && password == 'password') {
+      if (match != null && (password == 'password' || password == (match.pin ?? match.dob ?? 'password'))) {
         _currentUserProfile = match;
         return _currentUserProfile;
       }
@@ -610,7 +658,7 @@ class SupabaseService {
       try {
         // Authenticate via Supabase Auth
         final authRes = await Supabase.instance.client.auth.signInWithPassword(
-          email: email.trim(),
+          email: authEmail,
           password: password,
         );
 
@@ -1371,21 +1419,86 @@ class SupabaseService {
     return String.fromCharCodes(charCodes);
   }
 
-  Future<void> addDriver(String name, String email, String password, String? assignedVehicleId, {String? phone}) async {
+  Future<String> generateUniqueDriverPin({String? orgId}) async {
+    final random = Random();
+    final Set<String> existingPins = {};
+
+    if (_useMockMode) {
+      for (var p in _mockProfiles.values) {
+        if (p.role == 'driver') {
+          final pPin = p.pin ?? p.dob;
+          if (pPin != null && pPin.isNotEmpty) {
+            existingPins.add(pPin);
+          }
+        }
+      }
+    } else {
+      try {
+        final query = Supabase.instance.client
+            .from('profiles')
+            .select('dob')
+            .eq('role', 'driver');
+        final res = await query;
+        if (res is List) {
+          for (var row in res) {
+            final dob = row['dob']?.toString();
+            if (dob != null && dob.isNotEmpty) {
+              existingPins.add(dob);
+            }
+          }
+        }
+      } catch (e) {
+        print("Error fetching existing driver PINs: $e");
+      }
+    }
+
+    String pin = '';
+    int attempts = 0;
+    do {
+      pin = (100000 + random.nextInt(900000)).toString();
+      attempts++;
+    } while (existingPins.contains(pin) && attempts < 100);
+
+    return pin;
+  }
+
+  Future<void> addDriver(
+    String name,
+    String email,
+    String? password,
+    String? assignedVehicleId, {
+    String? phone,
+    String? pin,
+  }) async {
+    final orgId = _currentUserProfile?.orgId ?? _currentOrganization?.id ?? '';
+    final driverPin = (pin != null && pin.isNotEmpty)
+        ? pin
+        : (password != null && password.trim().isNotEmpty && password.trim().length == 6 && int.tryParse(password.trim()) != null)
+            ? password.trim()
+            : await generateUniqueDriverPin(orgId: orgId);
+
+    final cleanPhone = phone?.replaceAll(RegExp(r'[^\d]'), '') ?? '';
+    final finalEmail = email.trim().isNotEmpty
+        ? email.trim()
+        : (cleanPhone.isNotEmpty ? '$cleanPhone@mavio.driver' : 'driver_${DateTime.now().millisecondsSinceEpoch}@mavio.driver');
+
+    final finalPassword = (password != null && password.trim().isNotEmpty) ? password.trim() : driverPin;
+
     if (_useMockMode) {
       final id = 'd-${DateTime.now().millisecondsSinceEpoch}';
       _mockProfiles[id] = MavioProfile(
         id: id,
-        email: email,
+        email: finalEmail,
         name: name,
         role: 'driver',
-        orgId: _currentUserProfile!.orgId,
+        orgId: orgId,
         assignedVehicleId: assignedVehicleId,
         phone: phone,
+        pin: driverPin,
+        dob: driverPin,
       );
     } else {
       try {
-        final orgId = _currentUserProfile!.orgId;
         final tempClient = SupabaseClient(
           SupabaseKeys.url,
           SupabaseKeys.anonKey,
@@ -1396,8 +1509,8 @@ class SupabaseService {
         );
         
         final authRes = await tempClient.auth.signUp(
-          email: email.trim(),
-          password: password,
+          email: finalEmail,
+          password: finalPassword,
           data: {
             'role': 'driver',
             'org_id': orgId,
@@ -1409,12 +1522,13 @@ class SupabaseService {
           final client = Supabase.instance.client;
           await client.from('profiles').insert({
             'id': userId,
-            'email': email.trim(),
+            'email': finalEmail,
             'name': name,
             'role': 'driver',
             'org_id': orgId,
             'assigned_vehicle_id': assignedVehicleId,
             'phone': phone,
+            'dob': driverPin,
           });
         } else {
           throw Exception("Auth signUp failed to return user ID.");
@@ -1549,13 +1663,69 @@ class SupabaseService {
     }
   }
 
+  Future<String> regenerateDriverPin({
+    required String driverId,
+    required String email,
+    String? phone,
+  }) async {
+    final orgId = _currentUserProfile?.orgId ?? _currentOrganization?.id ?? '';
+    final newPin = await generateUniqueDriverPin(orgId: orgId);
+
+    if (_useMockMode) {
+      final d = _mockProfiles[driverId];
+      if (d != null) {
+        _mockProfiles[driverId] = MavioProfile(
+          id: d.id,
+          email: d.email,
+          name: d.name,
+          role: d.role,
+          orgId: d.orgId,
+          assignedVehicleId: d.assignedVehicleId,
+          phone: d.phone,
+          dob: newPin,
+          pin: newPin,
+        );
+      }
+    } else {
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'dob': newPin})
+          .eq('id', driverId);
+
+      try {
+        await Supabase.instance.client.rpc(
+          'update_auth_user',
+          params: {
+            'target_user_id': driverId,
+            'new_email': email.trim(),
+            'new_password': newPin,
+          },
+        );
+      } catch (e) {
+        print("Note: Optional auth record sync: $e");
+      }
+    }
+    return newPin;
+  }
+
   Future<void> updateDriverDetails({
     required String id,
     required String name,
     required String email,
     String? phone,
     String? assignedVehicleId,
+    String? pin,
   }) async {
+    final Map<String, dynamic> updateData = {
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'assigned_vehicle_id': assignedVehicleId,
+    };
+    if (pin != null && pin.isNotEmpty) {
+      updateData['dob'] = pin;
+    }
+
     if (_useMockMode) {
       final d = _mockProfiles[id];
       if (d != null) {
@@ -1567,15 +1737,12 @@ class SupabaseService {
           orgId: d.orgId,
           assignedVehicleId: assignedVehicleId,
           phone: phone,
+          dob: pin ?? d.dob,
+          pin: pin ?? d.pin,
         );
       }
     } else {
-      await Supabase.instance.client.from('profiles').update({
-        'name': name,
-        'email': email,
-        'phone': phone,
-        'assigned_vehicle_id': assignedVehicleId,
-      }).eq('id', id);
+      await Supabase.instance.client.from('profiles').update(updateData).eq('id', id);
 
       try {
         await Supabase.instance.client.rpc(
@@ -1583,7 +1750,7 @@ class SupabaseService {
           params: {
             'target_user_id': id,
             'new_email': email.trim(),
-            'new_password': null,
+            'new_password': (pin != null && pin.isNotEmpty) ? pin.trim() : null,
           },
         );
       } catch (e) {

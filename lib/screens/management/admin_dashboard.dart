@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -532,9 +533,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
     final phoneController = TextEditingController();
-    final passwordController = TextEditingController();
+    final pinController = TextEditingController();
     String? selectedVehicleId;
     final formKey = GlobalKey<FormState>();
+    bool isGeneratingPin = true;
 
     showDialog(
       context: context,
@@ -544,11 +546,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
             .toList();
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            if (isGeneratingPin && pinController.text.isEmpty) {
+              _db.generateUniqueDriverPin().then((pin) {
+                if (mounted) {
+                  setDialogState(() {
+                    pinController.text = pin;
+                    isGeneratingPin = false;
+                  });
+                }
+              });
+            }
+
             return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               backgroundColor: Colors.white,
-              title: const Text(
-                'Add Driver',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.person_add_rounded, color: AppColors.primary, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Add Driver',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ],
               ),
               content: SingleChildScrollView(
                 child: Container(
@@ -558,58 +585,78 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     key: formKey,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         TextFormField(
                           controller: nameController,
                           decoration: const InputDecoration(
-                            labelText: 'Full Name',
+                            labelText: 'Full Name *',
                             prefixIcon: Icon(
                               Icons.person_outline_rounded,
                               color: AppColors.primary,
                             ),
                           ),
                           validator: (v) =>
-                              v!.trim().isEmpty ? 'Enter name' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: emailController,
-                          decoration: const InputDecoration(
-                            labelText: 'Email Address',
-                            prefixIcon: Icon(
-                              Icons.email_outlined,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          validator: (v) =>
-                              v!.trim().isEmpty ? 'Enter email' : null,
+                              v!.trim().isEmpty ? 'Enter full name' : null,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: phoneController,
+                          keyboardType: TextInputType.phone,
                           decoration: const InputDecoration(
-                            labelText: 'Mobile Number',
+                            labelText: 'Mobile Number *',
+                            hintText: 'e.g. 9876543210',
                             prefixIcon: Icon(
                               Icons.phone_outlined,
                               color: AppColors.primary,
                             ),
                           ),
                           validator: (v) =>
-                              v!.trim().isEmpty ? 'Enter mobile number' : null,
+                              v!.trim().isEmpty ? 'Enter mobile number for driver login' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        // 6-Digit PIN Generation Row
+                        TextFormField(
+                          controller: pinController,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          decoration: InputDecoration(
+                            labelText: '6-Digit Login PIN *',
+                            counterText: '',
+                            prefixIcon: const Icon(
+                              Icons.pin_rounded,
+                              color: AppColors.primary,
+                            ),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+                              tooltip: 'Generate New Unique PIN',
+                              onPressed: () async {
+                                final p = await _db.generateUniqueDriverPin();
+                                setDialogState(() {
+                                  pinController.text = p;
+                                });
+                              },
+                            ),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().length != 6 || int.tryParse(v.trim()) == null) {
+                              return 'Enter a 6-digit PIN';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
-                          controller: passwordController,
-                          obscureText: true,
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
                           decoration: const InputDecoration(
-                            labelText: 'Password',
+                            labelText: 'Email Address (Optional)',
+                            hintText: 'Auto-generated if empty',
                             prefixIcon: Icon(
-                              Icons.lock_outlined,
+                              Icons.email_outlined,
                               color: AppColors.primary,
                             ),
                           ),
-                          validator: (v) =>
-                              v!.trim().isEmpty ? 'Enter password' : null,
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
@@ -641,27 +688,50 @@ class _AdminDashboardState extends State<AdminDashboard> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
                 ),
                 ElevatedButton(
                   onPressed: () async {
                     if (!formKey.currentState!.validate()) return;
                     final messenger = ScaffoldMessenger.of(context);
+                    final driverName = nameController.text.trim();
+                    final driverPhone = phoneController.text.trim();
+                    final driverPin = pinController.text.trim();
+                    final driverEmail = emailController.text.trim();
+
                     Navigator.pop(context);
                     setState(() => _isLoading = true);
                     try {
                       await _db.addDriver(
-                        nameController.text,
-                        emailController.text,
-                        passwordController.text,
+                        driverName,
+                        driverEmail,
+                        driverPin,
                         selectedVehicleId,
-                        phone: phoneController.text,
+                        phone: driverPhone,
+                        pin: driverPin,
                       );
                       await _loadAdminData();
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Driver $driverName created! Login PIN: $driverPin'),
+                            backgroundColor: AppColors.success,
+                            action: SnackBarAction(
+                              label: 'Copy Credentials',
+                              textColor: Colors.white,
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(
+                                  text: "🚌 MAVIO Driver Login Credentials:\nName: $driverName\nMobile: $driverPhone\n6-Digit PIN: $driverPin",
+                                ));
+                              },
+                            ),
+                          ),
+                        );
+                      }
                     } catch (e) {
                       messenger.showSnackBar(
                         SnackBar(
-                          content: Text('Error adding: $e'),
+                          content: Text('Error adding driver: $e'),
                           backgroundColor: AppColors.error,
                         ),
                       );
@@ -670,9 +740,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(100, 40),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(100, 42),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: const Text('Add'),
+                  child: const Text('Add Driver'),
                 ),
               ],
             );
@@ -686,7 +759,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final TextEditingController nameController = TextEditingController(text: d.name);
     final TextEditingController emailController = TextEditingController(text: d.email);
     final TextEditingController phoneController = TextEditingController(text: d.phone ?? '');
+    String currentPin = d.pin ?? d.dob ?? '';
     String? selectedVehicleId = d.assignedVehicleId;
+    bool isRegeneratingPin = false;
 
     showDialog(
       context: context,
@@ -700,9 +775,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
               title: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Driver Profile',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0284C7).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.badge_rounded, color: Color(0xFF0284C7), size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Driver Profile',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                    ],
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -717,6 +805,162 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Prominent Credentials & 6-Digit PIN Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFF0F9FF), Color(0xFFE0F2FE)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFBAE6FD), width: 1.2),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.key_rounded, size: 18, color: Color(0xFF0369A1)),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'Driver Login Credentials',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0369A1)),
+                                ),
+                                const Spacer(),
+                                if (isRegeneratingPin)
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0284C7)),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Username / Mobile:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      phoneController.text.isNotEmpty ? phoneController.text : (d.phone ?? 'N/A'),
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                    ),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    const Text('6-Digit PIN:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                    const SizedBox(height: 2),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0284C7),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        currentPin.isNotEmpty ? currentPin : '—',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                          letterSpacing: 2.0,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0284C7),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    icon: const Icon(Icons.copy_rounded, size: 16),
+                                    label: const Text(
+                                      'Copy Login Credentials',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                    onPressed: () {
+                                      final pNum = phoneController.text.trim().isNotEmpty ? phoneController.text.trim() : (d.phone ?? 'N/A');
+                                      Clipboard.setData(ClipboardData(
+                                        text: "🚌 MAVIO Driver Login Credentials\nName: ${nameController.text.trim()}\nMobile Number: $pNum\n6-Digit PIN: $currentPin",
+                                      ));
+                                      AppToast.show(context, "Driver login credentials copied to clipboard!");
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF0369A1),
+                                    side: const BorderSide(color: Color(0xFF0284C7)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  icon: const Icon(Icons.autorenew_rounded, size: 16),
+                                  label: const Text('New PIN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  onPressed: isRegeneratingPin
+                                      ? null
+                                      : () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text('Regenerate PIN', style: TextStyle(fontWeight: FontWeight.bold)),
+                                              content: Text('Are you sure you want to generate a new unique 6-digit login PIN for ${d.name}? The driver will need to use the new PIN to log in.'),
+                                              actions: [
+                                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                                ElevatedButton(
+                                                  onPressed: () => Navigator.pop(ctx, true),
+                                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                                                  child: const Text('Generate PIN'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm != true) return;
+
+                                          setDialogState(() => isRegeneratingPin = true);
+                                          try {
+                                            final newPin = await _db.regenerateDriverPin(
+                                              driverId: d.id,
+                                              email: emailController.text.trim(),
+                                              phone: phoneController.text.trim(),
+                                            );
+                                            setDialogState(() {
+                                              currentPin = newPin;
+                                              isRegeneratingPin = false;
+                                            });
+                                            await _loadAdminData();
+                                            if (mounted) {
+                                              AppToast.show(context, "New PIN generated: $newPin");
+                                            }
+                                          } catch (e) {
+                                            setDialogState(() => isRegeneratingPin = false);
+                                            _showSnackbar('Error generating PIN: $e', AppColors.error);
+                                          }
+                                        },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
                       const Text(
                         'Full Name',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
@@ -730,7 +974,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
+
+                      const Text(
+                        'Phone / Mobile Number',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          hintText: 'Enter phone number',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
 
                       const Text(
                         'Email Address',
@@ -745,22 +1005,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         ),
                       ),
-                      const SizedBox(height: 16),
-
-                      const Text(
-                        'Phone Number',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: phoneController,
-                        decoration: InputDecoration(
-                          hintText: 'Enter phone',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
 
                       const Text(
                         'Assign Vehicle / Bus',
@@ -792,7 +1037,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           });
                         },
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
 
                       const Divider(),
                       const SizedBox(height: 8),
@@ -903,6 +1148,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                   email: emailController.text.trim(),
                                   phone: phoneController.text.trim(),
                                   assignedVehicleId: selectedVehicleId,
+                                  pin: currentPin.isNotEmpty ? currentPin : null,
                                 );
                                 _loadAdminData();
                                 if (mounted) Navigator.pop(dialogContext);
@@ -3234,6 +3480,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         busName = (v['vehicle'] as MavioVehicle).name;
       }
     }
+    final pin = d.pin ?? d.dob ?? '';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -3243,19 +3490,53 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ),
       child: ListTile(
         leading: const CircleAvatar(
-          backgroundColor: AppColors.primaryLight,
-          child: Icon(Icons.person_rounded, color: AppColors.primary),
+          backgroundColor: Color(0xFFE0F2FE),
+          child: Icon(Icons.person_rounded, color: Color(0xFF0284C7)),
         ),
         title: Text(
           d.name,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text(d.email),
+        subtitle: Text(
+          d.phone != null && d.phone!.isNotEmpty ? d.phone! : d.email,
+          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
         onTap: () => _showDriverDetailsAndEditDialog(d),
-        trailing: Chip(
-          label: Text(busName, style: const TextStyle(fontSize: 11)),
-          backgroundColor: AppColors.surface,
-          side: const BorderSide(color: AppColors.border),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (pin.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F9FF),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFBAE6FD)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.pin_rounded, size: 12, color: Color(0xFF0284C7)),
+                    const SizedBox(width: 4),
+                    Text(
+                      pin,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0369A1),
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Chip(
+              label: Text(busName, style: const TextStyle(fontSize: 11)),
+              backgroundColor: AppColors.surface,
+              side: const BorderSide(color: AppColors.border),
+            ),
+          ],
         ),
       ),
     );
