@@ -154,11 +154,19 @@ class _DriverDashboardState extends State<DriverDashboard> {
       return;
     }
 
-    // 2. Verify Location Service is Enabled
+    // 2. Verify Location Service is Enabled (GPS)
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      _showSnackbar("Location services (GPS) are disabled. Please enable them in settings.", AppColors.error);
-      return;
+      final opened = await _showEnableGpsDialog();
+      if (opened) {
+        // Wait a moment for OS toggle transition
+        await Future.delayed(const Duration(milliseconds: 1200));
+        serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      }
+      if (!serviceEnabled) {
+        _showSnackbar("Location services (GPS) must be turned on to start a trip.", AppColors.error);
+        return;
+      }
     }
 
     // 3. Prominent Disclosure Check for Background Location (Google Play Policy Compliance)
@@ -183,27 +191,39 @@ class _DriverDashboardState extends State<DriverDashboard> {
     // 4. Verify Foreground Location Permissions
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
+    }
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      await _showPermissionSettingsDialog(
+        title: "Location Permission Required",
+        message: "Location permission is required to track and broadcast your bus route. Please enable location permissions in app settings.",
+        icon: Icons.location_on_rounded,
+      );
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         _showSnackbar("Location permissions are required for GPS tracking.", AppColors.error);
         return;
       }
     }
-    if (permission == LocationPermission.deniedForever) {
-      _showSnackbar("Location permissions are permanently denied. Please enable in settings.", AppColors.error);
-      return;
-    }
 
     // 5. Request Notification Permission for Foreground Service on Android 13+
     if (Platform.isAndroid) {
-      final status = await Permission.notification.status;
-      if (status != PermissionStatus.granted) {
+      var notifStatus = await Permission.notification.status;
+      if (notifStatus != PermissionStatus.granted) {
         final result = await Permission.notification.request();
         if (result != PermissionStatus.granted) {
-          _showSnackbar(
-            "Notification permission is required to run location updates in the background.",
-            AppColors.error,
+          await _showPermissionSettingsDialog(
+            title: "Notification Permission Required",
+            message: "Notification access is required to keep the live bus tracking service running in the background while driving.",
+            icon: Icons.notifications_active_rounded,
           );
-          return; // Block service initialization to prevent OS crash
+          notifStatus = await Permission.notification.status;
+          if (notifStatus != PermissionStatus.granted) {
+            _showSnackbar(
+              "Notification permission is required to run location updates in the background.",
+              AppColors.error,
+            );
+            return; // Block service initialization to prevent OS crash
+          }
         }
       }
     }
@@ -416,6 +436,134 @@ class _DriverDashboardState extends State<DriverDashboard> {
       },
     );
     return result ?? false;
+  }
+
+  Future<bool> _showEnableGpsDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.location_off_rounded,
+                  color: Color(0xFFDC2626),
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  "Turn On Location (GPS)",
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            "Device GPS is currently turned off. To start the trip and broadcast real-time bus location to students, please turn on Location services.",
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text("Cancel", style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop(true);
+                await Geolocator.openLocationSettings();
+              },
+              icon: const Icon(Icons.settings_suggest_rounded, size: 18),
+              label: const Text("Turn On GPS", style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<void> _showPermissionSettingsDialog({
+    required String title,
+    required String message,
+    required IconData icon,
+  }) async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: AppColors.primary, size: 26),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text("Cancel", style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await Geolocator.openAppSettings();
+              },
+              icon: const Icon(Icons.open_in_new_rounded, size: 18),
+              label: const Text("Open App Settings", style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _cleanupLocalTrackingUI() {

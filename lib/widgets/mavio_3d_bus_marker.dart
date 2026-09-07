@@ -31,7 +31,7 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 2400),
     )..repeat();
   }
 
@@ -48,63 +48,61 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
     final isStopped = effectiveSpeed == 0.0;
 
     return SizedBox(
-      width: 120,
-      height: 120,
+      width: 130,
+      height: 130,
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
-          // 1. Radar Pulse Glow when live
+          // 1. Subtle Radar Pulse when active
           if (widget.isLive)
             AnimatedBuilder(
               animation: _pulseController,
               builder: (context, child) {
                 final val = _pulseController.value;
                 return Container(
-                  width: 50 + (val * 45),
-                  height: 50 + (val * 45),
+                  width: 56 + (val * 42),
+                  height: 56 + (val * 42),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: (isStopped ? AppColors.primary : const Color(0xFF10B981))
-                          .withOpacity((1.0 - val) * 0.5),
-                      width: 2.0,
+                      color: const Color(0xFFF97316).withOpacity((1.0 - val) * 0.4),
+                      width: 1.5,
                     ),
                   ),
                 );
               },
             ),
 
-          // 2. Headlights Beam & 3D Bus Body (Rotated according to GPS Heading)
+          // 2. Headlights & Sleek 3D White & Orange Bus Model
           Transform.rotate(
             angle: widget.headingDegrees * (math.pi / 180.0),
             child: CustomPaint(
-              size: const Size(64, 64),
-              painter: _Bus3DPainter(
+              size: const Size(70, 70),
+              painter: _LuxuryWhiteOrangeBusPainter(
                 isMoving: !isStopped,
-                primaryColor: AppColors.primary,
               ),
             ),
           ),
 
-          // 3. Floating 3D Holographic Speed & Name Badge
+          // 3. Floating Premium Glassmorphism Badge
           if (widget.showBadge)
             Positioned(
-              bottom: 2,
+              bottom: 0,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withOpacity(0.96),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isStopped ? AppColors.borderLight : const Color(0xFF10B981).withOpacity(0.5),
+                    color: isStopped ? const Color(0xFFE2E8F0) : const Color(0xFFF97316).withOpacity(0.4),
                     width: 1.2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -112,22 +110,28 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 6,
-                      height: 6,
+                      width: 7,
+                      height: 7,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isStopped ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                        color: isStopped ? const Color(0xFFF59E0B) : const Color(0xFFEA580C),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isStopped ? const Color(0xFFF59E0B) : const Color(0xFFEA580C)).withOpacity(0.4),
+                            blurRadius: 4,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 6),
                     Text(
                       isStopped
                           ? 'Stopped'
                           : '${effectiveSpeed.toStringAsFixed(0)} km/h',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: isStopped ? const Color(0xFFB45309) : const Color(0xFF065F46),
+                        color: isStopped ? const Color(0xFFB45309) : const Color(0xFFEA580C),
                       ),
                     ),
                     if (widget.busName.isNotEmpty && widget.busName != 'Not Assigned') ...[
@@ -135,8 +139,8 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
                       Text(
                         '• ${widget.busName}',
                         style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
                         ),
                       ),
@@ -151,14 +155,12 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
   }
 }
 
-/// Custom 3D Isometric Bus Painter
-class _Bus3DPainter extends CustomPainter {
+/// Ultra-Premium White & Orange 3D Coach/Bus Painter
+class _LuxuryWhiteOrangeBusPainter extends CustomPainter {
   final bool isMoving;
-  final Color primaryColor;
 
-  _Bus3DPainter({
+  _LuxuryWhiteOrangeBusPainter({
     required this.isMoving,
-    required this.primaryColor,
   });
 
   @override
@@ -166,161 +168,171 @@ class _Bus3DPainter extends CustomPainter {
     final cx = size.width / 2;
     final cy = size.height / 2;
 
-    // Headlights Beam Projection (Fanning out forward / North)
+    // 1. Sleek Modern Headlight Beam (Crisp Soft Glow)
     final headlightPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFFFEF08A).withOpacity(isMoving ? 0.75 : 0.35),
-          const Color(0xFFFEF9C3).withOpacity(isMoving ? 0.40 : 0.15),
+          const Color(0xFFFEF3C7).withOpacity(isMoving ? 0.60 : 0.25),
+          const Color(0xFFFFFBEB).withOpacity(isMoving ? 0.25 : 0.10),
           Colors.transparent,
         ],
-        stops: const [0.0, 0.6, 1.0],
-      ).createShader(Rect.fromCircle(center: Offset(cx, cy - 26), radius: 34));
+        stops: const [0.0, 0.55, 1.0],
+      ).createShader(Rect.fromCircle(center: Offset(cx, cy - 28), radius: 36));
 
     final headlightPath = Path()
-      ..moveTo(cx - 10, cy - 14)
-      ..lineTo(cx - 24, cy - 38)
-      ..lineTo(cx + 24, cy - 38)
-      ..lineTo(cx + 10, cy - 14)
+      ..moveTo(cx - 8, cy - 20)
+      ..lineTo(cx - 20, cy - 42)
+      ..lineTo(cx + 20, cy - 42)
+      ..lineTo(cx + 8, cy - 20)
       ..close();
     canvas.drawPath(headlightPath, headlightPaint);
 
-    // 1. 3D Elevation Drop Shadow beneath the bus body
+    // 2. Realistic 3D Elevated Ambient Ground Shadow
     final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.25)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+      ..color = Colors.black.withOpacity(0.22)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
 
     final shadowRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy + 3), width: 22, height: 44),
-      const Radius.circular(8),
+      Rect.fromCenter(center: Offset(cx, cy + 3.5), width: 22, height: 50),
+      const Radius.circular(9),
     );
     canvas.drawRRect(shadowRect, shadowPaint);
 
-    // 2. Wheels / Side bevels (Metallic Gray/Black)
-    final wheelPaint = Paint()..color = const Color(0xFF1E293B);
-    // Front wheels
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx - 11, cy - 10), width: 4, height: 9),
-        const Radius.circular(2),
-      ),
-      wheelPaint,
+    // 3. Streamlined Underbody / Tire Arches (Subtle Dark Chassis)
+    final chassisPaint = Paint()..color = const Color(0xFF1E293B);
+    final chassisRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(cx, cy + 1), width: 22, height: 48),
+      const Radius.circular(7),
     );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx + 11, cy - 10), width: 4, height: 9),
-        const Radius.circular(2),
-      ),
-      wheelPaint,
-    );
-    // Rear wheels
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx - 11, cy + 12), width: 4, height: 10),
-        const Radius.circular(2),
-      ),
-      wheelPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx + 11, cy + 12), width: 4, height: 10),
-        const Radius.circular(2),
-      ),
-      wheelPaint,
-    );
+    canvas.drawRRect(chassisRect, chassisPaint);
 
-    // 3. Bus Outer Shell / Main Body (3D Gradient: Primary Indigo to Deep Violet)
+    // 4. Main Coach Body: Pearl White with Sleek 3D Shading
     final bodyPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Color(0xFF6366F1), // Bright Indigo front
-          Color(0xFF4F46E5), // Base Indigo
-          Color(0xFF3730A3), // Deep shadow rear
+          Color(0xFFFFFFFF), // Pure White Front
+          Color(0xFFF8FAFC), // Pearl White Mid
+          Color(0xFFE2E8F0), // Subtle Slate Shading Rear
         ],
-      ).createShader(Rect.fromLTWH(cx - 10, cy - 20, 20, 40));
+      ).createShader(Rect.fromLTWH(cx - 10, cy - 23, 20, 46));
 
     final bodyRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy), width: 20, height: 40),
-      const Radius.circular(6),
+      Rect.fromCenter(center: Offset(cx, cy), width: 20, height: 46),
+      const Radius.circular(7),
     );
     canvas.drawRRect(bodyRect, bodyPaint);
 
-    // 4. Chrome Side Accents
-    final chromePaint = Paint()
-      ..color = Colors.white.withOpacity(0.35)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-    canvas.drawRRect(bodyRect, chromePaint);
+    // 5. Dynamic Mavio Orange Racing & Aero Stripes on Sides
+    final orangeStripePaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xFFFB923C), // Light Orange
+          Color(0xFFEA580C), // Vibrant Mavio Orange
+          Color(0xFFC2410C), // Deep Orange
+        ],
+      ).createShader(Rect.fromLTWH(cx - 10, cy - 15, 20, 36));
 
-    // 5. Front Curved Windshield (Tinted Cyan/Sky Glass with reflection)
+    // Left Aero Stripe
+    final leftStripe = Path()
+      ..moveTo(cx - 9.5, cy - 12)
+      ..lineTo(cx - 7.5, cy - 12)
+      ..lineTo(cx - 7.5, cy + 20)
+      ..lineTo(cx - 9.5, cy + 20)
+      ..close();
+    canvas.drawPath(leftStripe, orangeStripePaint);
+
+    // Right Aero Stripe
+    final rightStripe = Path()
+      ..moveTo(cx + 7.5, cy - 12)
+      ..lineTo(cx + 9.5, cy - 12)
+      ..lineTo(cx + 9.5, cy + 20)
+      ..lineTo(cx + 7.5, cy + 20)
+      ..close();
+    canvas.drawPath(rightStripe, orangeStripePaint);
+
+    // 6. Panoramic Tinted Windshield & Sunroof (High-End Dark Glass)
     final windshieldPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Color(0xFFE0F2FE),
-          Color(0xFF38BDF8),
+          Color(0xFF0F172A), // Deep Obsidian Tint
+          Color(0xFF1E293B), // Dark Slate Glass
         ],
-      ).createShader(Rect.fromLTWH(cx - 8, cy - 17, 16, 8));
+      ).createShader(Rect.fromLTWH(cx - 8, cy - 21, 16, 9));
 
     final windshieldRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy - 13), width: 16, height: 7),
-      const Radius.circular(3),
+      Rect.fromCenter(center: Offset(cx, cy - 16), width: 16, height: 8.5),
+      const Radius.circular(4),
     );
     canvas.drawRRect(windshieldRect, windshieldPaint);
 
-    // 6. Roof Air-Conditioner Unit / Ventilation Hatch (3D Raised Panel)
-    final acPaint = Paint()
+    // Windshield Reflection Streak
+    final glassGlarePaint = Paint()
+      ..color = Colors.white.withOpacity(0.35)
+      ..strokeWidth = 1.0;
+    canvas.drawLine(Offset(cx - 5, cy - 18), Offset(cx + 3, cy - 14), glassGlarePaint);
+
+    // 7. Low-Profile Streamlined Rooftop AC Pod (White with Orange Center Fin)
+    final acPodPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
           Color(0xFFFFFFFF),
-          Color(0xFFCBD5E1),
+          Color(0xFFE2E8F0),
         ],
-      ).createShader(Rect.fromLTWH(cx - 6, cy - 4, 12, 14));
+      ).createShader(Rect.fromLTWH(cx - 5, cy - 4, 10, 16));
 
-    final acRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy + 2), width: 12, height: 12),
+    final acPodRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(cx, cy + 3), width: 10, height: 16),
       const Radius.circular(3),
     );
-    canvas.drawRRect(acRect, acPaint);
+    canvas.drawRRect(acPodRect, acPodPaint);
 
-    // AC Vents Slits
-    final ventPaint = Paint()
-      ..color = const Color(0xFF64748B)
-      ..strokeWidth = 1.0;
-    canvas.drawLine(Offset(cx - 4, cy - 1), Offset(cx + 4, cy - 1), ventPaint);
-    canvas.drawLine(Offset(cx - 4, cy + 2), Offset(cx + 4, cy + 2), ventPaint);
-    canvas.drawLine(Offset(cx - 4, cy + 5), Offset(cx + 4, cy + 5), ventPaint);
-
-    // 7. Headlight Lenses (Bright Amber/White Luminous points)
-    final lightLensPaint = Paint()..color = const Color(0xFFFEF08A);
-    canvas.drawCircle(Offset(cx - 6.5, cy - 18.5), 1.8, lightLensPaint);
-    canvas.drawCircle(Offset(cx + 6.5, cy - 18.5), 1.8, lightLensPaint);
-
-    // 8. Rear Brake Lights (Crimson / Ruby Red Glow)
-    final tailLightPaint = Paint()..color = const Color(0xFFEF4444);
+    // AC Pod Center Orange Stripe
+    final acOrangeFin = Paint()..color = const Color(0xFFEA580C);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx - 6.5, cy + 18.5), width: 3.5, height: 2),
+        Rect.fromCenter(center: Offset(cx, cy + 3), width: 2.5, height: 12),
         const Radius.circular(1),
       ),
-      tailLightPaint,
+      acOrangeFin,
     );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx + 6.5, cy + 18.5), width: 3.5, height: 2),
-        const Radius.circular(1),
-      ),
-      tailLightPaint,
-    );
+
+    // 8. Sleek LED DRL Headlight Strips (Modern Automotive Blade Lights)
+    final ledPaint = Paint()
+      ..color = const Color(0xFFFEF08A)
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round;
+
+    // Left LED Blade
+    canvas.drawLine(Offset(cx - 8, cy - 21), Offset(cx - 3, cy - 22), ledPaint);
+    // Right LED Blade
+    canvas.drawLine(Offset(cx + 8, cy - 21), Offset(cx + 3, cy - 22), ledPaint);
+
+    // 9. Rear Modern LED Tail Light Strip (Continuous Red Neon Bar)
+    final tailLightPaint = Paint()
+      ..color = const Color(0xFFDC2626)
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(Offset(cx - 7, cy + 22), Offset(cx + 7, cy + 22), tailLightPaint);
+
+    // 10. Crisp Outer Border / Bevel
+    final bevelPaint = Paint()
+      ..color = const Color(0xFFCBD5E1)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+    canvas.drawRRect(bodyRect, bevelPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _Bus3DPainter oldDelegate) {
-    return oldDelegate.isMoving != isMoving || oldDelegate.primaryColor != primaryColor;
+  bool shouldRepaint(covariant _LuxuryWhiteOrangeBusPainter oldDelegate) {
+    return oldDelegate.isMoving != isMoving;
   }
 }
