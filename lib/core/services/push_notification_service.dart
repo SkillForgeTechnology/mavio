@@ -106,12 +106,17 @@ class PushNotificationService {
     }
   }
 
+  static String? _currentLoggedInUserId;
+
   // Update subscription ID to user profile on Supabase
   static Future<void> syncSubscriptionId(String userId) async {
     if (kIsWeb) return;
 
     try {
-      // Bind user external ID to OneSignal
+      _currentLoggedInUserId = userId;
+      // 1. Opt in to push subscription
+      OneSignal.User.pushSubscription.optIn();
+      // 2. Bind user external ID to OneSignal
       OneSignal.login(userId);
 
       final subscriptionId = OneSignal.User.pushSubscription.id;
@@ -125,6 +130,8 @@ class PushNotificationService {
 
       // Automatically sync subscription ID if it changes later
       OneSignal.User.pushSubscription.addObserver((state) async {
+        // Strict guard: Only sync if this user is still the active logged-in user
+        if (_currentLoggedInUserId != userId) return;
         final newId = state.current.id;
         if (newId != null && newId.isNotEmpty && areNotificationsGloballyEnabled) {
           await SupabaseService().updateProfileOneSignalId(
@@ -143,12 +150,18 @@ class PushNotificationService {
     if (kIsWeb) return;
     try {
       print("OneSignal: Clearing push notification session for User: $userId");
+      _currentLoggedInUserId = null;
+
       // 1. Clear subscription ID from Supabase profiles table
       await SupabaseService().updateProfileOneSignalId(
         id: userId,
         onesignalId: null,
       );
-      // 2. Unbind external ID from OneSignal SDK so device stops receiving user alerts
+
+      // 2. Opt out push subscription on device so this phone stops receiving pushes
+      OneSignal.User.pushSubscription.optOut();
+
+      // 3. Unbind external ID from OneSignal SDK
       OneSignal.logout();
     } catch (e) {
       print("Error clearing OneSignal push on logout: $e");
@@ -182,11 +195,11 @@ class PushNotificationService {
         details,
       );
     } catch (e) {
-      print("Error displaying local notification: $e");
+      print("Error showing local notification: $e");
     }
   }
 
-  // Send Push Notification to specific OneSignal Subscription IDs or External User IDs via OneSignal REST API
+  // Send Push Notification via OneSignal REST API (Multi-Device & User Sync)
   static Future<void> sendPushNotification({
     List<String>? subscriptionIds,
     List<String>? externalUserIds,
@@ -194,15 +207,28 @@ class PushNotificationService {
     required String body,
     Map<String, dynamic>? data,
   }) async {
-    final validSubIds = subscriptionIds?.where((id) => id.isNotEmpty).toList() ?? [];
-    final validUserIds = externalUserIds?.where((id) => id.isNotEmpty).toList() ?? [];
+    if (kIsWeb) return;
+    if (appId.isEmpty || restApiKey.isEmpty) {
+      print("OneSignal configuration missing appId or restApiKey.");
+      return;
+    }
+
+    final validSubIds = (subscriptionIds ?? [])
+        .where((id) => id.trim().isNotEmpty)
+        .toSet()
+        .toList();
+
+    final validUserIds = (externalUserIds ?? [])
+        .where((id) => id.trim().isNotEmpty)
+        .toSet()
+        .toList();
 
     if (validSubIds.isEmpty && validUserIds.isEmpty) return;
 
     try {
       final url = Uri.parse('https://onesignal.com/api/v1/notifications');
 
-      // 1. Send by External User ID alias (notifies ALL devices logged in for each student)
+      // 1. Send by External User ID alias (notifies all active logged in devices for each student)
       if (validUserIds.isNotEmpty) {
         final payload = {
           'app_id': appId,
@@ -251,7 +277,7 @@ class PushNotificationService {
     }
   }
 
-  // Broadcast "Bus Trip Started!" to all students assigned to a specific bus
+  // Broadcast "Bus Trip Started!" to all active logged-in students assigned to a specific bus
   static Future<void> notifyTripStarted({
     required String vehicleId,
     required String vehicleName,
@@ -265,9 +291,10 @@ class PushNotificationService {
       final List<String> userIds = [];
 
       for (var s in students) {
-        userIds.add(s.id);
-        if (s.onesignalId != null && s.onesignalId!.isNotEmpty) {
-          subIds.add(s.onesignalId!);
+        // ONLY target students who are actively logged in with a non-null onesignal_id
+        if (s.onesignalId != null && s.onesignalId!.trim().isNotEmpty) {
+          subIds.add(s.onesignalId!.trim());
+          userIds.add(s.id);
         }
       }
 

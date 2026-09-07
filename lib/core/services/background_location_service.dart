@@ -121,29 +121,31 @@ void onStart(ServiceInstance service) async {
       final List<String> allUserIds = [];
 
       for (var s in passedStudents) {
-        final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
-        final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
-        final radius = s['alert_radius_meters'] as int? ?? 500;
         final onesignalId = s['onesignal_id'] as String?;
         final studentId = s['id'] as String;
 
-        allUserIds.add(studentId);
-        if (onesignalId != null && onesignalId.isNotEmpty) {
-          allSubIds.add(onesignalId);
-        }
+        // ONLY target students who are actively logged in
+        if (onesignalId != null && onesignalId.trim().isNotEmpty) {
+          allUserIds.add(studentId);
+          allSubIds.add(onesignalId.trim());
 
-        if (lat != null && lon != null) {
-          studentTargets.add(_StudentProximityTarget(
-            id: studentId,
-            name: s['name'] as String? ?? 'Student',
-            onesignalId: onesignalId,
-            lat: lat,
-            lon: lon,
-            radius: radius,
-          ));
+          final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
+          final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
+          final radius = s['alert_radius_meters'] as int? ?? 500;
+
+          if (lat != null && lon != null) {
+            studentTargets.add(_StudentProximityTarget(
+              id: studentId,
+              name: s['name'] as String? ?? 'Student',
+              onesignalId: onesignalId.trim(),
+              lat: lat,
+              lon: lon,
+              radius: radius,
+            ));
+          }
         }
       }
-      print("MAVIO Background: Loaded ${studentTargets.length} student proximity targets from foreground for vehicle $vehicleId");
+      print("MAVIO Background: Loaded ${studentTargets.length} active student proximity targets from foreground for vehicle $vehicleId");
     } else if (vehicleId != null && vehicleId!.isNotEmpty) {
       try {
         final List<dynamic> students = await client
@@ -156,29 +158,31 @@ void onStart(ServiceInstance service) async {
         final List<String> allUserIds = [];
 
         for (var s in students) {
-          final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
-          final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
-          final radius = s['alert_radius_meters'] as int? ?? 500;
           final onesignalId = s['onesignal_id'] as String?;
           final studentId = s['id'] as String;
 
-          allUserIds.add(studentId);
-          if (onesignalId != null && onesignalId.isNotEmpty) {
-            allSubIds.add(onesignalId);
-          }
+          // ONLY target students who are actively logged in
+          if (onesignalId != null && onesignalId.trim().isNotEmpty) {
+            allUserIds.add(studentId);
+            allSubIds.add(onesignalId.trim());
 
-          if (lat != null && lon != null) {
-            studentTargets.add(_StudentProximityTarget(
-              id: studentId,
-              name: s['name'] as String? ?? 'Student',
-              onesignalId: onesignalId,
-              lat: lat,
-              lon: lon,
-              radius: radius,
-            ));
+            final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
+            final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
+            final radius = s['alert_radius_meters'] as int? ?? 500;
+
+            if (lat != null && lon != null) {
+              studentTargets.add(_StudentProximityTarget(
+                id: studentId,
+                name: s['name'] as String? ?? 'Student',
+                onesignalId: onesignalId.trim(),
+                lat: lat,
+                lon: lon,
+                radius: radius,
+              ));
+            }
           }
         }
-        print("MAVIO Background: Loaded ${studentTargets.length} student proximity targets for vehicle $vehicleId");
+        print("MAVIO Background: Loaded ${studentTargets.length} active student proximity targets for vehicle $vehicleId");
       } catch (e) {
         print("MAVIO Background: Error fetching student targets: $e");
       }
