@@ -74,48 +74,13 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
               },
             ),
 
-          // 2. Headlights & Sleek 3D Google Maps Style Bus Model
+          // 2. Headlights & Sleek Google Maps Style 3D Navigation Bus Model
           Transform.rotate(
             angle: widget.headingDegrees * (math.pi / 180.0),
-            child: SizedBox(
-              width: 80,
-              height: 80,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Headlight beam casting forward onto road
-                  Positioned(
-                    top: 0,
-                    child: CustomPaint(
-                      size: const Size(60, 40),
-                      painter: _HeadlightBeamPainter(isMoving: !isStopped),
-                    ),
-                  ),
-                  // High-Definition 3D Model Asset with Fallback
-                  Image.asset(
-                    'assets/mavio_3d_bus.png',
-                    width: 66,
-                    height: 66,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.asset(
-                        'mavio_bus.png',
-                        width: 66,
-                        height: 66,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, err, stack) {
-                          return CustomPaint(
-                            size: const Size(70, 70),
-                            painter: _LuxuryWhiteOrangeBusPainter(
-                              isMoving: !isStopped,
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ],
+            child: CustomPaint(
+              size: const Size(76, 76),
+              painter: _GoogleMaps3DBusPainter(
+                isMoving: !isStopped,
               ),
             ),
           ),
@@ -190,46 +155,11 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
   }
 }
 
-/// Headlight beam projecting onto the road ahead of the 3D bus
-class _HeadlightBeamPainter extends CustomPainter {
+/// High-End Google Maps Style 3D Vector Coach/Bus Painter
+class _GoogleMaps3DBusPainter extends CustomPainter {
   final bool isMoving;
 
-  _HeadlightBeamPainter({required this.isMoving});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height;
-
-    final headlightPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFFFEF3C7).withOpacity(isMoving ? 0.65 : 0.30),
-          const Color(0xFFFFFBEB).withOpacity(isMoving ? 0.30 : 0.12),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.6, 1.0],
-      ).createShader(Rect.fromCircle(center: Offset(cx, 0), radius: 36));
-
-    final headlightPath = Path()
-      ..moveTo(cx - 10, cy)
-      ..lineTo(cx - 24, 0)
-      ..lineTo(cx + 24, 0)
-      ..lineTo(cx + 10, cy)
-      ..close();
-    canvas.drawPath(headlightPath, headlightPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _HeadlightBeamPainter oldDelegate) =>
-      oldDelegate.isMoving != isMoving;
-}
-
-/// Ultra-Premium White & Orange 3D Coach/Bus Painter
-class _LuxuryWhiteOrangeBusPainter extends CustomPainter {
-  final bool isMoving;
-
-  _LuxuryWhiteOrangeBusPainter({
+  _GoogleMaps3DBusPainter({
     required this.isMoving,
   });
 
@@ -238,116 +168,139 @@ class _LuxuryWhiteOrangeBusPainter extends CustomPainter {
     final cx = size.width / 2;
     final cy = size.height / 2;
 
-    // 1. Sleek Modern Headlight Beam (Crisp Soft Glow)
+    // 1. Dynamic Forward LED Headlight Beams (Illuminates road ahead)
     final headlightPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFFFEF3C7).withOpacity(isMoving ? 0.60 : 0.25),
-          const Color(0xFFFFFBEB).withOpacity(isMoving ? 0.25 : 0.10),
+          const Color(0xFFFEF3C7).withOpacity(isMoving ? 0.70 : 0.28),
+          const Color(0xFFFFFBEB).withOpacity(isMoving ? 0.30 : 0.10),
           Colors.transparent,
         ],
-        stops: const [0.0, 0.55, 1.0],
-      ).createShader(Rect.fromCircle(center: Offset(cx, cy - 28), radius: 36));
+        stops: const [0.0, 0.60, 1.0],
+      ).createShader(Rect.fromCircle(center: Offset(cx, cy - 30), radius: 38));
 
     final headlightPath = Path()
-      ..moveTo(cx - 8, cy - 20)
-      ..lineTo(cx - 20, cy - 42)
-      ..lineTo(cx + 20, cy - 42)
-      ..lineTo(cx + 8, cy - 20)
+      ..moveTo(cx - 9, cy - 22)
+      ..lineTo(cx - 24, cy - 44)
+      ..lineTo(cx + 24, cy - 44)
+      ..lineTo(cx + 9, cy - 22)
       ..close();
     canvas.drawPath(headlightPath, headlightPaint);
 
-    // 2. Realistic 3D Elevated Ambient Ground Shadow
+    // 2. Realistic 3D Elevated Ground Drop Shadow
     final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.22)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+      ..color = Colors.black.withOpacity(0.28)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
 
-    final shadowRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy + 3.5), width: 22, height: 50),
-      const Radius.circular(9),
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy + 3.5), width: 24, height: 52),
+        const Radius.circular(10),
+      ),
+      shadowPaint,
     );
-    canvas.drawRRect(shadowRect, shadowPaint);
 
-    // 3. Streamlined Underbody / Tire Arches (Subtle Dark Chassis)
-    final chassisPaint = Paint()..color = const Color(0xFF1E293B);
-    final chassisRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy + 1), width: 22, height: 48),
-      const Radius.circular(7),
+    // 3. Dark Underbody Chassis & Wheels Base
+    final chassisPaint = Paint()..color = const Color(0xFF0F172A);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy + 0.5), width: 24, height: 49),
+        const Radius.circular(8),
+      ),
+      chassisPaint,
     );
-    canvas.drawRRect(chassisRect, chassisPaint);
 
-    // 4. Main Coach Body: Pearl White with Sleek 3D Shading
+    // 4. Aerodynamic Side Mirrors (Left & Right)
+    final mirrorPaint = Paint()..color = const Color(0xFFEA580C);
+    // Left Mirror
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx - 13.5, cy - 16), width: 3.5, height: 8),
+        const Radius.circular(2),
+      ),
+      mirrorPaint,
+    );
+    // Right Mirror
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx + 13.5, cy - 16), width: 3.5, height: 8),
+        const Radius.circular(2),
+      ),
+      mirrorPaint,
+    );
+
+    // 5. Main Coach Body: Metallic Pearl White with 3D Bevel Lighting
     final bodyPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
           Color(0xFFFFFFFF), // Pure White Front
-          Color(0xFFF8FAFC), // Pearl White Mid
-          Color(0xFFE2E8F0), // Subtle Slate Shading Rear
+          Color(0xFFF1F5F9), // Pearl White Mid
+          Color(0xFFCBD5E1), // 3D Shading Rear
         ],
-      ).createShader(Rect.fromLTWH(cx - 10, cy - 23, 20, 46));
+      ).createShader(Rect.fromLTWH(cx - 11, cy - 24, 22, 48));
 
     final bodyRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy), width: 20, height: 46),
-      const Radius.circular(7),
+      Rect.fromCenter(center: Offset(cx, cy), width: 22, height: 48),
+      const Radius.circular(8),
     );
     canvas.drawRRect(bodyRect, bodyPaint);
 
-    // 5. Dynamic Mavio Orange Racing & Aero Stripes on Sides
+    // 6. Dynamic Mavio Orange Racing Side Accents
     final orangeStripePaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Color(0xFFFB923C), // Light Orange
-          Color(0xFFEA580C), // Vibrant Mavio Orange
-          Color(0xFFC2410C), // Deep Orange
+          Color(0xFFFB923C),
+          Color(0xFFEA580C),
+          Color(0xFFC2410C),
         ],
-      ).createShader(Rect.fromLTWH(cx - 10, cy - 15, 20, 36));
+      ).createShader(Rect.fromLTWH(cx - 11, cy - 14, 22, 36));
 
-    // Left Aero Stripe
+    // Left Stripe
     final leftStripe = Path()
-      ..moveTo(cx - 9.5, cy - 12)
-      ..lineTo(cx - 7.5, cy - 12)
-      ..lineTo(cx - 7.5, cy + 20)
-      ..lineTo(cx - 9.5, cy + 20)
+      ..moveTo(cx - 10.5, cy - 12)
+      ..lineTo(cx - 8.0, cy - 12)
+      ..lineTo(cx - 8.0, cy + 20)
+      ..lineTo(cx - 10.5, cy + 20)
       ..close();
     canvas.drawPath(leftStripe, orangeStripePaint);
 
-    // Right Aero Stripe
+    // Right Stripe
     final rightStripe = Path()
-      ..moveTo(cx + 7.5, cy - 12)
-      ..lineTo(cx + 9.5, cy - 12)
-      ..lineTo(cx + 9.5, cy + 20)
-      ..lineTo(cx + 7.5, cy + 20)
+      ..moveTo(cx + 8.0, cy - 12)
+      ..lineTo(cx + 10.5, cy - 12)
+      ..lineTo(cx + 10.5, cy + 20)
+      ..lineTo(cx + 8.0, cy + 20)
       ..close();
     canvas.drawPath(rightStripe, orangeStripePaint);
 
-    // 6. Panoramic Tinted Windshield & Sunroof (High-End Dark Glass)
+    // 7. Panoramic Curved Windshield (Deep Obsidian Glass with 3D Glare)
     final windshieldPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Color(0xFF0F172A), // Deep Obsidian Tint
-          Color(0xFF1E293B), // Dark Slate Glass
+          Color(0xFF0F172A),
+          Color(0xFF1E293B),
         ],
-      ).createShader(Rect.fromLTWH(cx - 8, cy - 21, 16, 9));
+      ).createShader(Rect.fromLTWH(cx - 9, cy - 22, 18, 10));
 
     final windshieldRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy - 16), width: 16, height: 8.5),
-      const Radius.circular(4),
+      Rect.fromCenter(center: Offset(cx, cy - 17), width: 18, height: 9.5),
+      const Radius.circular(5),
     );
     canvas.drawRRect(windshieldRect, windshieldPaint);
 
-    // Windshield Reflection Streak
+    // 3D Glass Sun Reflection
     final glassGlarePaint = Paint()
-      ..color = Colors.white.withOpacity(0.35)
-      ..strokeWidth = 1.0;
-    canvas.drawLine(Offset(cx - 5, cy - 18), Offset(cx + 3, cy - 14), glassGlarePaint);
+      ..color = Colors.white.withOpacity(0.40)
+      ..strokeWidth = 1.2;
+    canvas.drawLine(Offset(cx - 6, cy - 19), Offset(cx + 3, cy - 15), glassGlarePaint);
 
-    // 7. Low-Profile Streamlined Rooftop AC Pod (White with Orange Center Fin)
+    // 8. Streamlined Rooftop AC Pod with Orange Winglets
     final acPodPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
@@ -356,53 +309,56 @@ class _LuxuryWhiteOrangeBusPainter extends CustomPainter {
           Color(0xFFFFFFFF),
           Color(0xFFE2E8F0),
         ],
-      ).createShader(Rect.fromLTWH(cx - 5, cy - 4, 10, 16));
+      ).createShader(Rect.fromLTWH(cx - 5.5, cy - 5, 11, 18));
 
     final acPodRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy + 3), width: 10, height: 16),
-      const Radius.circular(3),
+      Rect.fromCenter(center: Offset(cx, cy + 3), width: 11, height: 18),
+      const Radius.circular(3.5),
     );
     canvas.drawRRect(acPodRect, acPodPaint);
 
-    // AC Pod Center Orange Stripe
-    final acOrangeFin = Paint()..color = const Color(0xFFEA580C);
+    // AC Center Spine & Dual Vent Fans
+    final fanPaint = Paint()..color = const Color(0xFF94A3B8);
+    canvas.drawCircle(Offset(cx, cy - 1), 2.2, fanPaint);
+    canvas.drawCircle(Offset(cx, cy + 7), 2.2, fanPaint);
+
+    // AC Orange Accent Fin
+    final acFinPaint = Paint()..color = const Color(0xFFEA580C);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy + 3), width: 2.5, height: 12),
+        Rect.fromCenter(center: Offset(cx, cy + 3), width: 2.0, height: 14),
         const Radius.circular(1),
       ),
-      acOrangeFin,
+      acFinPaint,
     );
 
-    // 8. Sleek LED DRL Headlight Strips (Modern Automotive Blade Lights)
+    // 9. Modern LED Headlight Blades
     final ledPaint = Paint()
       ..color = const Color(0xFFFEF08A)
-      ..strokeWidth = 1.6
-      ..strokeCap = StrokeCap.round;
-
-    // Left LED Blade
-    canvas.drawLine(Offset(cx - 8, cy - 21), Offset(cx - 3, cy - 22), ledPaint);
-    // Right LED Blade
-    canvas.drawLine(Offset(cx + 8, cy - 21), Offset(cx + 3, cy - 22), ledPaint);
-
-    // 9. Rear Modern LED Tail Light Strip (Continuous Red Neon Bar)
-    final tailLightPaint = Paint()
-      ..color = const Color(0xFFDC2626)
       ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawLine(Offset(cx - 7, cy + 22), Offset(cx + 7, cy + 22), tailLightPaint);
+    canvas.drawLine(Offset(cx - 9, cy - 22), Offset(cx - 4, cy - 23.5), ledPaint);
+    canvas.drawLine(Offset(cx + 9, cy - 22), Offset(cx + 4, cy - 23.5), ledPaint);
 
-    // 10. Crisp Outer Border / Bevel
+    // 10. Rear LED Neon Tail-Light Bar
+    final tailLightPaint = Paint()
+      ..color = const Color(0xFFEF4444)
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(Offset(cx - 8, cy + 23), Offset(cx + 8, cy + 23), tailLightPaint);
+
+    // 11. Crisp Outer Metallic Edge / 3D Bevel
     final bevelPaint = Paint()
       ..color = const Color(0xFFCBD5E1)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8;
+      ..strokeWidth = 0.9;
     canvas.drawRRect(bodyRect, bevelPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _LuxuryWhiteOrangeBusPainter oldDelegate) {
+  bool shouldRepaint(covariant _GoogleMaps3DBusPainter oldDelegate) {
     return oldDelegate.isMoving != isMoving;
   }
 }
