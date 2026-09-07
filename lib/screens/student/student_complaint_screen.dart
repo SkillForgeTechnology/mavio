@@ -51,6 +51,7 @@ class _StudentComplaintScreenState extends State<StudentComplaintScreen>
 
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
+  bool _isPickingImage = false;
   bool _isSubmitting = false;
 
   // My Tickets State
@@ -104,6 +105,7 @@ class _StudentComplaintScreenState extends State<StudentComplaintScreen>
   }
 
   Future<void> _pickImage() async {
+    setState(() => _isPickingImage = true);
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
@@ -131,15 +133,21 @@ class _StudentComplaintScreenState extends State<StudentComplaintScreen>
             return;
           }
 
-          setState(() {
-            _selectedImageBytes = bytes;
-            _selectedImageName = file.name;
-          });
+          if (mounted) {
+            setState(() {
+              _selectedImageBytes = bytes;
+              _selectedImageName = file.name;
+            });
+          }
         }
       }
     } catch (e) {
       if (mounted) {
         AppToast.show(context, "Failed to pick image: $e");
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPickingImage = false);
       }
     }
   }
@@ -487,7 +495,34 @@ class _StudentComplaintScreenState extends State<StudentComplaintScreen>
               ),
               child: Column(
                 children: [
-                  if (_selectedImageBytes != null) ...[
+                  if (_isPickingImage) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 36),
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                            strokeWidth: 2.5,
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            'Loading & preparing image...',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (_selectedImageBytes != null) ...[
                     Stack(
                       children: [
                         ClipRRect(

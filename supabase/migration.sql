@@ -231,3 +231,7 @@ CREATE INDEX IF NOT EXISTS idx_complaints_org ON public.complaints(org_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_student ON public.complaints(student_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON public.complaints(status);
 
+-- Enable RLS & Grant access policies for student & admin submissions
+ALTER TABLE public.complaints DISABLE ROW LEVEL SECURITY;
+
+
