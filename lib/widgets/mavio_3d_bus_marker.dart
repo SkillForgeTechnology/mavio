@@ -74,13 +74,48 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
               },
             ),
 
-          // 2. Headlights & Sleek 3D White & Orange Bus Model
+          // 2. Headlights & Sleek 3D Google Maps Style Bus Model
           Transform.rotate(
             angle: widget.headingDegrees * (math.pi / 180.0),
-            child: CustomPaint(
-              size: const Size(70, 70),
-              painter: _LuxuryWhiteOrangeBusPainter(
-                isMoving: !isStopped,
+            child: SizedBox(
+              width: 80,
+              height: 80,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Headlight beam casting forward onto road
+                  Positioned(
+                    top: 0,
+                    child: CustomPaint(
+                      size: const Size(60, 40),
+                      painter: _HeadlightBeamPainter(isMoving: !isStopped),
+                    ),
+                  ),
+                  // High-Definition 3D Model Asset with Fallback
+                  Image.asset(
+                    'assets/mavio_3d_bus.png',
+                    width: 66,
+                    height: 66,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Image.asset(
+                        'mavio_bus.png',
+                        width: 66,
+                        height: 66,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, err, stack) {
+                          return CustomPaint(
+                            size: const Size(70, 70),
+                            painter: _LuxuryWhiteOrangeBusPainter(
+                              isMoving: !isStopped,
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ),
@@ -153,6 +188,41 @@ class _Mavio3DBusMarkerState extends State<Mavio3DBusMarker>
       ),
     );
   }
+}
+
+/// Headlight beam projecting onto the road ahead of the 3D bus
+class _HeadlightBeamPainter extends CustomPainter {
+  final bool isMoving;
+
+  _HeadlightBeamPainter({required this.isMoving});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height;
+
+    final headlightPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFFFEF3C7).withOpacity(isMoving ? 0.65 : 0.30),
+          const Color(0xFFFFFBEB).withOpacity(isMoving ? 0.30 : 0.12),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.6, 1.0],
+      ).createShader(Rect.fromCircle(center: Offset(cx, 0), radius: 36));
+
+    final headlightPath = Path()
+      ..moveTo(cx - 10, cy)
+      ..lineTo(cx - 24, 0)
+      ..lineTo(cx + 24, 0)
+      ..lineTo(cx + 10, cy)
+      ..close();
+    canvas.drawPath(headlightPath, headlightPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeadlightBeamPainter oldDelegate) =>
+      oldDelegate.isMoving != isMoving;
 }
 
 /// Ultra-Premium White & Orange 3D Coach/Bus Painter

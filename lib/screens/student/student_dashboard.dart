@@ -311,144 +311,159 @@ class _HomeTab extends StatelessWidget {
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      padding: const EdgeInsets.all(18.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Top Header: Bus Identity + Live Status Pill
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                width: 50,
-                                height: 50,
+                                width: 46,
+                                height: 46,
                                 decoration: BoxDecoration(
-                                  color: AppColors.primaryLight.withOpacity(
-                                    0.5,
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
+                                  color: AppColors.primaryLight.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: const Icon(
                                   Icons.directions_bus_rounded,
                                   color: AppColors.primary,
-                                  size: 26,
+                                  size: 24,
                                 ),
                               ),
-                              const SizedBox(width: 16),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      vehicle?.name ?? 'BUS --',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      vehicle?.regNumber ?? 'TN -- AB ----',
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _PulsingLiveIndicator(isLive: isLive),
+                            ],
+                          ),
+
+                          // Telemetry Rows when live
+                          if (isLive && tracking.latestLocation != null) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.borderLight),
+                              ),
+                              child: Column(
                                 children: [
-                                  Text(
-                                    vehicle?.name ?? 'BUS --',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    vehicle?.regNumber ?? 'TN -- AB ----',
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  if (isLive &&
-                                      tracking.latestLocation != null) ...[
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.speed_rounded,
-                                          size: 14,
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.speed_rounded,
+                                        size: 14,
+                                        color: AppColors.primary,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Speed: ${tracking.latestLocation!.speed < 3.0 ? "0.0" : tracking.latestLocation!.speed.toStringAsFixed(1)} km/h',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
                                           color: AppColors.primary,
                                         ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Speed: ${tracking.latestLocation!.speed.toStringAsFixed(1)} km/h',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (profile?.alertLatitude != null &&
-                                        profile?.alertLongitude != null) ...[
-                                      const SizedBox(height: 6),
-                                      Builder(
-                                        builder: (context) {
-                                          final distM = _calculateDistance(
-                                            tracking.latestLocation!.latitude,
-                                            tracking.latestLocation!.longitude,
-                                            profile!.alertLatitude!,
-                                            profile.alertLongitude!,
-                                          );
-                                          
-                                          double speedKmh = tracking.latestLocation!.speed;
-                                          if (speedKmh < 5.0) speedKmh = 25.0;
-                                          final speedMps = speedKmh / 3.6;
-                                          final etaSeconds = distM / speedMps;
-                                          final etaMinutes = (etaSeconds / 60).round();
-                                          
-                                          final distText = distM >= 1000
-                                              ? '${(distM / 1000.0).toStringAsFixed(2)} km'
-                                              : '${distM.toStringAsFixed(0)} m';
-
-                                          return Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  const Icon(
-                                                    Icons.location_on_rounded,
-                                                    size: 14,
-                                                    color: Colors.orangeAccent,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    'Distance to Stop: $distText',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Colors.orangeAccent,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Row(
-                                                children: [
-                                                  const Icon(
-                                                    Icons.access_time_filled_rounded,
-                                                    size: 14,
-                                                    color: AppColors.success,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    etaMinutes <= 0
-                                                        ? 'Arriving now'
-                                                        : 'Arriving in ~ $etaMinutes mins',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: AppColors.success,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          );
-                                        },
                                       ),
                                     ],
+                                  ),
+                                  if (profile?.alertLatitude != null &&
+                                      profile?.alertLongitude != null) ...[
+                                    const SizedBox(height: 8),
+                                    Builder(
+                                      builder: (context) {
+                                        final distM = _calculateDistance(
+                                          tracking.latestLocation!.latitude,
+                                          tracking.latestLocation!.longitude,
+                                          profile!.alertLatitude!,
+                                          profile.alertLongitude!,
+                                        );
+
+                                        double speedKmh = tracking.latestLocation!.speed;
+                                        if (speedKmh < 5.0) speedKmh = 25.0;
+                                        final speedMps = speedKmh / 3.6;
+                                        final etaSeconds = distM / speedMps;
+                                        final etaMinutes = (etaSeconds / 60).round();
+
+                                        final distText = distM >= 1000
+                                            ? '${(distM / 1000.0).toStringAsFixed(2)} km'
+                                            : '${distM.toStringAsFixed(0)} m';
+
+                                        return Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.location_on_rounded,
+                                                  size: 14,
+                                                  color: Colors.orangeAccent,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  'Distance to Stop: $distText',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.orangeAccent,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.access_time_filled_rounded,
+                                                  size: 14,
+                                                  color: AppColors.success,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  etaMinutes <= 0
+                                                      ? 'Arriving now'
+                                                      : 'Arriving in ~ $etaMinutes mins',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppColors.success,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
                                   ],
                                 ],
                               ),
-                            ],
-                          ),
-                          // Live Indicator Pill
-                          _PulsingLiveIndicator(isLive: isLive),
+                            ),
+                          ],
                         ],
                       ),
                     ),
