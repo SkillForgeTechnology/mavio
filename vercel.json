@@ -1,8 +1,19 @@
 {
-  "rewrites": [
+  "routes": [
     {
-      "source": "/((?!api/|static/|.*\\..*$).*)",
-      "destination": "/index.html"
+      "src": "/privacy(/)?$",
+      "dest": "/privacy.html"
+    },
+    {
+      "src": "/delete-account(/)?$",
+      "dest": "/delete-account.html"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/((?!api/|static/|.*\\..*$).*)",
+      "dest": "/index.html"
     }
   ],
   "headers": [
