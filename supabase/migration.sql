@@ -234,4 +234,47 @@ CREATE INDEX IF NOT EXISTS idx_complaints_status ON public.complaints(status);
 -- Enable RLS & Grant access policies for student & admin submissions
 ALTER TABLE public.complaints DISABLE ROW LEVEL SECURITY;
 
+-- 7. AUTO-UPDATE updated_at TIMESTAMP ON COMPLAINTS
+CREATE OR REPLACE FUNCTION public.handle_complaint_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = timezone('utc'::text, now());
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS tr_complaint_updated_at ON public.complaints;
+CREATE TRIGGER tr_complaint_updated_at
+BEFORE UPDATE ON public.complaints
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_complaint_updated_at();
+
+-- 8. AUTO-PURGE CLOSED / RESOLVED TICKETS OLDER THAN 30 DAYS
+CREATE OR REPLACE FUNCTION public.cleanup_old_closed_complaints()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  DELETE FROM public.complaints
+  WHERE status IN ('RESOLVED', 'CLOSED')
+    AND COALESCE(updated_at, created_at) < (NOW() - INTERVAL '30 days');
+END;
+$$;
+
+-- Schedule daily cron job (runs every midnight at 00:00 UTC) if pg_cron is enabled in Supabase
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    PERFORM cron.schedule(
+      'daily_purge_closed_tickets_30_days',
+      '0 0 * * *',
+      'SELECT public.cleanup_old_closed_complaints()'
+    );
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
+
+
 

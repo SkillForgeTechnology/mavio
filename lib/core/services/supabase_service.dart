@@ -1960,6 +1960,22 @@ class SupabaseService {
     } else {
       try {
         final client = Supabase.instance.client;
+
+        // Auto-purge closed/resolved tickets older than 30 days
+        try {
+          final cutoff = DateTime.now().subtract(const Duration(days: 30)).toUtc().toIso8601String();
+          await client
+              .from('complaints')
+              .delete()
+              .inFilter('status', ['RESOLVED', 'CLOSED'])
+              .lt('updated_at', cutoff);
+        } catch (_) {
+          // Attempt RPC fallback if available
+          try {
+            await client.rpc('cleanup_old_closed_complaints');
+          } catch (_) {}
+        }
+
         final res = await client
             .from('complaints')
             .select()
