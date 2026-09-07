@@ -231,7 +231,6 @@ class SupabaseService {
     if (!_isInitialized) {
       await init();
     }
-    await Future.delayed(const Duration(milliseconds: 600)); // Simulate latency
     final cleanCode = code.trim().toUpperCase();
 
     if (_useMockMode) {
@@ -418,7 +417,6 @@ class SupabaseService {
 
   // Get all buses, drivers, and students for a specific organization (used in Admin Portal detailed view)
   Future<Map<String, dynamic>> getOrganizationDetailData(String orgId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
     if (_useMockMode) {
       final buses = _mockVehicles.where((v) => v.orgId == orgId).toList();
       final drivers = _mockProfiles.values.where((p) => p.orgId == orgId && p.role == 'driver').toList();
@@ -731,7 +729,6 @@ class SupabaseService {
 
   // 4. Fetch Details for Current User
   Future<Map<String, dynamic>> getStudentDashboardData() async {
-    await Future.delayed(const Duration(milliseconds: 500));
     if (_currentUserProfile == null) return {};
 
     final vehicleId = _currentUserProfile!.assignedVehicleId;
@@ -857,7 +854,6 @@ class SupabaseService {
 
   // 5. Driver: Start Trip
   Future<MavioTrip> startTrip(String vehicleId) async {
-    await Future.delayed(const Duration(milliseconds: 600));
     if (_currentUserProfile == null) throw Exception("Unauthorized");
 
     final orgId = _currentUserProfile!.orgId;
@@ -978,8 +974,6 @@ class SupabaseService {
 
   // 6. Driver: End Trip
   Future<void> endTrip(String tripId, String vehicleId) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-
     if (_useMockMode) {
       final tripIndex = _mockTrips.indexWhere((t) => t.id == tripId);
       if (tripIndex != -1) {
@@ -1202,8 +1196,6 @@ class SupabaseService {
 
   // 9. Admin Dashboard Data
   Future<Map<String, dynamic>> getAdminDashboardData() async {
-    await Future.delayed(const Duration(milliseconds: 600));
-
     if (_useMockMode) {
       final totalBuses = _mockVehicles.length;
       int activeNow = 0;
