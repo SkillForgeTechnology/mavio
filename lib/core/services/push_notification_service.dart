@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../constants/keys.dart';
 import 'supabase_service.dart';
 
@@ -72,7 +73,14 @@ class PushNotificationService {
 
     try {
       if (enable) {
-        // 1. Request system notification permission
+        // 1. Request system notification permission via permission_handler
+        final status = await Permission.notification.status;
+        if (!status.isGranted) {
+          final res = await Permission.notification.request();
+          if (res.isPermanentlyDenied) {
+            await openAppSettings();
+          }
+        }
         await OneSignal.Notifications.requestPermission(true);
         // 2. Opt in to OneSignal push subscription
         OneSignal.User.pushSubscription.optIn();
@@ -96,11 +104,15 @@ class PushNotificationService {
   }
 
   // Register push permission observer on entering dashboards
-  static void setupVerificationObserver(BuildContext context) {
+  static void setupVerificationObserver(BuildContext context) async {
     if (kIsWeb) return;
 
     try {
-      OneSignal.Notifications.requestPermission(true);
+      final status = await Permission.notification.status;
+      if (!status.isGranted) {
+        await Permission.notification.request();
+      }
+      await OneSignal.Notifications.requestPermission(true);
     } catch (e) {
       print("Error prompting for notification permission: $e");
     }
@@ -115,7 +127,11 @@ class PushNotificationService {
     try {
       _currentLoggedInUserId = userId;
 
-      // 1. Request notification permission ONLY after user is logged in
+      // 1. Request Android OS system notification permission on login
+      final status = await Permission.notification.status;
+      if (!status.isGranted) {
+        await Permission.notification.request();
+      }
       await OneSignal.Notifications.requestPermission(true);
 
       // 2. Log in user to OneSignal SDK
