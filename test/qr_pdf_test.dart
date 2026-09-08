@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mavio/core/services/qr_pdf_service.dart';
 import 'package:mavio/models/models.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/pdf.dart';
 
 void main() {
   test('Test QrPdfService generate single and batch', () async {

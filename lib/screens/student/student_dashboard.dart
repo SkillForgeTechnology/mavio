@@ -1861,13 +1861,70 @@ class _ProfileTab extends StatefulWidget {
   State<_ProfileTab> createState() => _ProfileTabState();
 }
 
-class _ProfileTabState extends State<_ProfileTab> {
+class _ProfileTabState extends State<_ProfileTab> with WidgetsBindingObserver {
   bool _pushNotificationsEnabled = true;
+  bool _isTogglingPush = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pushNotificationsEnabled = PushNotificationService.isPushEnabled();
+    _checkActivePushState();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkActivePushState();
+    }
+  }
+
+  Future<void> _checkActivePushState() async {
+    final active = await PushNotificationService.isPushNotificationsActive();
+    if (mounted) {
+      setState(() {
+        _pushNotificationsEnabled = active;
+      });
+    }
+  }
+
+  Future<void> _handleTogglePush(bool val, String? profileId) async {
+    if (profileId == null) return;
+    setState(() {
+      _isTogglingPush = true;
+    });
+
+    try {
+      final result = await PushNotificationService.setPushNotificationsEnabled(
+        val,
+        profileId,
+      );
+      if (mounted) {
+        setState(() {
+          _pushNotificationsEnabled = result;
+          _isTogglingPush = false;
+        });
+        AppToast.show(
+          context,
+          result
+              ? "Push notifications enabled for bus arrival alerts."
+              : "Push notifications disabled for this device.",
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isTogglingPush = false;
+        });
+      }
+    }
   }
 
   @override
@@ -2236,65 +2293,106 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
               const SizedBox(height: 24),
 
-              // Settings Switch Card
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
+              // Settings Switch Card (Push Notifications Toggle)
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _isTogglingPush
+                      ? null
+                      : () => _handleTogglePush(!_pushNotificationsEnabled, profile?.id),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.borderLight, width: 1.5),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(
-                          Icons.notifications_active_rounded,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
-                        SizedBox(width: 12),
-                        Text(
-                          'Push Notifications',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _pushNotificationsEnabled
+                            ? AppColors.primary.withValues(alpha: 0.3)
+                            : AppColors.borderLight,
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    Switch(
-                      value: _pushNotificationsEnabled,
-                      activeThumbColor: AppColors.primary,
-                      activeTrackColor: AppColors.primaryLight,
-                      onChanged: (val) async {
-                        setState(() {
-                          _pushNotificationsEnabled = val;
-                        });
-                        if (profile != null) {
-                          final result =
-                              await PushNotificationService.setPushNotificationsEnabled(
-                                  val, profile.id);
-                          if (mounted) {
-                            setState(() {
-                              _pushNotificationsEnabled = result;
-                            });
-                            AppToast.show(
-                              context,
-                              val
-                                  ? "Push notifications enabled for bus arrival alerts."
-                                  : "Push notifications disabled for this device.",
-                            );
-                          }
-                        }
-                      },
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _pushNotificationsEnabled
+                                ? AppColors.primary.withValues(alpha: 0.1)
+                                : Colors.grey.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _pushNotificationsEnabled
+                                ? Icons.notifications_active_rounded
+                                : Icons.notifications_off_rounded,
+                            color: _pushNotificationsEnabled
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Push Notifications',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _pushNotificationsEnabled
+                                    ? 'Active • Bus arrival & proximity alerts'
+                                    : 'Disabled • Tap to enable alerts',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _pushNotificationsEnabled
+                                      ? AppColors.success
+                                      : AppColors.textSecondary,
+                                  fontWeight: _pushNotificationsEnabled
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_isTogglingPush)
+                          const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                            ),
+                          )
+                        else
+                          Switch(
+                            value: _pushNotificationsEnabled,
+                            activeThumbColor: AppColors.primary,
+                            activeTrackColor: AppColors.primaryLight,
+                            onChanged: (val) => _handleTogglePush(val, profile?.id),
+                          ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 48),
@@ -2326,10 +2424,11 @@ class _ProfileTabState extends State<_ProfileTab> {
                           ),
                           ElevatedButton(
                             onPressed: () async {
+                              final nav = Navigator.of(context);
                               Navigator.pop(dialogContext);
                               await auth.logout();
                               if (!mounted) return;
-                              Navigator.of(context).pushAndRemoveUntil(
+                              nav.pushAndRemoveUntil(
                                 MaterialPageRoute(
                                   builder: (_) => const SplashScreen(),
                                 ),

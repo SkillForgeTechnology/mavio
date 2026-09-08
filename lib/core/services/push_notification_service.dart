@@ -60,9 +60,21 @@ class PushNotificationService {
   static bool isPushEnabled() {
     if (kIsWeb) return false;
     try {
-      return OneSignal.User.pushSubscription.optedIn ?? true;
+      return (OneSignal.User.pushSubscription.optedIn ?? true) && areNotificationsGloballyEnabled;
     } catch (_) {
-      return true;
+      return areNotificationsGloballyEnabled;
+    }
+  }
+
+  // Asynchronously check both system permission and OneSignal subscription state
+  static Future<bool> isPushNotificationsActive() async {
+    if (kIsWeb) return false;
+    try {
+      final status = await Permission.notification.status;
+      final optedIn = OneSignal.User.pushSubscription.optedIn ?? true;
+      return status.isGranted && optedIn && areNotificationsGloballyEnabled;
+    } catch (_) {
+      return isPushEnabled();
     }
   }
 
@@ -79,12 +91,17 @@ class PushNotificationService {
           final res = await Permission.notification.request();
           if (res.isPermanentlyDenied) {
             await openAppSettings();
+            return false;
+          }
+          if (!res.isGranted) {
+            areNotificationsGloballyEnabled = false;
+            return false;
           }
         }
         await OneSignal.Notifications.requestPermission(true);
         // 2. Opt in to OneSignal push subscription
         OneSignal.User.pushSubscription.optIn();
-        // 3. Sync subscription ID to Supabase
+        // 3. Sync subscription ID & external alias to Supabase
         await syncSubscriptionId(userId);
         return true;
       } else {
@@ -108,6 +125,8 @@ class PushNotificationService {
     if (kIsWeb) return;
 
     try {
+      // Delay slightly so route animation completes and Activity has window focus
+      await Future.delayed(const Duration(milliseconds: 700));
       final status = await Permission.notification.status;
       if (!status.isGranted) {
         await Permission.notification.request();
@@ -127,7 +146,8 @@ class PushNotificationService {
     try {
       _currentLoggedInUserId = userId;
 
-      // 1. Request Android OS system notification permission on login
+      // 1. Request Android OS system notification permission on login (with delay for window focus)
+      await Future.delayed(const Duration(milliseconds: 500));
       final status = await Permission.notification.status;
       if (!status.isGranted) {
         await Permission.notification.request();
@@ -140,11 +160,11 @@ class PushNotificationService {
       // 3. Opt in to push subscription on this device
       OneSignal.User.pushSubscription.optIn();
 
-      // 3. Obtain current subscription token (with retry if registering asynchronously)
+      // 4. Obtain current subscription token (with retry if registering asynchronously)
       var subscriptionId = OneSignal.User.pushSubscription.id;
       if (subscriptionId == null || subscriptionId.isEmpty) {
-        for (int i = 0; i < 5; i++) {
-          await Future.delayed(const Duration(milliseconds: 800));
+        for (int i = 0; i < 8; i++) {
+          await Future.delayed(const Duration(milliseconds: 750));
           subscriptionId = OneSignal.User.pushSubscription.id;
           if (subscriptionId != null && subscriptionId.isNotEmpty) break;
         }
