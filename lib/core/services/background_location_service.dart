@@ -363,7 +363,6 @@ Future<void> _sendBackgroundProximityPush({
   try {
     final url = Uri.parse('https://onesignal.com/api/v1/notifications');
 
-    // Send with high priority & channel to wake device even when app is killed/closed
     final payload = <String, dynamic>{
       'app_id': appId,
       'include_aliases': {
@@ -375,13 +374,7 @@ Future<void> _sendBackgroundProximityPush({
       'data': {'tripId': tripId, 'busNumber': busNumber, 'type': 'proximity_alert'},
       'priority': 10,
       'android_accent_color': 'FF1E3A8A',
-      'android_channel_id': 'mavio_bus_alerts',
     };
-
-    if (validSubIds.isNotEmpty) {
-      payload['include_subscription_ids'] = validSubIds;
-      payload['include_player_ids'] = validSubIds;
-    }
 
     final response = await http.post(
       url,
