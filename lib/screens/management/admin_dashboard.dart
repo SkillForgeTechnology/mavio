@@ -4803,87 +4803,47 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                               ],
                             ),
                             if (!_isEditingProfile)
-                              OutlinedButton.icon(
+                              ElevatedButton.icon(
                                 onPressed: () {
                                   setState(() {
                                     _isEditingProfile = true;
                                   });
                                 },
                                 icon: const Icon(Icons.edit_rounded, size: 16),
-                                label: const Text('Edit Profile'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.primary,
-                                  side: const BorderSide(color: AppColors.primary),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                label: const Text('Edit Details'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
                               )
                             else
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  TextButton.icon(
-                                    onPressed: () {
-                                      setState(() {
-                                        _nameCtrl.text = org.name;
-                                        _phoneCtrl.text = org.phone ?? '';
-                                        _addressCtrl.text = org.address ?? '';
-                                        _isEditingProfile = false;
-                                      });
-                                    },
-                                    icon: const Icon(Icons.close_rounded, size: 16),
-                                    label: const Text('Cancel'),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: AppColors.textSecondary,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () async {
-                                      if (_formKey.currentState!.validate()) {
-                                        final auth = Provider.of<AuthProvider>(context, listen: false);
-                                        final success = await auth.updateOrganizationDetails(
-                                          name: _nameCtrl.text.trim(),
-                                          code: _codeCtrl.text.trim(),
-                                          phone: _phoneCtrl.text.trim(),
-                                          address: _addressCtrl.text.trim(),
-                                        );
-                                        if (success && mounted) {
-                                          setState(() {
-                                            _isEditingProfile = false;
-                                          });
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Organization details updated successfully.'),
-                                              backgroundColor: AppColors.success,
-                                            ),
-                                          );
-                                        } else if (mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text(auth.error ?? 'Failed to update details.'),
-                                              backgroundColor: AppColors.error,
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    },
-                                    icon: const Icon(Icons.check_rounded, size: 16),
-                                    label: const Text('Save Changes'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.primary,
-                                      foregroundColor: Colors.white,
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryLight,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 16),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Editing Mode',
+                                      style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                           ],
                         ),
@@ -4952,11 +4912,11 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                           ),
                         ),
                         if (_isEditingProfile) ...[
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 28),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              OutlinedButton(
+                              OutlinedButton.icon(
                                 onPressed: () {
                                   setState(() {
                                     _nameCtrl.text = org.name;
@@ -4965,15 +4925,18 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                                     _isEditingProfile = false;
                                   });
                                 },
+                                icon: const Icon(Icons.close_rounded, size: 16),
+                                label: const Text('Cancel'),
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                  foregroundColor: AppColors.textSecondary,
+                                  side: const BorderSide(color: AppColors.border),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
-                                child: const Text('Cancel'),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 14),
                               ElevatedButton.icon(
                                 onPressed: () async {
                                   if (_formKey.currentState!.validate()) {
@@ -5004,12 +4967,16 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                                     }
                                   }
                                 },
-                                icon: const Icon(Icons.save_rounded, size: 18),
-                                label: const Text('Save Changes'),
+                                icon: const Icon(Icons.check_circle_rounded, size: 18),
+                                label: const Text(
+                                  'Save Changes',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                  elevation: 1,
+                                  padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
