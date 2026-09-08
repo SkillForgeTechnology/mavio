@@ -410,7 +410,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
         _isTripActive = true;
       });
 
-      _startTracking(trip.id);
+      await _startTracking(trip.id);
 
       // Broadcast trip started notification to all students assigned to this bus
       await PushNotificationService.notifyTripStarted(
@@ -863,7 +863,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   // Core tracking router
-  void _startTracking(String tripId) async {
+  Future<void> _startTracking(String tripId) async {
     _cleanupLocalTrackingUI(); // Ensure cleanup of local variables only
 
     // Calculate elapsed duration & existing uploaded pings if resuming from an active session
@@ -901,6 +901,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
       if (!isServiceRunning) {
         await backgroundService.startService();
+        await Future.delayed(const Duration(milliseconds: 600));
       }
 
       // Bind UI updates to background telemetry broadcaster FIRST
@@ -929,6 +930,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
             'alert_longitude': s.alertLongitude,
             'alert_radius_meters': s.alertRadiusMeters,
           }).toList();
+          print("Driver Dashboard: Pre-loaded ${studentList.length} assigned students for proximity tracking.");
         } catch (e) {
           print("Error pre-loading students for background service: $e");
         }

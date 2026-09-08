@@ -282,10 +282,39 @@ class PushNotificationService {
     }
 
     try {
-      final url = Uri.parse('https://onesignal.com/api/v1/notifications');
+      final url = Uri.parse('https://api.onesignal.com/notifications');
+      final authHeader = restApiKey.startsWith('os_v2_')
+          ? 'Key $restApiKey'
+          : 'Basic $restApiKey';
 
-      // 1. Primary broadcast via external_id aliases (targets all active logged-in devices under these students)
-      if (validUserIds.isNotEmpty) {
+      final collapseId = data?['collapse_id'] ?? data?['tripId'] ?? 'mavio_alert';
+
+      // 1. Direct hardware subscription token delivery (most reliable when app is closed)
+      if (validSubIds.isNotEmpty) {
+        final payload = {
+          'app_id': appId,
+          'include_subscription_ids': validSubIds,
+          'target_channel': 'push',
+          'headings': {'en': title},
+          'contents': {'en': body},
+          'data': data ?? {},
+          'collapse_id': collapseId,
+          'priority': 10,
+          'android_visibility': 1,
+          'android_accent_color': 'FF1E3A8A',
+        };
+
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': authHeader,
+          },
+          body: jsonEncode(payload),
+        );
+        print("OneSignal Direct Subscription Push sent to ${validSubIds.length} active devices: ${response.statusCode} - ${response.body}");
+      } else if (validUserIds.isNotEmpty) {
+        // 2. Fallback to external_id alias if subscription IDs are not yet synced
         final payload = {
           'app_id': appId,
           'include_aliases': {'external_id': validUserIds},
@@ -293,7 +322,9 @@ class PushNotificationService {
           'headings': {'en': title},
           'contents': {'en': body},
           'data': data ?? {},
+          'collapse_id': collapseId,
           'priority': 10,
+          'android_visibility': 1,
           'android_accent_color': 'FF1E3A8A',
         };
 
@@ -301,34 +332,11 @@ class PushNotificationService {
           url,
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
-            'Authorization': 'Basic $restApiKey',
+            'Authorization': authHeader,
           },
           body: jsonEncode(payload),
         );
         print("OneSignal Multi-Device Alias Push sent to ${validUserIds.length} users: ${response.statusCode} - ${response.body}");
-      }
-      
-      // 2. Secondary fallback broadcast to subscription IDs
-      if (validSubIds.isNotEmpty) {
-        final payload = {
-          'app_id': appId,
-          'include_subscription_ids': validSubIds,
-          'headings': {'en': title},
-          'contents': {'en': body},
-          'data': data ?? {},
-          'priority': 10,
-          'android_accent_color': 'FF1E3A8A',
-        };
-
-        final response = await http.post(
-          url,
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Authorization': 'Basic $restApiKey',
-          },
-          body: jsonEncode(payload),
-        );
-        print("OneSignal Subscription Push sent to ${validSubIds.length} active devices: ${response.statusCode} - ${response.body}");
       }
     } catch (e) {
       print("Error sending OneSignal push notification: $e");

@@ -56,7 +56,8 @@
             android:enabled="true"
             android:exported="true"
             android:foregroundServiceType="location"
-            tools:replace="android:exported" />
+            android:stopWithTask="false"
+            tools:replace="android:exported,android:stopWithTask" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

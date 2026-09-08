@@ -55,6 +55,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _studentSearchCtrl.clear();
   }
 
+  bool _isFleetListVisible = true;
   Map<String, dynamic>? _selectedMapFleetItem;
   final MapController _mapController = MapController();
   final Map<String, LatLng> _liveVehicleLocations = {};
@@ -3131,195 +3132,334 @@ class _AdminDashboardState extends State<AdminDashboard> {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 320,
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            width: _isFleetListVisible ? 320 : 0,
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                right: BorderSide(color: AppColors.border, width: 1),
+                right: BorderSide(
+                  color: _isFleetListVisible ? AppColors.border : Colors.transparent,
+                  width: 1,
+                ),
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Text(
-                    'Fleet Status List',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _fleet.length,
-                    itemBuilder: (context, index) {
-                      final item = _fleet[index];
-                      final v = item['vehicle'] as MavioVehicle;
-                      final isLive = item['isLive'] as bool;
-                      final isSelected =
-                          _selectedMapFleetItem != null &&
-                          (_selectedMapFleetItem!['vehicle'] as MavioVehicle)
-                                  .id ==
-                              v.id;
-
-                      return Container(
-                        color: isSelected
-                            ? AppColors.primary.withOpacity(0.05)
-                            : Colors.transparent,
-                        child: ListTile(
-                          leading: Icon(
-                            Icons.directions_bus_rounded,
-                            color: isLive
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
-                          ),
-                          title: Text(
-                            v.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+            child: ClipRect(
+              child: OverflowBox(
+                minWidth: 320,
+                maxWidth: 320,
+                alignment: Alignment.topLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Fleet Status List',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                           ),
-                          subtitle: Text(
-                            isLive ? 'LIVE' : 'OFFLINE',
-                            style: TextStyle(
-                              color: isLive
-                                  ? AppColors.success
-                                  : AppColors.textSecondary,
-                              fontSize: 12,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryLight,
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                          ),
-                          trailing: const Icon(
-                            Icons.chevron_right_rounded,
-                            size: 18,
-                          ),
-                          onTap: () {
-                            setState(() {
-                              _selectedMapFleetItem = item;
-                            });
-                            if (isLive) {
-                              LatLng markerPos;
-                              final activeTrip =
-                                  item['activeTrip'] as MavioTrip?;
-                              if (activeTrip != null &&
-                                  _liveVehicleLocations.containsKey(
-                                    activeTrip.id,
-                                  )) {
-                                markerPos =
-                                    _liveVehicleLocations[activeTrip.id]!;
-                              } else {
-                                if (v.name == 'BUS 03') {
-                                  markerPos = activeLocation;
-                                } else {
-                                  markerPos = LatLng(
-                                    11.0168 + (index * 0.007),
-                                    76.9558 + (index * 0.004),
-                                  );
-                                }
-                              }
-                              _mapController.move(markerPos, 14.5);
-                            }
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                if (_selectedMapFleetItem != null) ...[
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          (_selectedMapFleetItem!['vehicle'] as MavioVehicle)
-                              .name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Driver: ${_selectedMapFleetItem!['driverName'] ?? "Not Assigned"}',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Plate: ${(_selectedMapFleetItem!['vehicle'] as MavioVehicle).regNumber}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (_selectedMapFleetItem!['isLive'] == true) ...[
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.speed_rounded,
-                                size: 14,
+                            child: Text(
+                              '${_fleet.length}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
                                 color: AppColors.primary,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Speed: ${(() {
-                                  final activeTrip = _selectedMapFleetItem!['activeTrip'] as MavioTrip?;
-                                  final speedVal = activeTrip != null ? _liveVehicleSpeeds[activeTrip.id] : null;
-                                  return (speedVal ?? 0.0).toStringAsFixed(1);
-                                })()} km/h',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: 'Close Fleet List',
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _isFleetListVisible = false;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.borderLight),
+                                ),
+                                child: const Icon(
+                                  Icons.chevron_left_rounded,
+                                  size: 18,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                          const SizedBox(height: 12),
-                        ] else ...[
-                          const SizedBox(height: 12),
                         ],
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => MavioVehicleDetailsScreen(
-                                  fleetItem: _selectedMapFleetItem!,
-                                  db: _db,
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: _fleet.length,
+                        itemBuilder: (context, index) {
+                          final item = _fleet[index];
+                          final v = item['vehicle'] as MavioVehicle;
+                          final isLive = item['isLive'] as bool;
+                          final isSelected =
+                              _selectedMapFleetItem != null &&
+                              (_selectedMapFleetItem!['vehicle'] as MavioVehicle)
+                                      .id ==
+                                  v.id;
+
+                          return Container(
+                            color: isSelected
+                                ? AppColors.primary.withOpacity(0.05)
+                                : Colors.transparent,
+                            child: ListTile(
+                              leading: Icon(
+                                Icons.directions_bus_rounded,
+                                color: isLive
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
+                              ),
+                              title: Text(
+                                v.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
                                 ),
                               ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(double.infinity, 36),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Full Specifications',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ],
+                              subtitle: Text(
+                                isLive ? 'LIVE' : 'OFFLINE',
+                                style: TextStyle(
+                                  color: isLive
+                                      ? AppColors.success
+                                      : AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              trailing: const Icon(
+                                Icons.chevron_right_rounded,
+                                size: 18,
+                              ),
+                              onTap: () {
+                                setState(() {
+                                  _selectedMapFleetItem = item;
+                                });
+                                if (isLive) {
+                                  LatLng markerPos;
+                                  final activeTrip =
+                                      item['activeTrip'] as MavioTrip?;
+                                  if (activeTrip != null &&
+                                      _liveVehicleLocations.containsKey(
+                                        activeTrip.id,
+                                      )) {
+                                    markerPos =
+                                        _liveVehicleLocations[activeTrip.id]!;
+                                  } else {
+                                    if (v.name == 'BUS 03') {
+                                      markerPos = activeLocation;
+                                    } else {
+                                      markerPos = LatLng(
+                                        11.0168 + (index * 0.007),
+                                        76.9558 + (index * 0.004),
+                                      );
+                                    }
+                                  }
+                                  _mapController.move(markerPos, 14.5);
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              ],
+                    if (_selectedMapFleetItem != null) ...[
+                      const Divider(height: 1),
+                      Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (_selectedMapFleetItem!['vehicle'] as MavioVehicle)
+                                  .name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Driver: ${_selectedMapFleetItem!['driverName'] ?? "Not Assigned"}',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Plate: ${(_selectedMapFleetItem!['vehicle'] as MavioVehicle).regNumber}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            if (_selectedMapFleetItem!['isLive'] == true) ...[
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.speed_rounded,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Speed: ${(() {
+                                      final activeTrip = _selectedMapFleetItem!['activeTrip'] as MavioTrip?;
+                                      final speedVal = activeTrip != null ? _liveVehicleSpeeds[activeTrip.id] : null;
+                                      return (speedVal ?? 0.0).toStringAsFixed(1);
+                                    })()} km/h',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                            ] else ...[
+                              const SizedBox(height: 12),
+                            ],
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => MavioVehicleDetailsScreen(
+                                      fleetItem: _selectedMapFleetItem!,
+                                      db: _db,
+                                    ),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(double.infinity, 36),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                'Full Specifications',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
           Expanded(
             child: Stack(
               children: [
                 mapWidget,
+                if (!_isFleetListVisible)
+                  Positioned(
+                    top: 20,
+                    left: 20,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            _isFleetListVisible = true;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.borderLight,
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.directions_bus_rounded,
+                                size: 18,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Fleet Status List',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryLight,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '${_fleet.length}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.chevron_right_rounded,
+                                size: 18,
+                                color: AppColors.textSecondary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (_selectedMapFleetItem == null)
                   Positioned(
                     top: 20,

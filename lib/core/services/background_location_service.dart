@@ -168,20 +168,8 @@ void onStart(ServiceInstance service) async {
       }
     }
 
-    // Start geolocator stream inside background thread
-    final locationSettings = AndroidSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 0, // capture all updates
-      intervalDuration: const Duration(seconds: 3), // 3s telemetry interval
-      forceLocationManager: true,
-      foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationText: "MAVIO is tracking your bus location in the background for active student routing.",
-        notificationTitle: "MAVIO Smart Transit Active",
-        enableWakeLock: true,
-      ),
-    );
-
-    gpsSub = Geolocator.getPositionStream(locationSettings: locationSettings).listen((Position position) async {
+    // Define reusable position handler that uploads GPS and checks student proximity
+    Future<void> handlePosition(Position position) async {
       if (tripId == null) return;
 
       try {
@@ -211,7 +199,7 @@ void onStart(ServiceInstance service) async {
           'tripId': tripId,
         });
 
-        // 2. Periodically refresh student targets from Supabase (every ~30s / 10 updates)
+        // 2. Periodically refresh student targets from Supabase if authenticated (every ~30s / 10 updates)
         if (uploadCount % 10 == 0 && vehicleId != null && vehicleId!.isNotEmpty) {
           try {
             final List<dynamic> freshStudents = await client
@@ -220,36 +208,42 @@ void onStart(ServiceInstance service) async {
                 .eq('assigned_vehicle_id', vehicleId!)
                 .eq('role', 'student');
 
-            final Set<String> existingNotifiedIds = studentTargets
-                .where((t) => t.hasNotified)
-                .map((t) => t.id)
-                .toSet();
+            if (freshStudents.isNotEmpty) {
+              final Set<String> existingNotifiedIds = studentTargets
+                  .where((t) => t.hasNotified)
+                  .map((t) => t.id)
+                  .toSet();
 
-            studentTargets.clear();
-            for (var s in freshStudents) {
-              final studentId = s['id'] as String;
-              final onesignalId = s['onesignal_id'] as String?;
-              final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
-              final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
-              final radius = s['alert_radius_meters'] as int? ?? 500;
+              final List<_StudentProximityTarget> newTargets = [];
+              for (var s in freshStudents) {
+                final studentId = s['id'] as String;
+                final onesignalId = s['onesignal_id'] as String?;
+                final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
+                final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
+                final radius = s['alert_radius_meters'] as int? ?? 500;
 
-              if (lat != null && lon != null) {
-                final target = _StudentProximityTarget(
-                  id: studentId,
-                  name: s['name'] as String? ?? 'Student',
-                  onesignalId: onesignalId?.trim(),
-                  lat: lat,
-                  lon: lon,
-                  radius: radius,
-                );
-                if (existingNotifiedIds.contains(studentId)) {
-                  target.hasNotified = true;
+                if (lat != null && lon != null) {
+                  final target = _StudentProximityTarget(
+                    id: studentId,
+                    name: s['name'] as String? ?? 'Student',
+                    onesignalId: onesignalId?.trim(),
+                    lat: lat,
+                    lon: lon,
+                    radius: radius,
+                  );
+                  if (existingNotifiedIds.contains(studentId)) {
+                    target.hasNotified = true;
+                  }
+                  newTargets.add(target);
                 }
-                studentTargets.add(target);
+              }
+              if (newTargets.isNotEmpty) {
+                studentTargets.clear();
+                studentTargets.addAll(newTargets);
               }
             }
           } catch (e) {
-            print("MAVIO Background: Error refreshing student targets: $e");
+            print("MAVIO Background: Error refreshing student targets (retaining existing targets): $e");
           }
         }
 
@@ -263,6 +257,8 @@ void onStart(ServiceInstance service) async {
               target.lon,
             );
 
+            print("MAVIO Proximity Check: Student ${target.name} (${target.id}) is ${distance.round()}m away (radius: ${target.radius}m)");
+
             if (distance <= target.radius) {
               target.hasNotified = true;
               final distText = distance < 1000
@@ -275,7 +271,9 @@ void onStart(ServiceInstance service) async {
                   .where((t) => t.isNotEmpty)
                   .toList();
 
-              _sendBackgroundProximityPush(
+              print("MAVIO Proximity Triggered! Sending push for student ${target.name} ($distText away)");
+
+              await _sendBackgroundProximityPush(
                 studentId: target.id,
                 subscriptionIds: tokens,
                 title: "🚌 Bus Approaching!",
@@ -301,7 +299,33 @@ void onStart(ServiceInstance service) async {
       } catch (e) {
         print("MAVIO Background GPS processing error: $e");
       }
-    });
+    }
+
+    // Process immediate GPS position right upon starting
+    try {
+      final initialPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 4),
+      );
+      await handlePosition(initialPosition);
+    } catch (e) {
+      print("MAVIO Background: Initial position capture warning: $e");
+    }
+
+    // Start geolocator stream inside background thread
+    final locationSettings = AndroidSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 0, // capture all updates
+      intervalDuration: const Duration(seconds: 3), // 3s telemetry interval
+      forceLocationManager: true,
+      foregroundNotificationConfig: const ForegroundNotificationConfig(
+        notificationText: "MAVIO is tracking your bus location in the background for active student routing.",
+        notificationTitle: "MAVIO Smart Transit Active",
+        enableWakeLock: true,
+      ),
+    );
+
+    gpsSub = Geolocator.getPositionStream(locationSettings: locationSettings).listen(handlePosition);
   });
 }
 
@@ -341,51 +365,63 @@ Future<void> _sendBackgroundProximityPush({
       .toList();
 
   try {
-    final url = Uri.parse('https://onesignal.com/api/v1/notifications');
+    final url = Uri.parse('https://api.onesignal.com/notifications');
+    final authHeader = restApiKey.startsWith('os_v2_')
+        ? 'Key $restApiKey'
+        : 'Basic $restApiKey';
 
-    // 1. Primary broadcast to external_id (all active devices under studentId)
-    final payload = <String, dynamic>{
-      'app_id': appId,
-      'include_aliases': {
-        'external_id': [studentId]
-      },
-      'target_channel': 'push',
-      'headings': {'en': title},
-      'contents': {'en': body},
-      'data': {'tripId': tripId, 'busNumber': busNumber, 'type': 'proximity_alert'},
-      'priority': 10,
-      'android_accent_color': 'FF1E3A8A',
-    };
+    // OneSignal strictly requires collapse_id <= 64 bytes
+    final collapseId = 'prox_$studentId';
 
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Authorization': 'Basic $restApiKey',
-      },
-      body: jsonEncode(payload),
-    );
-    print("MAVIO Background Proximity Push to student $studentId: ${response.statusCode} - ${response.body}");
-
-    // 2. Secondary fallback broadcast to subscription tokens
+    // 1. Direct hardware subscription token delivery (most reliable when app is closed)
     if (validSubIds.isNotEmpty) {
       final payloadSub = <String, dynamic>{
         'app_id': appId,
         'include_subscription_ids': validSubIds,
+        'target_channel': 'push',
         'headings': {'en': title},
         'contents': {'en': body},
         'data': {'tripId': tripId, 'busNumber': busNumber, 'type': 'proximity_alert'},
+        'collapse_id': collapseId,
         'priority': 10,
+        'android_visibility': 1,
         'android_accent_color': 'FF1E3A8A',
       };
-      await http.post(
+      final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Basic $restApiKey',
+          'Authorization': authHeader,
         },
         body: jsonEncode(payloadSub),
       );
+      print("MAVIO Background Proximity Direct Push to ${validSubIds.length} devices (student $studentId): ${response.statusCode} - ${response.body}");
+    } else if (studentId.trim().isNotEmpty) {
+      // 2. Fallback broadcast to external_id alias if subscription IDs are not available
+      final payload = <String, dynamic>{
+        'app_id': appId,
+        'include_aliases': {
+          'external_id': [studentId]
+        },
+        'target_channel': 'push',
+        'headings': {'en': title},
+        'contents': {'en': body},
+        'data': {'tripId': tripId, 'busNumber': busNumber, 'type': 'proximity_alert'},
+        'collapse_id': collapseId,
+        'priority': 10,
+        'android_visibility': 1,
+        'android_accent_color': 'FF1E3A8A',
+      };
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': authHeader,
+        },
+        body: jsonEncode(payload),
+      );
+      print("MAVIO Background Proximity Alias Push to student $studentId: ${response.statusCode} - ${response.body}");
     }
   } catch (e) {
     print("MAVIO Background Proximity Push error: $e");
