@@ -4584,6 +4584,8 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
   final _formKey = GlobalKey<FormState>();
   final _passFormKey = GlobalKey<FormState>();
 
+  bool _isEditingProfile = false;
+
   @override
   void initState() {
     super.initState();
@@ -4604,6 +4606,108 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogoUpload(BuildContext context, AuthProvider auth) async {
+    try {
+      final res = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
+        withData: true,
+        allowMultiple: false,
+      );
+      if (res != null && res.files.isNotEmpty) {
+        final file = res.files.first;
+        Uint8List? bytes = file.bytes;
+        if (bytes == null && file.path != null && !kIsWeb) {
+          final ioFile = io.File(file.path!);
+          if (await ioFile.exists()) {
+            bytes = await ioFile.readAsBytes();
+          }
+        }
+        if (bytes != null) {
+          if (bytes.lengthInBytes > 500 * 1024) {
+            if (context.mounted) {
+              AppToast.show(
+                context,
+                "Logo image must be under 500 KB (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB chosen). Please select a smaller or compressed logo.",
+                isError: true,
+              );
+            }
+            return;
+          }
+          final ext = (file.extension ?? 'png').toLowerCase();
+          final mime = (ext == 'jpg' || ext == 'jpeg')
+              ? 'image/jpeg'
+              : (ext == 'webp' ? 'image/webp' : 'image/png');
+          final base64Str = base64Encode(bytes);
+          final dataUri = 'data:$mime;base64,$base64Str';
+          
+          final success = await auth.updateOrganizationLogo(dataUri);
+          if (success && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Institution logo updated successfully!'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppToast.show(context, "Error selecting logo: $e", isError: true);
+      }
+    }
+  }
+
+  Future<void> _handleLogoRemove(BuildContext context, AuthProvider auth) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 26),
+            SizedBox(width: 10),
+            Text('Remove Logo?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to remove your custom institution logo? Your portal and mobile applications will revert to default Mavio branding.',
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Remove Logo'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await auth.updateOrganizationLogo(null);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Logo removed. Defaulting to Mavio branding.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -4641,16 +4745,21 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        children: const [
-                          Icon(Icons.palette_rounded, color: AppColors.primary, size: 28),
-                          SizedBox(width: 16),
-                          Text(
-                            'Institution Branding & Logo',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.palette_rounded, color: AppColors.primary, size: 28),
+                              SizedBox(width: 16),
+                              Text(
+                                'Institution Branding & Logo',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -4677,35 +4786,53 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Logo Preview or Placeholder Box
-                                Container(
-                                  width: 72,
-                                  height: 72,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: AppColors.borderLight),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.04),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
-                                      ? MavioOrgLogo(
-                                          logoUrl: org.logoUrl,
-                                          size: 64,
-                                          borderRadius: 12,
-                                          showBorder: false,
-                                        )
-                                      : const Icon(
-                                          Icons.account_balance_rounded,
-                                          size: 32,
-                                          color: AppColors.textSecondary,
+                                // Clickable Logo Preview or Placeholder Box
+                                InkWell(
+                                  onTap: () => _handleLogoUpload(context, auth),
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    width: 76,
+                                    height: 76,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: AppColors.borderLight),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.04),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
                                         ),
+                                      ],
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
+                                        ? MavioOrgLogo(
+                                            logoUrl: org.logoUrl,
+                                            size: 68,
+                                            borderRadius: 12,
+                                            showBorder: false,
+                                          )
+                                        : Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: const [
+                                              Icon(
+                                                Icons.add_photo_alternate_rounded,
+                                                size: 28,
+                                                color: AppColors.primary,
+                                              ),
+                                              SizedBox(height: 2),
+                                              Text(
+                                                'Upload',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.primary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
                                 ),
                                 const SizedBox(width: 20),
                                 // Title, Badge, and Description
@@ -4781,17 +4908,7 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                               children: [
                                 if (org.logoUrl != null && org.logoUrl!.trim().isNotEmpty) ...[
                                   OutlinedButton.icon(
-                                    onPressed: () async {
-                                      final success = await auth.updateOrganizationLogo(null);
-                                      if (success && mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Logo removed. Defaulting to Mavio branding.'),
-                                            backgroundColor: AppColors.success,
-                                          ),
-                                        );
-                                      }
-                                    },
+                                    onPressed: () => _handleLogoRemove(context, auth),
                                     icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
                                     label: const Text('Remove Logo', style: TextStyle(color: Colors.redAccent)),
                                     style: OutlinedButton.styleFrom(
@@ -4805,50 +4922,7 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                                   const SizedBox(width: 12),
                                 ],
                                 ElevatedButton.icon(
-                                  onPressed: () async {
-                                    final res = await FilePicker.platform.pickFiles(
-                                      type: FileType.custom,
-                                      allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
-                                      withData: true,
-                                      allowMultiple: false,
-                                    );
-                                    if (res != null && res.files.isNotEmpty) {
-                                      final file = res.files.first;
-                                      Uint8List? bytes = file.bytes;
-                                      if (bytes == null && file.path != null && !kIsWeb) {
-                                        final ioFile = io.File(file.path!);
-                                        if (await ioFile.exists()) {
-                                          bytes = await ioFile.readAsBytes();
-                                        }
-                                      }
-                                      if (bytes != null) {
-                                        if (bytes.lengthInBytes > 500 * 1024) {
-                                          AppToast.show(
-                                            context,
-                                            "Logo image must be under 500 KB (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB chosen). Please select a smaller or compressed logo.",
-                                            isError: true,
-                                          );
-                                          return;
-                                        }
-                                        final ext = (file.extension ?? 'png').toLowerCase();
-                                        final mime = (ext == 'jpg' || ext == 'jpeg')
-                                            ? 'image/jpeg'
-                                            : (ext == 'webp' ? 'image/webp' : 'image/png');
-                                        final base64Str = base64Encode(bytes);
-                                        final dataUri = 'data:$mime;base64,$base64Str';
-                                        
-                                        final success = await auth.updateOrganizationLogo(dataUri);
-                                        if (success && mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Institution logo updated successfully!'),
-                                              backgroundColor: AppColors.success,
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    }
-                                  },
+                                  onPressed: () => _handleLogoUpload(context, auth),
                                   icon: const Icon(Icons.upload_file_rounded, size: 18),
                                   label: Text(
                                     org.logoUrl != null && org.logoUrl!.trim().isNotEmpty
@@ -4875,7 +4949,7 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
               ),
               const SizedBox(height: 32),
 
-              // 1. Details Card
+              // 1. Organization Profile Details Card
               Card(
                 elevation: 0,
                 color: Colors.white,
@@ -4891,17 +4965,105 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          children: const [
-                            Icon(Icons.business_rounded, color: AppColors.primary, size: 28),
-                            SizedBox(width: 16),
-                            Text(
-                              'Organization Profile',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(Icons.business_rounded, color: AppColors.primary, size: 28),
+                                SizedBox(width: 16),
+                                Text(
+                                  'Organization Profile',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ],
                             ),
+                            if (!_isEditingProfile)
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _isEditingProfile = true;
+                                  });
+                                },
+                                icon: const Icon(Icons.edit_rounded, size: 16),
+                                label: const Text('Edit Profile'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  side: const BorderSide(color: AppColors.primary),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              )
+                            else
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        _nameCtrl.text = org.name;
+                                        _phoneCtrl.text = org.phone ?? '';
+                                        _addressCtrl.text = org.address ?? '';
+                                        _isEditingProfile = false;
+                                      });
+                                    },
+                                    icon: const Icon(Icons.close_rounded, size: 16),
+                                    label: const Text('Cancel'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: AppColors.textSecondary,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      if (_formKey.currentState!.validate()) {
+                                        final auth = Provider.of<AuthProvider>(context, listen: false);
+                                        final success = await auth.updateOrganizationDetails(
+                                          name: _nameCtrl.text.trim(),
+                                          code: _codeCtrl.text.trim(),
+                                          phone: _phoneCtrl.text.trim(),
+                                          address: _addressCtrl.text.trim(),
+                                        );
+                                        if (success && mounted) {
+                                          setState(() {
+                                            _isEditingProfile = false;
+                                          });
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Organization details updated successfully.'),
+                                              backgroundColor: AppColors.success,
+                                            ),
+                                          );
+                                        } else if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(auth.error ?? 'Failed to update details.'),
+                                              backgroundColor: AppColors.error,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    icon: const Icon(Icons.check_rounded, size: 16),
+                                    label: const Text('Save Changes'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                           ],
                         ),
                         const SizedBox(height: 24),
@@ -4910,9 +5072,12 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                             Expanded(
                               child: TextFormField(
                                 controller: _nameCtrl,
-                                decoration: const InputDecoration(
+                                readOnly: !_isEditingProfile,
+                                decoration: InputDecoration(
                                   labelText: 'Organization Name',
-                                  prefixIcon: Icon(Icons.apartment_rounded),
+                                  prefixIcon: const Icon(Icons.apartment_rounded),
+                                  fillColor: _isEditingProfile ? Colors.white : const Color(0xFFF8F9FA),
+                                  filled: true,
                                 ),
                                 validator: (v) => v!.trim().isEmpty ? 'Enter name' : null,
                               ),
@@ -4922,10 +5087,10 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                               child: TextFormField(
                                 controller: _codeCtrl,
                                 readOnly: true,
-                                decoration: InputDecoration(
+                                decoration: const InputDecoration(
                                   labelText: 'Organization Code',
-                                  prefixIcon: const Icon(Icons.tag_rounded),
-                                  fillColor: Colors.grey.shade50,
+                                  prefixIcon: Icon(Icons.tag_rounded),
+                                  fillColor: Color(0xFFF8F9FA),
                                   filled: true,
                                 ),
                               ),
@@ -4936,68 +5101,102 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                         TextFormField(
                           controller: _emailCtrl,
                           readOnly: true,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: 'Administrator Email',
-                            prefixIcon: const Icon(Icons.email_outlined),
-                            fillColor: Colors.grey.shade50,
+                            prefixIcon: Icon(Icons.email_outlined),
+                            fillColor: Color(0xFFF8F9FA),
                             filled: true,
                           ),
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _phoneCtrl,
-                          decoration: const InputDecoration(
+                          readOnly: !_isEditingProfile,
+                          decoration: InputDecoration(
                             labelText: 'Contact Phone Number',
-                            prefixIcon: Icon(Icons.phone_outlined),
+                            prefixIcon: const Icon(Icons.phone_outlined),
+                            fillColor: _isEditingProfile ? Colors.white : const Color(0xFFF8F9FA),
+                            filled: true,
                           ),
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _addressCtrl,
-                          decoration: const InputDecoration(
+                          readOnly: !_isEditingProfile,
+                          decoration: InputDecoration(
                             labelText: 'Physical Address',
-                            prefixIcon: Icon(Icons.location_on_outlined),
+                            prefixIcon: const Icon(Icons.location_on_outlined),
+                            fillColor: _isEditingProfile ? Colors.white : const Color(0xFFF8F9FA),
+                            filled: true,
                           ),
                         ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: () async {
-                            if (_formKey.currentState!.validate()) {
-                              final auth = Provider.of<AuthProvider>(context, listen: false);
-                              final success = await auth.updateOrganizationDetails(
-                                name: _nameCtrl.text.trim(),
-                                code: _codeCtrl.text.trim(),
-                                phone: _phoneCtrl.text.trim(),
-                                address: _addressCtrl.text.trim(),
-                              );
-                              if (success && mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Organization details updated successfully.'),
-                                    backgroundColor: AppColors.success,
+                        if (_isEditingProfile) ...[
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              OutlinedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _nameCtrl.text = org.name;
+                                    _phoneCtrl.text = org.phone ?? '';
+                                    _addressCtrl.text = org.address ?? '';
+                                    _isEditingProfile = false;
+                                  });
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                );
-                              } else if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(auth.error ?? 'Failed to update details.'),
-                                    backgroundColor: AppColors.error,
+                                ),
+                                child: const Text('Cancel'),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  if (_formKey.currentState!.validate()) {
+                                    final auth = Provider.of<AuthProvider>(context, listen: false);
+                                    final success = await auth.updateOrganizationDetails(
+                                      name: _nameCtrl.text.trim(),
+                                      code: _codeCtrl.text.trim(),
+                                      phone: _phoneCtrl.text.trim(),
+                                      address: _addressCtrl.text.trim(),
+                                    );
+                                    if (success && mounted) {
+                                      setState(() {
+                                        _isEditingProfile = false;
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Organization details updated successfully.'),
+                                          backgroundColor: AppColors.success,
+                                        ),
+                                      );
+                                    } else if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(auth.error ?? 'Failed to update details.'),
+                                          backgroundColor: AppColors.error,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                icon: const Icon(Icons.save_rounded, size: 18),
+                                label: const Text('Save Changes'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                );
-                              }
-                            }
-                          },
-                          icon: const Icon(Icons.save_rounded, size: 18),
-                          label: const Text('Update Profile Details'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
