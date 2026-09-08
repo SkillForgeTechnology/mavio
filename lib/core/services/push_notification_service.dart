@@ -258,6 +258,7 @@ class PushNotificationService {
           'data': data ?? {},
           'priority': 10,
           'android_accent_color': 'FF1E3A8A',
+          'android_channel_id': 'mavio_bus_alerts',
         };
 
         final response = await http.post(
@@ -279,6 +280,7 @@ class PushNotificationService {
           'data': data ?? {},
           'priority': 10,
           'android_accent_color': 'FF1E3A8A',
+          'android_channel_id': 'mavio_bus_alerts',
         };
 
         final response = await http.post(

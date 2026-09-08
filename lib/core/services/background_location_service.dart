@@ -221,7 +221,59 @@ void onStart(ServiceInstance service) async {
 
         uploadCount++;
 
-        // Check proximity for each assigned student
+        // 1. Emit live stats to Driver UI on every GPS update
+        service.invoke('updateStats', {
+          'speed': lastSpeed,
+          'uploads': uploadCount,
+          'latitude': lastLat,
+          'longitude': lastLng,
+          'isTracking': true,
+          'tripId': tripId,
+        });
+
+        // 2. Periodically refresh student targets from Supabase (every ~30s / 10 updates)
+        if (uploadCount % 10 == 0 && vehicleId != null && vehicleId!.isNotEmpty) {
+          try {
+            final List<dynamic> freshStudents = await client
+                .from('profiles')
+                .select('id, name, onesignal_id, alert_latitude, alert_longitude, alert_radius_meters')
+                .eq('assigned_vehicle_id', vehicleId!)
+                .eq('role', 'student');
+
+            final Set<String> existingNotifiedIds = studentTargets
+                .where((t) => t.hasNotified)
+                .map((t) => t.id)
+                .toSet();
+
+            studentTargets.clear();
+            for (var s in freshStudents) {
+              final studentId = s['id'] as String;
+              final onesignalId = s['onesignal_id'] as String?;
+              final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
+              final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
+              final radius = s['alert_radius_meters'] as int? ?? 500;
+
+              if (lat != null && lon != null) {
+                final target = _StudentProximityTarget(
+                  id: studentId,
+                  name: s['name'] as String? ?? 'Student',
+                  onesignalId: onesignalId?.trim(),
+                  lat: lat,
+                  lon: lon,
+                  radius: radius,
+                );
+                if (existingNotifiedIds.contains(studentId)) {
+                  target.hasNotified = true;
+                }
+                studentTargets.add(target);
+              }
+            }
+          } catch (e) {
+            print("MAVIO Background: Error refreshing student targets: $e");
+          }
+        }
+
+        // 3. Check proximity for each assigned student
         for (var target in studentTargets) {
           if (!target.hasNotified) {
             final distance = Geolocator.distanceBetween(
@@ -243,16 +295,15 @@ void onStart(ServiceInstance service) async {
                   .where((t) => t.isNotEmpty)
                   .toList();
 
-              if (tokens.isNotEmpty) {
-                _sendBackgroundProximityPush(
-                  subscriptionIds: tokens,
-                  title: "🚌 Bus Approaching!",
-                  body:
-                      "${vehicleName ?? 'Your school bus'} is approaching your stop ($distText away). Please be ready!",
-                  tripId: tripId!,
-                  busNumber: vehicleName ?? 'Mavio Bus',
-                );
-              }
+              _sendBackgroundProximityPush(
+                studentId: target.id,
+                subscriptionIds: tokens,
+                title: "🚌 Bus Approaching!",
+                body:
+                    "${vehicleName ?? 'Your school bus'} is approaching your stop ($distText away). Please be ready!",
+                tripId: tripId!,
+                busNumber: vehicleName ?? 'Mavio Bus',
+              );
             }
           }
         }
@@ -294,6 +345,7 @@ class _StudentProximityTarget {
 }
 
 Future<void> _sendBackgroundProximityPush({
+  required String studentId,
   required List<String> subscriptionIds,
   required String title,
   required String body,
@@ -308,21 +360,28 @@ Future<void> _sendBackgroundProximityPush({
       .toSet()
       .toList();
 
-  if (validSubIds.isEmpty) return;
-
   try {
     final url = Uri.parse('https://onesignal.com/api/v1/notifications');
 
-    final payload = {
+    // Send with high priority & channel to wake device even when app is killed/closed
+    final payload = <String, dynamic>{
       'app_id': appId,
-      'include_subscription_ids': validSubIds,
-      'include_player_ids': validSubIds,
+      'include_aliases': {
+        'external_id': [studentId]
+      },
+      'target_channel': 'push',
       'headings': {'en': title},
       'contents': {'en': body},
-      'data': {'tripId': tripId, 'busNumber': busNumber},
+      'data': {'tripId': tripId, 'busNumber': busNumber, 'type': 'proximity_alert'},
       'priority': 10,
       'android_accent_color': 'FF1E3A8A',
+      'android_channel_id': 'mavio_bus_alerts',
     };
+
+    if (validSubIds.isNotEmpty) {
+      payload['include_subscription_ids'] = validSubIds;
+      payload['include_player_ids'] = validSubIds;
+    }
 
     final response = await http.post(
       url,
@@ -332,9 +391,9 @@ Future<void> _sendBackgroundProximityPush({
       },
       body: jsonEncode(payload),
     );
-    print("MAVIO Background Push to ${validSubIds.length} devices: ${response.statusCode}");
+    print("MAVIO Background Proximity Push to student $studentId: ${response.statusCode} - ${response.body}");
   } catch (e) {
-    print("MAVIO Background Push error: $e");
+    print("MAVIO Background Proximity Push error: $e");
   }
 }
 
