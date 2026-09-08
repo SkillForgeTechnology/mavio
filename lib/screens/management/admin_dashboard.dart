@@ -4829,20 +4829,47 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Header
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Row(
-                              children: const [
-                                Icon(Icons.business_rounded, color: AppColors.primary, size: 28),
-                                SizedBox(width: 16),
-                                Text(
-                                  'Organization Profile',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryLight,
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
+                                  child: const Icon(
+                                    Icons.business_rounded,
+                                    color: AppColors.primary,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Organization Profile',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _isEditingProfile
+                                          ? 'Modify organization details below and tap Save Changes.'
+                                          : 'Institutional identity and contact credentials.',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -4854,60 +4881,49 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                                   });
                                 },
                                 icon: const Icon(Icons.edit_rounded, size: 16),
-                                label: const Text('Edit Profile'),
+                                label: const Text(
+                                  'Edit Profile',
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
                                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                               )
                             else
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  OutlinedButton.icon(
-                                    onPressed: _isSavingProfile ? null : () => _handleCancelEdit(org),
-                                    icon: const Icon(Icons.close_rounded, size: 14),
-                                    label: const Text('Cancel'),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                      foregroundColor: AppColors.textSecondary,
-                                      side: const BorderSide(color: AppColors.border),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryLight,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 16),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Editing Mode',
+                                      style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  ElevatedButton.icon(
-                                    onPressed: _isSavingProfile ? null : () => _handleSaveProfile(context, org),
-                                    icon: _isSavingProfile
-                                        ? const SizedBox(
-                                            width: 14,
-                                            height: 14,
-                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                          )
-                                        : const Icon(Icons.check_circle_rounded, size: 16),
-                                    label: const Text('Save Changes'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.primary,
-                                      foregroundColor: Colors.white,
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 28),
+
+                        // Form Fields
                         Row(
                           children: [
                             Expanded(
@@ -4919,8 +4935,15 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                                   prefixIcon: const Icon(Icons.apartment_rounded),
                                   fillColor: _isEditingProfile ? Colors.white : const Color(0xFFF8F9FA),
                                   filled: true,
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: _isEditingProfile ? AppColors.primary.withOpacity(0.6) : AppColors.border,
+                                      width: _isEditingProfile ? 1.5 : 1,
+                                    ),
+                                  ),
                                 ),
-                                validator: (v) => v!.trim().isEmpty ? 'Enter name' : null,
+                                validator: (v) => v!.trim().isEmpty ? 'Organization name is required' : null,
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -4928,11 +4951,19 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                               child: TextFormField(
                                 controller: _codeCtrl,
                                 readOnly: true,
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: 'Organization Code',
-                                  prefixIcon: Icon(Icons.tag_rounded),
-                                  fillColor: Color(0xFFF8F9FA),
+                                  prefixIcon: const Icon(Icons.tag_rounded),
+                                  suffixIcon: const Tooltip(
+                                    message: 'Organization Code is permanent',
+                                    child: Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.textSecondary),
+                                  ),
+                                  fillColor: const Color(0xFFF8F9FA),
                                   filled: true,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: AppColors.border),
+                                  ),
                                 ),
                               ),
                             ),
@@ -4942,11 +4973,19 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                         TextFormField(
                           controller: _emailCtrl,
                           readOnly: true,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Administrator Email',
-                            prefixIcon: Icon(Icons.email_outlined),
-                            fillColor: Color(0xFFF8F9FA),
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            suffixIcon: const Tooltip(
+                              message: 'Administrator email is locked for security',
+                              child: Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.textSecondary),
+                            ),
+                            fillColor: const Color(0xFFF8F9FA),
                             filled: true,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -4958,6 +4997,13 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                             prefixIcon: const Icon(Icons.phone_outlined),
                             fillColor: _isEditingProfile ? Colors.white : const Color(0xFFF8F9FA),
                             filled: true,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: _isEditingProfile ? AppColors.primary.withOpacity(0.6) : AppColors.border,
+                                width: _isEditingProfile ? 1.5 : 1,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -4969,73 +5015,91 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                             prefixIcon: const Icon(Icons.location_on_outlined),
                             fillColor: _isEditingProfile ? Colors.white : const Color(0xFFF8F9FA),
                             filled: true,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: _isEditingProfile ? AppColors.primary.withOpacity(0.6) : AppColors.border,
+                                width: _isEditingProfile ? 1.5 : 1,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 28),
+
+                        // Action Buttons at bottom
                         if (_isEditingProfile)
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              OutlinedButton.icon(
-                                onPressed: _isSavingProfile ? null : () => _handleCancelEdit(org),
-                                icon: const Icon(Icons.close_rounded, size: 16),
-                                label: const Text('Cancel'),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                                  foregroundColor: AppColors.textSecondary,
-                                  side: const BorderSide(color: AppColors.border),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                              Expanded(
+                                flex: 1,
+                                child: OutlinedButton.icon(
+                                  onPressed: _isSavingProfile ? null : () => _handleCancelEdit(org),
+                                  icon: const Icon(Icons.close_rounded, size: 18),
+                                  label: const Text(
+                                    'Cancel',
+                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    foregroundColor: AppColors.textSecondary,
+                                    side: const BorderSide(color: AppColors.border, width: 1.2),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 14),
-                              ElevatedButton.icon(
-                                onPressed: _isSavingProfile ? null : () => _handleSaveProfile(context, org),
-                                icon: _isSavingProfile
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                      )
-                                    : const Icon(Icons.check_circle_rounded, size: 18),
-                                label: Text(
-                                  _isSavingProfile ? 'Saving...' : 'Save Changes',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  elevation: 1,
-                                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                flex: 2,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isSavingProfile ? null : () => _handleSaveProfile(context, org),
+                                  icon: _isSavingProfile
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                                        )
+                                      : const Icon(Icons.check_circle_rounded, size: 20),
+                                  label: Text(
+                                    _isSavingProfile ? 'Saving Changes...' : 'Save Changes',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    elevation: 2,
+                                    shadowColor: AppColors.primary.withOpacity(0.4),
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
                           )
                         else
-                          Align(
-                            alignment: Alignment.centerRight,
+                          SizedBox(
+                            width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed: () {
                                 setState(() {
                                   _isEditingProfile = true;
                                 });
                               },
-                              icon: const Icon(Icons.edit_rounded, size: 16),
+                              icon: const Icon(Icons.edit_rounded, size: 18),
                               label: const Text(
                                 'Edit Organization Profile',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                             ),
