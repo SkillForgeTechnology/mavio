@@ -117,32 +117,22 @@ void onStart(ServiceInstance service) async {
     // Load all students assigned to this vehicle with active stop alerts
     final List<dynamic>? passedStudents = event?['students'] as List<dynamic>?;
     if (passedStudents != null && passedStudents.isNotEmpty) {
-      final List<String> allSubIds = [];
-      final List<String> allUserIds = [];
-
       for (var s in passedStudents) {
         final onesignalId = s['onesignal_id'] as String?;
         final studentId = s['id'] as String;
+        final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
+        final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
+        final radius = s['alert_radius_meters'] as int? ?? 500;
 
-        // ONLY target students who are actively logged in
-        if (onesignalId != null && onesignalId.trim().isNotEmpty) {
-          allUserIds.add(studentId);
-          allSubIds.add(onesignalId.trim());
-
-          final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
-          final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
-          final radius = s['alert_radius_meters'] as int? ?? 500;
-
-          if (lat != null && lon != null) {
-            studentTargets.add(_StudentProximityTarget(
-              id: studentId,
-              name: s['name'] as String? ?? 'Student',
-              onesignalId: onesignalId.trim(),
-              lat: lat,
-              lon: lon,
-              radius: radius,
-            ));
-          }
+        if (lat != null && lon != null) {
+          studentTargets.add(_StudentProximityTarget(
+            id: studentId,
+            name: s['name'] as String? ?? 'Student',
+            onesignalId: onesignalId?.trim(),
+            lat: lat,
+            lon: lon,
+            radius: radius,
+          ));
         }
       }
       print("MAVIO Background: Loaded ${studentTargets.length} active student proximity targets from foreground for vehicle $vehicleId");
@@ -154,32 +144,22 @@ void onStart(ServiceInstance service) async {
             .eq('assigned_vehicle_id', vehicleId!)
             .eq('role', 'student');
 
-        final List<String> allSubIds = [];
-        final List<String> allUserIds = [];
-
         for (var s in students) {
           final onesignalId = s['onesignal_id'] as String?;
           final studentId = s['id'] as String;
+          final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
+          final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
+          final radius = s['alert_radius_meters'] as int? ?? 500;
 
-          // ONLY target students who are actively logged in
-          if (onesignalId != null && onesignalId.trim().isNotEmpty) {
-            allUserIds.add(studentId);
-            allSubIds.add(onesignalId.trim());
-
-            final lat = s['alert_latitude'] != null ? (s['alert_latitude'] as num).toDouble() : null;
-            final lon = s['alert_longitude'] != null ? (s['alert_longitude'] as num).toDouble() : null;
-            final radius = s['alert_radius_meters'] as int? ?? 500;
-
-            if (lat != null && lon != null) {
-              studentTargets.add(_StudentProximityTarget(
-                id: studentId,
-                name: s['name'] as String? ?? 'Student',
-                onesignalId: onesignalId.trim(),
-                lat: lat,
-                lon: lon,
-                radius: radius,
-              ));
-            }
+          if (lat != null && lon != null) {
+            studentTargets.add(_StudentProximityTarget(
+              id: studentId,
+              name: s['name'] as String? ?? 'Student',
+              onesignalId: onesignalId?.trim(),
+              lat: lat,
+              lon: lon,
+              radius: radius,
+            ));
           }
         }
         print("MAVIO Background: Loaded ${studentTargets.length} active student proximity targets for vehicle $vehicleId");
@@ -352,8 +332,8 @@ Future<void> _sendBackgroundProximityPush({
   required String tripId,
   required String busNumber,
 }) async {
-  const String appId = "2633169a-2c5f-4856-bfd3-12361105dc17";
-  const String restApiKey = String.fromEnvironment('ONESIGNAL_REST_API_KEY');
+  const String appId = OneSignalKeys.appId;
+  const String restApiKey = OneSignalKeys.restApiKey;
 
   final validSubIds = subscriptionIds
       .where((id) => id.trim().isNotEmpty)
@@ -363,6 +343,7 @@ Future<void> _sendBackgroundProximityPush({
   try {
     final url = Uri.parse('https://onesignal.com/api/v1/notifications');
 
+    // 1. Primary broadcast to external_id (all active devices under studentId)
     final payload = <String, dynamic>{
       'app_id': appId,
       'include_aliases': {
@@ -385,6 +366,27 @@ Future<void> _sendBackgroundProximityPush({
       body: jsonEncode(payload),
     );
     print("MAVIO Background Proximity Push to student $studentId: ${response.statusCode} - ${response.body}");
+
+    // 2. Secondary fallback broadcast to subscription tokens
+    if (validSubIds.isNotEmpty) {
+      final payloadSub = <String, dynamic>{
+        'app_id': appId,
+        'include_subscription_ids': validSubIds,
+        'headings': {'en': title},
+        'contents': {'en': body},
+        'data': {'tripId': tripId, 'busNumber': busNumber, 'type': 'proximity_alert'},
+        'priority': 10,
+        'android_accent_color': 'FF1E3A8A',
+      };
+      await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': 'Basic $restApiKey',
+        },
+        body: jsonEncode(payloadSub),
+      );
+    }
   } catch (e) {
     print("MAVIO Background Proximity Push error: $e");
   }

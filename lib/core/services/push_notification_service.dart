@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
+import '../constants/keys.dart';
 import 'supabase_service.dart';
 
 class PushNotificationService {
-  static const String appId = "2633169a-2c5f-4856-bfd3-12361105dc17";
-  static const String restApiKey = String.fromEnvironment('ONESIGNAL_REST_API_KEY');
+  static const String appId = OneSignalKeys.appId;
+  static const String restApiKey = OneSignalKeys.restApiKey;
 
   static final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -269,7 +270,10 @@ class PushNotificationService {
           body: jsonEncode(payload),
         );
         print("OneSignal Multi-Device Alias Push sent to ${validUserIds.length} users: ${response.statusCode} - ${response.body}");
-      } else if (validSubIds.isNotEmpty) {
+      }
+      
+      // 2. Secondary fallback broadcast to subscription IDs
+      if (validSubIds.isNotEmpty) {
         final payload = {
           'app_id': appId,
           'include_subscription_ids': validSubIds,
@@ -309,26 +313,26 @@ class PushNotificationService {
       final List<String> userIds = [];
 
       for (var s in students) {
-        // ONLY target students who are actively logged in with a non-null onesignal_id
+        // ALWAYS target every assigned student by their profile ID (external_id in OneSignal)
+        userIds.add(s.id);
         if (s.onesignalId != null && s.onesignalId!.trim().isNotEmpty) {
           final tokens = s.onesignalId!
               .split(',')
               .map((t) => t.trim())
               .where((t) => t.isNotEmpty);
           subIds.addAll(tokens);
-          userIds.add(s.id);
         }
       }
 
-      print("OneSignal: Found ${subIds.length} active device tokens and ${userIds.length} users for vehicle $vehicleId ($vehicleName)");
+      print("OneSignal: Broadcasting trip started for ${userIds.length} assigned students on $vehicleName");
 
-      if (subIds.isNotEmpty || userIds.isNotEmpty) {
+      if (userIds.isNotEmpty || subIds.isNotEmpty) {
         await sendPushNotification(
           subscriptionIds: subIds,
           externalUserIds: userIds,
           title: "🚌 Bus Trip Started!",
           body: "$vehicleName has started its trip and is on the way. Open MAVIO to track live!",
-          data: {'tripId': tripId, 'busNumber': vehicleName},
+          data: {'tripId': tripId, 'busNumber': vehicleName, 'type': 'trip_started'},
         );
       }
     } catch (e) {
