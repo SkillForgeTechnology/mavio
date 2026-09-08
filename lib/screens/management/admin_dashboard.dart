@@ -4749,6 +4749,50 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
     super.dispose();
   }
 
+  bool _isSavingProfile = false;
+
+  Future<void> _handleSaveProfile(BuildContext context, dynamic org) async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSavingProfile = true);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final success = await auth.updateOrganizationDetails(
+      name: _nameCtrl.text.trim(),
+      code: _codeCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim(),
+      address: _addressCtrl.text.trim(),
+    );
+    if (mounted) {
+      setState(() {
+        _isSavingProfile = false;
+        if (success) _isEditingProfile = false;
+      });
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Organization details updated successfully.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(auth.error ?? 'Failed to update details.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleCancelEdit(dynamic org) {
+    setState(() {
+      _nameCtrl.text = org.name;
+      _phoneCtrl.text = org.phone ?? '';
+      _addressCtrl.text = org.address ?? '';
+      _isEditingProfile = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
@@ -4822,28 +4866,44 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                                 ),
                               )
                             else
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryLight,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 16),
-                                    SizedBox(width: 6),
-                                    Text(
-                                      'Editing Mode Active',
-                                      style: TextStyle(
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: _isSavingProfile ? null : () => _handleCancelEdit(org),
+                                    icon: const Icon(Icons.close_rounded, size: 14),
+                                    label: const Text('Cancel'),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      foregroundColor: AppColors.textSecondary,
+                                      side: const BorderSide(color: AppColors.border),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  ElevatedButton.icon(
+                                    onPressed: _isSavingProfile ? null : () => _handleSaveProfile(context, org),
+                                    icon: _isSavingProfile
+                                        ? const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Icon(Icons.check_circle_rounded, size: 16),
+                                    label: const Text('Save Changes'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                           ],
                         ),
@@ -4917,14 +4977,7 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               OutlinedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _nameCtrl.text = org.name;
-                                    _phoneCtrl.text = org.phone ?? '';
-                                    _addressCtrl.text = org.address ?? '';
-                                    _isEditingProfile = false;
-                                  });
-                                },
+                                onPressed: _isSavingProfile ? null : () => _handleCancelEdit(org),
                                 icon: const Icon(Icons.close_rounded, size: 16),
                                 label: const Text('Cancel'),
                                 style: OutlinedButton.styleFrom(
@@ -4938,39 +4991,17 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                               ),
                               const SizedBox(width: 14),
                               ElevatedButton.icon(
-                                onPressed: () async {
-                                  if (_formKey.currentState!.validate()) {
-                                    final auth = Provider.of<AuthProvider>(context, listen: false);
-                                    final success = await auth.updateOrganizationDetails(
-                                      name: _nameCtrl.text.trim(),
-                                      code: _codeCtrl.text.trim(),
-                                      phone: _phoneCtrl.text.trim(),
-                                      address: _addressCtrl.text.trim(),
-                                    );
-                                    if (success && mounted) {
-                                      setState(() {
-                                        _isEditingProfile = false;
-                                      });
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Organization details updated successfully.'),
-                                          backgroundColor: AppColors.success,
-                                        ),
-                                      );
-                                    } else if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(auth.error ?? 'Failed to update details.'),
-                                          backgroundColor: AppColors.error,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                icon: const Icon(Icons.check_circle_rounded, size: 18),
-                                label: const Text(
-                                  'Save Changes',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                onPressed: _isSavingProfile ? null : () => _handleSaveProfile(context, org),
+                                icon: _isSavingProfile
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                      )
+                                    : const Icon(Icons.check_circle_rounded, size: 18),
+                                label: Text(
+                                  _isSavingProfile ? 'Saving...' : 'Save Changes',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,

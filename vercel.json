@@ -22,6 +22,15 @@
   ],
   "headers": [
     {
+      "source": "/(index\\.html|flutter_bootstrap\\.js|main\\.dart\\.js|flutter\\.js|manifest\\.json)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {
