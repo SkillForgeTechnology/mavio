@@ -764,10 +764,30 @@ class SupabaseService {
     clearSession();
   }
 
-  Future<void> updatePassword(String newPassword) async {
+  Future<void> updatePassword({required String oldPassword, required String newPassword}) async {
     if (_useMockMode) {
       return;
     }
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    final email = currentUser?.email ?? _currentUserProfile?.email;
+    if (email == null || email.isEmpty) {
+      throw Exception("No authenticated user session found. Please log in again.");
+    }
+
+    // Verify current password by attempting sign in
+    try {
+      final res = await Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: oldPassword,
+      );
+      if (res.user == null) {
+        throw Exception("Current password is incorrect.");
+      }
+    } catch (e) {
+      throw Exception("The current password you entered is incorrect. Please verify and try again.");
+    }
+
+    // Update password in Supabase Auth
     await Supabase.instance.client.auth.updateUser(
       UserAttributes(password: newPassword),
     );

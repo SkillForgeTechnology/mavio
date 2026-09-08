@@ -128,12 +128,12 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> updatePassword(String newPassword) async {
+  Future<bool> updatePassword({required String oldPassword, required String newPassword}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
-      await _db.updatePassword(newPassword);
+      await _db.updatePassword(oldPassword: oldPassword, newPassword: newPassword);
       _isLoading = false;
       notifyListeners();
       return true;

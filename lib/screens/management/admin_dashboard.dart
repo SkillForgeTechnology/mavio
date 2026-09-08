@@ -4574,6 +4574,7 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _addressCtrl;
   
+  final _oldPasswordCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
 
@@ -4581,6 +4582,9 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
   final _passFormKey = GlobalKey<FormState>();
 
   bool _isEditingProfile = false;
+  bool _obscureOldPass = true;
+  bool _obscureNewPass = true;
+  bool _obscureConfirmPass = true;
 
   @override
   void initState() {
@@ -4599,6 +4603,7 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
+    _oldPasswordCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     super.dispose();
@@ -4916,25 +4921,65 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                         ),
                         const SizedBox(height: 24),
                         TextFormField(
+                          controller: _oldPasswordCtrl,
+                          obscureText: _obscureOldPass,
+                          decoration: InputDecoration(
+                            labelText: 'Current Password',
+                            prefixIcon: const Icon(Icons.lock_outline_rounded),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureOldPass ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                size: 20,
+                                color: AppColors.textSecondary,
+                              ),
+                              onPressed: () => setState(() => _obscureOldPass = !_obscureOldPass),
+                            ),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Enter your current password';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
                           controller: _passwordCtrl,
-                          obscureText: true,
-                          decoration: const InputDecoration(
+                          obscureText: _obscureNewPass,
+                          decoration: InputDecoration(
                             labelText: 'New Password',
-                            prefixIcon: Icon(Icons.vpn_key_outlined),
+                            prefixIcon: const Icon(Icons.vpn_key_outlined),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureNewPass ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                size: 20,
+                                color: AppColors.textSecondary,
+                              ),
+                              onPressed: () => setState(() => _obscureNewPass = !_obscureNewPass),
+                            ),
                           ),
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return 'Enter new password';
                             if (v.trim().length < 6) return 'Password must be at least 6 characters';
+                            if (v.trim() == _oldPasswordCtrl.text.trim()) {
+                              return 'New password must be different from current password';
+                            }
                             return null;
                           },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _confirmPasswordCtrl,
-                          obscureText: true,
-                          decoration: const InputDecoration(
+                          obscureText: _obscureConfirmPass,
+                          decoration: InputDecoration(
                             labelText: 'Confirm New Password',
-                            prefixIcon: Icon(Icons.vpn_key_rounded),
+                            prefixIcon: const Icon(Icons.vpn_key_rounded),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureConfirmPass ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                size: 20,
+                                color: AppColors.textSecondary,
+                              ),
+                              onPressed: () => setState(() => _obscureConfirmPass = !_obscureConfirmPass),
+                            ),
                           ),
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return 'Confirm new password';
@@ -4947,8 +4992,12 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                           onPressed: () async {
                             if (_passFormKey.currentState!.validate()) {
                               final auth = Provider.of<AuthProvider>(context, listen: false);
-                              final success = await auth.updatePassword(_passwordCtrl.text.trim());
+                              final success = await auth.updatePassword(
+                                oldPassword: _oldPasswordCtrl.text.trim(),
+                                newPassword: _passwordCtrl.text.trim(),
+                              );
                               if (success && mounted) {
+                                _oldPasswordCtrl.clear();
                                 _passwordCtrl.clear();
                                 _confirmPasswordCtrl.clear();
                                 ScaffoldMessenger.of(context).showSnackBar(
