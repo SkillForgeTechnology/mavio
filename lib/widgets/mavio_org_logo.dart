@@ -9,6 +9,9 @@ class MavioOrgLogo extends StatelessWidget {
   final double borderRadius;
   final bool showBorder;
 
+  // Static in-memory cache to prevent re-decoding base64 strings on each frame build
+  static final Map<String, Uint8List> _base64Cache = {};
+
   const MavioOrgLogo({
     super.key,
     required this.logoUrl,
@@ -26,16 +29,22 @@ class MavioOrgLogo extends StatelessWidget {
     final raw = logoUrl!.trim();
     Uint8List? imageBytes;
 
-    try {
-      if (raw.startsWith('data:image')) {
-        final commaIdx = raw.indexOf(',');
-        if (commaIdx != -1) {
-          imageBytes = base64Decode(raw.substring(commaIdx + 1));
+    if (_base64Cache.containsKey(raw)) {
+      imageBytes = _base64Cache[raw];
+    } else {
+      try {
+        if (raw.startsWith('data:image')) {
+          final commaIdx = raw.indexOf(',');
+          if (commaIdx != -1) {
+            imageBytes = base64Decode(raw.substring(commaIdx + 1));
+            _base64Cache[raw] = imageBytes;
+          }
+        } else if (!raw.startsWith('http')) {
+          imageBytes = base64Decode(raw);
+          _base64Cache[raw] = imageBytes;
         }
-      } else if (!raw.startsWith('http')) {
-        imageBytes = base64Decode(raw);
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     Widget imageWidget;
     if (imageBytes != null) {
@@ -44,6 +53,8 @@ class MavioOrgLogo extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.contain,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.medium,
         errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
       );
     } else if (raw.startsWith('http')) {
@@ -52,6 +63,18 @@ class MavioOrgLogo extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.contain,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.medium,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) {
+            return child;
+          }
+          return Container(
+            width: size,
+            height: size,
+            color: Colors.white,
+          );
+        },
         errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
       );
     } else {
