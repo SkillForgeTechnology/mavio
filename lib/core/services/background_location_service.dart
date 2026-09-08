@@ -333,7 +333,7 @@ Future<void> _sendBackgroundProximityPush({
   required String busNumber,
 }) async {
   const String appId = OneSignalKeys.appId;
-  const String restApiKey = OneSignalKeys.restApiKey;
+  final String restApiKey = OneSignalKeys.restApiKey;
 
   final validSubIds = subscriptionIds
       .where((id) => id.trim().isNotEmpty)

@@ -9,7 +9,7 @@ import 'supabase_service.dart';
 
 class PushNotificationService {
   static const String appId = OneSignalKeys.appId;
-  static const String restApiKey = OneSignalKeys.restApiKey;
+  static String get restApiKey => OneSignalKeys.restApiKey;
 
   static final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
