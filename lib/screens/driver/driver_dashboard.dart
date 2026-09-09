@@ -77,20 +77,38 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
     final profile = Provider.of<AuthProvider>(context, listen: false).currentProfile;
     if (profile != null) {
+      // 1. Fetch default assigned vehicle
+      MavioVehicle? defaultV;
       if (profile.assignedVehicleId != null) {
-        final data = await _db.getStudentDashboardData();
-        setState(() {
-          _defaultVehicle = data['vehicle'] as MavioVehicle?;
-          _assignedVehicle = _defaultVehicle;
-          _isTemporaryAssigned = false;
+        defaultV = await _db.getVehicle(profile.assignedVehicleId!);
+      }
 
-          _activeTrip = data['activeTrip'] as MavioTrip?;
-          _isTripActive = _activeTrip != null;
-        });
+      // 2. Check if driver currently has an ACTIVE trip across ANY vehicle (scanned or default)
+      final activeTrip = await _db.getActiveTripForDriver(profile.id);
 
-        if (_isTripActive) {
-          _startTracking(_activeTrip!.id);
-        }
+      MavioVehicle? activeV;
+      bool isTemp = false;
+
+      if (activeTrip != null) {
+        // Driver is currently in an active trip! Fetch that specific vehicle
+        activeV = await _db.getVehicle(activeTrip.vehicleId);
+        isTemp = (defaultV == null || activeV?.id != defaultV.id);
+      } else {
+        // If driver had scanned a shift vehicle before starting trip, retain it; otherwise use default
+        activeV = _assignedVehicle ?? defaultV;
+        isTemp = (defaultV == null || activeV?.id != defaultV.id);
+      }
+
+      setState(() {
+        _defaultVehicle = defaultV;
+        _assignedVehicle = activeV;
+        _isTemporaryAssigned = isTemp;
+        _activeTrip = activeTrip;
+        _isTripActive = activeTrip != null;
+      });
+
+      if (_isTripActive && _activeTrip != null) {
+        _startTracking(_activeTrip!.id);
       }
 
       // Fetch Driver History
@@ -155,22 +173,269 @@ class _DriverDashboardState extends State<DriverDashboard> {
     final result = await showDialog<MavioVehicle>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const BusQrScannerDialog(),
+      builder: (ctx) => BusQrScannerDialog(
+        expectedOrgId: _db.currentUserProfile?.orgId,
+      ),
     );
 
     if (result != null && mounted) {
+      // Try to fetch complete vehicle record from database
+      MavioVehicle finalVehicle = result;
+      try {
+        final fresh = await _db.getVehicle(result.id);
+        if (fresh != null) {
+          finalVehicle = fresh;
+        }
+      } catch (_) {}
+
       setState(() {
-        _assignedVehicle = result;
-        _isTemporaryAssigned = (_defaultVehicle == null || result.id != _defaultVehicle!.id);
+        _assignedVehicle = finalVehicle;
+        _isTemporaryAssigned = (_defaultVehicle == null || finalVehicle.id != _defaultVehicle!.id);
       });
 
-      _showSnackbar(
-        _isTemporaryAssigned
-            ? "Shift bus set to ${result.name} (${result.regNumber})."
-            : "Bus assigned to ${result.name}.",
-        AppColors.success,
-      );
+      // Show bottom sheet popup with Start Trip and Ready options
+      _showScannedBusActionSheet(finalVehicle);
     }
+  }
+
+  void _showScannedBusActionSheet(MavioVehicle vehicle) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 25,
+                offset: Offset(0, -5),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.fromLTRB(
+            24,
+            12,
+            24,
+            MediaQuery.of(ctx).padding.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag Handle
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Bus Icon & Verified Badge
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.25),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.directions_bus_rounded,
+                      color: AppColors.primary,
+                      size: 38,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              const Text(
+                "Bus Scanned Successfully",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                "Assigned vehicle updated. You can start the trip now or keep it ready for departure.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Bus Details Summary Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: const Icon(
+                        Icons.qr_code_scanner_rounded,
+                        color: AppColors.primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            vehicle.name,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            vehicle.regNumber.isNotEmpty ? vehicle.regNumber : "Registration Pending",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                      ),
+                      child: const Text(
+                        "CONNECTED",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF059669),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 22),
+
+              // 1. Start Trip Button
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _startNewTrip();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.play_arrow_rounded, size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        "Start Trip Now",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // 2. Ready Button (Dismiss & remain ready)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _showSnackbar(
+                      "Bus assigned to ${vehicle.name}. You can start the trip anytime.",
+                      AppColors.primary,
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    side: BorderSide(color: Colors.grey.shade300, width: 1.3),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    "Ready",
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _toggleTrip() async {

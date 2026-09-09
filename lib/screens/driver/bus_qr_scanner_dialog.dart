@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/services/qr_pdf_service.dart';
 import '../../core/theme/theme.dart';
+import '../../models/models.dart';
 
 class BusQrScannerDialog extends StatefulWidget {
   final String? expectedOrgId;
@@ -57,9 +58,17 @@ class _BusQrScannerDialogState extends State<BusQrScannerDialog> {
       return;
     }
 
+    final vehicle = MavioVehicle(
+      id: parsed['vehicleId'] ?? '',
+      name: parsed['name'] ?? 'Bus',
+      regNumber: parsed['regNumber'] ?? '',
+      status: 'OFFLINE',
+      orgId: parsed['orgId'] ?? '',
+    );
+
     _isProcessing = true;
     _controller.stop();
-    Navigator.of(context).pop(parsed);
+    Navigator.of(context).pop(vehicle);
   }
 
   @override

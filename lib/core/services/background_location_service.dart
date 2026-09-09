@@ -34,6 +34,8 @@ void onStart(ServiceInstance service) async {
 
   final client = Supabase.instance.client;
   StreamSubscription<Position>? gpsSub;
+  Timer? periodicTicker;
+  DateTime lastUploadTime = DateTime.fromMillisecondsSinceEpoch(0);
   String? tripId;
   String? vehicleId;
   String? vehicleName;
@@ -58,7 +60,7 @@ void onStart(ServiceInstance service) async {
       'uploads': uploadCount,
       'latitude': lastLat,
       'longitude': lastLng,
-      'isTracking': tripId != null && gpsSub != null,
+      'isTracking': tripId != null && (gpsSub != null || periodicTicker != null),
       'tripId': tripId,
     });
   });
@@ -66,6 +68,8 @@ void onStart(ServiceInstance service) async {
   service.on('stopService').listen((event) {
     gpsSub?.cancel();
     gpsSub = null;
+    periodicTicker?.cancel();
+    periodicTicker = null;
     studentTargets.clear();
     tripId = null;
     uploadCount = 0;
@@ -301,7 +305,7 @@ void onStart(ServiceInstance service) async {
       }
     }
 
-    // Process immediate GPS position right upon starting
+    // 1. Process immediate GPS position right upon starting
     try {
       final initialPosition = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
@@ -312,7 +316,7 @@ void onStart(ServiceInstance service) async {
       print("MAVIO Background: Initial position capture warning: $e");
     }
 
-    // Start geolocator stream inside background thread using Google Fused Location
+    // 2. Start geolocator stream inside background thread using Google Fused Location
     final locationSettings = AndroidSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 0, // capture all updates
@@ -331,6 +335,27 @@ void onStart(ServiceInstance service) async {
         print("MAVIO Background GPS Stream error: $e");
       },
     );
+
+    // 3. Continuous 3-second periodic ticker to guarantee pings keep incrementing (1, 2, 3...) even when stationary
+    periodicTicker?.cancel();
+    periodicTicker = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (tripId == null) {
+        periodicTicker?.cancel();
+        return;
+      }
+      try {
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 3),
+        );
+        await handlePosition(pos);
+      } catch (_) {
+        final last = await Geolocator.getLastKnownPosition();
+        if (last != null) {
+          await handlePosition(last);
+        }
+      }
+    });
   });
 }
 

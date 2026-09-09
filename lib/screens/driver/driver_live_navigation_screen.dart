@@ -994,51 +994,23 @@ class _DriverLiveNavigationScreenState extends State<DriverLiveNavigationScreen>
                   ),
                 ],
               ),
-              child: Row(
-                children: [
-                  // View All Stops Button
-                  Expanded(
-                    flex: 3,
-                    child: ElevatedButton.icon(
-                      onPressed: _showAllStopsModal,
-                      icon: const Icon(Icons.format_list_bulleted_rounded, size: 18),
-                      label: Text(
-                        'Stops (${_stops.where((s) => !s.isVisited).length}/${_stops.length})',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _showAllStopsModal,
+                  icon: const Icon(Icons.format_list_bulleted_rounded, size: 20),
+                  label: Text(
+                    'View Route Stops (${_stops.where((s) => !s.isVisited).length}/${_stops.length} Remaining)',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                  const SizedBox(width: 10),
-
-                  // End Trip Button
-                  Expanded(
-                    flex: 2,
-                    child: OutlinedButton.icon(
-                      onPressed: _isEndingTrip ? null : _confirmEndTrip,
-                      icon: const Icon(Icons.stop_circle_rounded, size: 18, color: AppColors.error),
-                      label: const Text(
-                        'End Trip',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: AppColors.error,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: const BorderSide(color: AppColors.error, width: 1.5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                ],
+                ),
               ),
             ),
           ),

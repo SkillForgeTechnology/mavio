@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/keys.dart';
 import '../../models/models.dart';
@@ -1062,6 +1063,32 @@ class SupabaseService {
     }
   }
 
+  /// Retrieves the currently ACTIVE trip for a specific driver ID
+  Future<MavioTrip?> getActiveTripForDriver(String driverId) async {
+    if (_useMockMode) {
+      final match = _mockTrips.where((t) => t.driverId == driverId && t.status == 'ACTIVE');
+      return match.isNotEmpty ? match.first : null;
+    }
+    try {
+      final client = Supabase.instance.client;
+      final res = await client
+          .from('trips')
+          .select()
+          .eq('driver_id', driverId)
+          .eq('status', 'ACTIVE')
+          .order('started_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (res != null) {
+        return MavioTrip.fromJson(res);
+      }
+      return null;
+    } catch (e) {
+      print("Error fetching active trip for driver: $e");
+      return null;
+    }
+  }
+
   // 6. Driver: End Trip
   Future<void> endTrip(String tripId, String vehicleId) async {
     if (_useMockMode) {
@@ -1096,12 +1123,35 @@ class SupabaseService {
       try {
         final client = Supabase.instance.client;
 
-        // Set trip to completed
+        // Calculate total distance traveled from all location_updates
+        double totalDistanceKm = 0.0;
+        try {
+          final points = await client
+              .from('location_updates')
+              .select('latitude, longitude')
+              .eq('trip_id', tripId)
+              .order('created_at', ascending: true);
+
+          if (points is List && points.length > 1) {
+            double totalMeters = 0.0;
+            for (int i = 0; i < points.length - 1; i++) {
+              final lat1 = (points[i]['latitude'] as num).toDouble();
+              final lon1 = (points[i]['longitude'] as num).toDouble();
+              final lat2 = (points[i + 1]['latitude'] as num).toDouble();
+              final lon2 = (points[i + 1]['longitude'] as num).toDouble();
+              totalMeters += Geolocator.distanceBetween(lat1, lon1, lat2, lon2);
+            }
+            totalDistanceKm = double.parse((totalMeters / 1000.0).toStringAsFixed(2));
+          }
+        } catch (_) {}
+
+        // Set trip to completed with total distance
         await client
             .from('trips')
             .update({
               'status': 'COMPLETED',
               'ended_at': DateTime.now().toUtc().toIso8601String(),
+              'total_distance_km': totalDistanceKm,
             })
             .eq('id', tripId);
 

@@ -30,7 +30,7 @@ class QrPdfService {
     return uri.toString();
   }
 
-  /// Parses and validates a scanned QR payload string (supports both Universal URL & JSON formats)
+  /// Parses and validates a scanned QR payload string (supports Universal URL, JSON, and raw UUID formats)
   static Map<String, dynamic>? parseBusQrPayload(String rawData) {
     final trimmed = rawData.trim();
     if (trimmed.isEmpty) return null;
@@ -40,35 +40,51 @@ class QrPdfService {
       try {
         final uri = Uri.parse(trimmed);
         final params = uri.queryParameters;
-        if (params['app'] == 'mavio' &&
-            params['type'] == 'bus_qr' &&
-            params.containsKey('vehicleId') &&
-            params.containsKey('orgId')) {
+        if (params.containsKey('vehicleId') || params.containsKey('vId') || params.containsKey('id')) {
           return {
             'app': 'mavio',
             'type': 'bus_qr',
             'v': int.tryParse(params['v'] ?? '1') ?? 1,
-            'orgId': params['orgId'] ?? '',
-            'vehicleId': params['vehicleId'] ?? '',
-            'name': params['name'] ?? '',
-            'regNumber': params['regNumber'] ?? '',
+            'orgId': params['orgId'] ?? params['org_id'] ?? '',
+            'vehicleId': params['vehicleId'] ?? params['vId'] ?? params['id'] ?? '',
+            'name': params['name'] ?? 'Bus',
+            'regNumber': params['regNumber'] ?? params['reg_number'] ?? '',
           };
         }
       } catch (_) {}
     }
 
-    // 2. Fallback check for legacy JSON payload
+    // 2. Fallback check for JSON payload
     try {
       final decoded = jsonDecode(trimmed);
       if (decoded is Map<String, dynamic>) {
-        if (decoded['app'] == 'mavio' &&
-            decoded['type'] == 'bus_qr' &&
-            decoded.containsKey('vehicleId') &&
-            decoded.containsKey('orgId')) {
-          return decoded;
+        if (decoded.containsKey('vehicleId') || decoded.containsKey('id') || decoded.containsKey('vehicle_id')) {
+          return {
+            'app': 'mavio',
+            'type': 'bus_qr',
+            'v': decoded['v'] ?? 1,
+            'orgId': decoded['orgId'] ?? decoded['org_id'] ?? '',
+            'vehicleId': decoded['vehicleId'] ?? decoded['vehicle_id'] ?? decoded['id'] ?? '',
+            'name': decoded['name'] ?? 'Bus',
+            'regNumber': decoded['regNumber'] ?? decoded['reg_number'] ?? '',
+          };
         }
       }
     } catch (_) {}
+
+    // 3. Fallback: Raw UUID format (e.g. 36-char string)
+    final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+    if (uuidRegex.hasMatch(trimmed)) {
+      return {
+        'app': 'mavio',
+        'type': 'bus_qr',
+        'v': 1,
+        'orgId': '',
+        'vehicleId': trimmed,
+        'name': 'Bus',
+        'regNumber': '',
+      };
+    }
 
     return null;
   }
