@@ -312,12 +312,12 @@ void onStart(ServiceInstance service) async {
       print("MAVIO Background: Initial position capture warning: $e");
     }
 
-    // Start geolocator stream inside background thread
+    // Start geolocator stream inside background thread using Google Fused Location
     final locationSettings = AndroidSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 0, // capture all updates
       intervalDuration: const Duration(seconds: 3), // 3s telemetry interval
-      forceLocationManager: true,
+      forceLocationManager: false, // ⚡ Use Google Play Services Fused Location for instant fixes indoors/outdoors
       foregroundNotificationConfig: const ForegroundNotificationConfig(
         notificationText: "MAVIO is tracking your bus location in the background for active student routing.",
         notificationTitle: "MAVIO Smart Transit Active",
@@ -325,7 +325,12 @@ void onStart(ServiceInstance service) async {
       ),
     );
 
-    gpsSub = Geolocator.getPositionStream(locationSettings: locationSettings).listen(handlePosition);
+    gpsSub = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+      handlePosition,
+      onError: (e) {
+        print("MAVIO Background GPS Stream error: $e");
+      },
+    );
   });
 }
 

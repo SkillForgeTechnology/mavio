@@ -625,15 +625,23 @@ class _DriverDashboardState extends State<DriverDashboard> {
         }
       }
 
-      backgroundService.invoke('startTracking', {
+      final trackingPayload = {
         'tripId': tripId,
         'vehicleId': _assignedVehicle?.id,
         'vehicleName': _assignedVehicle?.name ?? 'Mavio Bus',
         'students': studentList,
         'initialUploads': initialPings,
-      });
+      };
 
-      backgroundService.invoke('getStats');
+      backgroundService.invoke('startTracking', trackingPayload);
+      
+      // Follow-up redundancy handshakes to guarantee background isolate receives event
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        backgroundService.invoke('startTracking', trackingPayload);
+      });
+      Future.delayed(const Duration(milliseconds: 2500), () {
+        backgroundService.invoke('getStats');
+      });
     }
   }
 
