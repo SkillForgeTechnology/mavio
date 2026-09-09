@@ -22,8 +22,13 @@ class TrackingProvider extends ChangeNotifier {
   Timer? _tripCheckTimer;
   final Set<String> _notifiedTripIds = {};
 
+  MavioVehicle? _originalVehicle;
+  bool _isSubstituteRoute = false;
+
   bool get isLoading => _isLoading;
   MavioVehicle? get assignedVehicle => _assignedVehicle;
+  MavioVehicle? get originalVehicle => _originalVehicle;
+  bool get isSubstituteRoute => _isSubstituteRoute;
 
   MavioTrip? get activeTrip => _activeTrip;
   String get driverName => _driverName;
@@ -70,6 +75,8 @@ class TrackingProvider extends ChangeNotifier {
     try {
       final data = await _db.getStudentDashboardData();
       _assignedVehicle = data['vehicle'] as MavioVehicle?;
+      _originalVehicle = data['originalVehicle'] as MavioVehicle?;
+      _isSubstituteRoute = data['isSubstituteRoute'] as bool? ?? false;
 
       _activeTrip = data['activeTrip'] as MavioTrip?;
       _driverName = data['driverName'] as String? ?? "Not Assigned";
@@ -99,18 +106,33 @@ class TrackingProvider extends ChangeNotifier {
     _tripCheckTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
       try {
         final data = await _db.getStudentDashboardData();
+        final newVehicle = data['vehicle'] as MavioVehicle?;
+        final newOriginalVehicle = data['originalVehicle'] as MavioVehicle?;
+        final newIsSubstituteRoute = data['isSubstituteRoute'] as bool? ?? false;
         final newActiveTrip = data['activeTrip'] as MavioTrip?;
+        final newDriverName = data['driverName'] as String? ?? "Not Assigned";
+        final newDriverEmail = data['driverEmail'] as String? ?? "";
+        final newDriverPhone = data['driverPhone'] as String? ?? "";
         
         bool changed = false;
-        if (newActiveTrip?.id != _activeTrip?.id || newActiveTrip?.status != _activeTrip?.status) {
+        if (newVehicle?.id != _assignedVehicle?.id ||
+            newOriginalVehicle?.id != _originalVehicle?.id ||
+            newIsSubstituteRoute != _isSubstituteRoute ||
+            newActiveTrip?.id != _activeTrip?.id ||
+            newActiveTrip?.status != _activeTrip?.status ||
+            newDriverName != _driverName ||
+            newDriverPhone != _driverPhone) {
           changed = true;
         }
 
         if (changed) {
+          _assignedVehicle = newVehicle;
+          _originalVehicle = newOriginalVehicle;
+          _isSubstituteRoute = newIsSubstituteRoute;
           _activeTrip = newActiveTrip;
-          _driverName = data['driverName'] as String? ?? "Not Assigned";
-          _driverEmail = data['driverEmail'] as String? ?? "";
-          _driverPhone = data['driverPhone'] as String? ?? "";
+          _driverName = newDriverName;
+          _driverEmail = newDriverEmail;
+          _driverPhone = newDriverPhone;
           
           if (_activeTrip != null && _activeTrip!.status == 'ACTIVE') {
             _subscribeToLocationUpdates(_activeTrip!.id);
@@ -121,7 +143,7 @@ class TrackingProvider extends ChangeNotifier {
           notifyListeners();
         }
       } catch (e) {
-        print("Error polling trip status: $e");
+        print("Error polling trip & bus status: $e");
       }
     });
   }

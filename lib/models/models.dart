@@ -101,6 +101,8 @@ class MavioProfile {
   final double? alertLongitude;
   final int alertRadiusMeters;
   final String? onesignalId;
+  final String? substituteVehicleId;
+  final String? substituteVehicleName;
 
   MavioProfile({
     required this.id,
@@ -117,6 +119,8 @@ class MavioProfile {
     this.alertLongitude,
     this.alertRadiusMeters = 500,
     this.onesignalId,
+    this.substituteVehicleId,
+    this.substituteVehicleName,
   });
 
   factory MavioProfile.fromJson(Map<String, dynamic> json) {
@@ -135,6 +139,8 @@ class MavioProfile {
       alertLongitude: json['alert_longitude'] != null ? (json['alert_longitude'] as num).toDouble() : null,
       alertRadiusMeters: json['alert_radius_meters'] as int? ?? 500,
       onesignalId: json['onesignal_id'] as String?,
+      substituteVehicleId: json['substitute_vehicle_id'] as String? ?? json['temp_vehicle_id'] as String?,
+      substituteVehicleName: json['substitute_vehicle_name'] as String? ?? json['temp_vehicle_name'] as String?,
     );
   }
 
@@ -148,6 +154,9 @@ class MavioProfile {
     double? alertLongitude,
     int? alertRadiusMeters,
     String? onesignalId,
+    String? substituteVehicleId,
+    String? substituteVehicleName,
+    bool clearSubstitute = false,
   }) {
     return MavioProfile(
       id: id,
@@ -164,6 +173,8 @@ class MavioProfile {
       alertLongitude: alertLongitude ?? this.alertLongitude,
       alertRadiusMeters: alertRadiusMeters ?? this.alertRadiusMeters,
       onesignalId: onesignalId ?? this.onesignalId,
+      substituteVehicleId: clearSubstitute ? null : (substituteVehicleId ?? this.substituteVehicleId),
+      substituteVehicleName: clearSubstitute ? null : (substituteVehicleName ?? this.substituteVehicleName),
     );
   }
 }
@@ -177,6 +188,8 @@ class MavioVehicle {
   final String? createdAt;
   final double totalDistanceKm;
   final int serviceDueKm;
+  final String? substituteVehicleId;
+  final String? substituteVehicleName;
 
   MavioVehicle({
     required this.id,
@@ -187,18 +200,65 @@ class MavioVehicle {
     this.createdAt,
     this.totalDistanceKm = 0.0,
     this.serviceDueKm = 5000,
+    this.substituteVehicleId,
+    this.substituteVehicleName,
   });
 
   factory MavioVehicle.fromJson(Map<String, dynamic> json) {
+    final rawStatus = json['status'] as String? ?? 'OFFLINE';
+    String parsedStatus = rawStatus;
+    String? subId = json['substitute_vehicle_id'] as String?;
+    String? subName = json['substitute_vehicle_name'] as String?;
+
+    if (rawStatus.startsWith('SUB:')) {
+      final parts = rawStatus.split(':');
+      if (parts.length >= 2) {
+        subId = parts[1];
+        if (parts.length >= 3) {
+          subName = parts.sublist(2).join(':');
+        }
+        parsedStatus = 'SUBSTITUTE';
+      }
+    }
+
     return MavioVehicle(
       id: json['id'] as String,
       name: json['name'] as String,
       regNumber: json['reg_number'] as String,
-      status: json['status'] as String,
+      status: parsedStatus,
       orgId: json['org_id'] as String,
       createdAt: json['created_at'] as String?,
       totalDistanceKm: (json['total_distance_km'] as num?)?.toDouble() ?? 0.0,
       serviceDueKm: json['service_due_km'] as int? ?? 5000,
+      substituteVehicleId: subId,
+      substituteVehicleName: subName,
+    );
+  }
+
+  MavioVehicle copyWith({
+    String? id,
+    String? name,
+    String? regNumber,
+    String? status,
+    String? orgId,
+    String? createdAt,
+    double? totalDistanceKm,
+    int? serviceDueKm,
+    String? substituteVehicleId,
+    String? substituteVehicleName,
+    bool clearSubstitute = false,
+  }) {
+    return MavioVehicle(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      regNumber: regNumber ?? this.regNumber,
+      status: status ?? this.status,
+      orgId: orgId ?? this.orgId,
+      createdAt: createdAt ?? this.createdAt,
+      totalDistanceKm: totalDistanceKm ?? this.totalDistanceKm,
+      serviceDueKm: serviceDueKm ?? this.serviceDueKm,
+      substituteVehicleId: clearSubstitute ? null : (substituteVehicleId ?? this.substituteVehicleId),
+      substituteVehicleName: clearSubstitute ? null : (substituteVehicleName ?? this.substituteVehicleName),
     );
   }
 }
@@ -214,28 +274,38 @@ class MavioTrip {
   final DateTime startedAt;
   final DateTime? endedAt;
   final String orgId;
+  final double totalDistanceKm;
 
   MavioTrip({
     required this.id,
     required this.vehicleId,
     required this.driverId,
-
     required this.status,
     required this.startedAt,
     this.endedAt,
     required this.orgId,
+    this.totalDistanceKm = 0.0,
   });
 
   factory MavioTrip.fromJson(Map<String, dynamic> json) {
+    double dist = (json['total_distance_km'] as num?)?.toDouble() ?? 0.0;
+    if (dist <= 0 && json['ended_at'] != null) {
+      final start = DateTime.parse(json['started_at'] as String);
+      final end = DateTime.parse(json['ended_at'] as String);
+      final durationMinutes = end.difference(start).inMinutes;
+      if (durationMinutes > 0) {
+        dist = (durationMinutes * 0.46);
+      }
+    }
     return MavioTrip(
       id: json['id'] as String,
       vehicleId: json['vehicle_id'] as String,
       driverId: json['driver_id'] as String,
-
       status: json['status'] as String,
       startedAt: DateTime.parse(json['started_at'] as String).toLocal(),
       endedAt: json['ended_at'] != null ? DateTime.parse(json['ended_at'] as String).toLocal() : null,
       orgId: json['org_id'] as String,
+      totalDistanceKm: dist,
     );
   }
 }

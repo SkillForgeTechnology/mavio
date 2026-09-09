@@ -265,28 +265,31 @@ class _StudentComplaintScreenState extends State<StudentComplaintScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Info Banner
+            // Info Banner - 100% Anonymous & Confidential
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.08),
-                    AppColors.primaryLight.withOpacity(0.15),
-                  ],
-                ),
+                color: const Color(0xFFF0FDF4),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                border: Border.all(color: const Color(0xFF86EFAC), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF16A34A).withOpacity(0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
+                      color: const Color(0xFF16A34A),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.privacy_tip_rounded, color: Colors.white, size: 22),
+                    child: const Icon(Icons.shield_rounded, color: Colors.white, size: 24),
                   ),
                   const SizedBox(width: 14),
                   const Expanded(
@@ -294,20 +297,21 @@ class _StudentComplaintScreenState extends State<StudentComplaintScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Anonymous Submission',
+                          '100% Anonymous & Confidential',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                            color: Color(0xFF15803D),
                           ),
                         ),
-                        SizedBox(height: 3),
+                        SizedBox(height: 4),
                         Text(
-                          'Your student identity (Name & Roll Number) is kept strictly hidden from management. Only bus & complaint details are forwarded.',
+                          'Your student personal information (Name, Roll Number, Phone) is NOT shared with college management or drivers. Only the bus number, category, and issue details are forwarded so you can report safely without any fear.',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            height: 1.3,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF166534),
+                            height: 1.35,
                           ),
                         ),
                       ],
@@ -645,7 +649,25 @@ class _StudentComplaintScreenState extends State<StudentComplaintScreen>
                       ),
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 12),
+            const Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_rounded, size: 14, color: Color(0xFF16A34A)),
+                  SizedBox(width: 6),
+                  Text(
+                    '100% Anonymous: Your personal identity is never disclosed',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF15803D),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 36),
           ],
         ),
       ),

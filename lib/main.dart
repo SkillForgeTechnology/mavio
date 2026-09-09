@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -18,12 +19,17 @@ import 'core/services/push_notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
+  
+  // Fast Supabase initialization
   await SupabaseService().init();
-  await PushNotificationService.initialize();
+  
+  // Asynchronous non-blocking push notification initialization
+  unawaited(PushNotificationService.initialize());
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()..initialize()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
       ],
       child: const MainApp(),
     ),

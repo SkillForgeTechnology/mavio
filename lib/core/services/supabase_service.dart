@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/keys.dart';
 import '../../models/models.dart';
+import 'push_notification_service.dart';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -856,16 +857,37 @@ class SupabaseService {
         _currentUserProfile = MavioProfile.fromJson(freshProfileRes);
 
         MavioVehicle? vehicle;
+        MavioVehicle? originalVehicle;
+        bool isSubstituteRoute = false;
+
         if (_currentUserProfile!.assignedVehicleId != null) {
+          final assignedId = _currentUserProfile!.assignedVehicleId!;
           final res = await client
               .from('vehicles')
               .select()
-              .eq('id', _currentUserProfile!.assignedVehicleId!)
+              .eq('id', assignedId)
               .single();
-          vehicle = MavioVehicle.fromJson(res);
+          originalVehicle = MavioVehicle.fromJson(res);
+
+          final subId = _currentUserProfile!.substituteVehicleId ??
+              originalVehicle.substituteVehicleId ??
+              _vehicleSubstitutes[assignedId];
+          if (subId != null && subId.isNotEmpty && subId != assignedId) {
+            try {
+              final subRes = await client
+                  .from('vehicles')
+                  .select()
+                  .eq('id', subId)
+                  .single();
+              vehicle = MavioVehicle.fromJson(subRes);
+              isSubstituteRoute = true;
+            } catch (_) {
+              vehicle = originalVehicle;
+            }
+          } else {
+            vehicle = originalVehicle;
+          }
         }
-
-
 
         MavioTrip? activeTrip;
         String driverName = "Not Assigned";
@@ -906,6 +928,8 @@ class SupabaseService {
         return {
           'profile': _currentUserProfile,
           'vehicle': vehicle,
+          'originalVehicle': originalVehicle,
+          'isSubstituteRoute': isSubstituteRoute,
           'activeTrip': activeTrip,
           'driverName': driverName,
           'driverEmail': driverEmail,
@@ -1711,6 +1735,168 @@ class SupabaseService {
           })
           .eq('id', studentId);
     }
+  }
+
+  Future<int> bulkShiftStudentsBus({
+    required String orgId,
+    required String? fromVehicleId,
+    required String? toVehicleId,
+  }) async {
+    if (_useMockMode) {
+      int count = 0;
+      for (final key in _mockProfiles.keys.toList()) {
+        final p = _mockProfiles[key]!;
+        if (p.role == 'student' && p.orgId == orgId && p.assignedVehicleId == fromVehicleId) {
+          _mockProfiles[key] = p.copyWith(assignedVehicleId: toVehicleId);
+          count++;
+        }
+      }
+      return count;
+    } else {
+      final client = Supabase.instance.client;
+      var query = client.from('profiles').update({
+        'assigned_vehicle_id': toVehicleId,
+      }).eq('org_id', orgId).eq('role', 'student');
+
+      if (fromVehicleId == null) {
+        query = query.isFilter('assigned_vehicle_id', null);
+      } else {
+        query = query.eq('assigned_vehicle_id', fromVehicleId);
+      }
+
+      await query;
+      return 1;
+    }
+  }
+
+  static final Map<String, String> _vehicleSubstitutes = {}; // sourceVehicleId -> targetSubstituteVehicleId
+
+  Future<MavioVehicle?> getVehicle(String vehicleId) async {
+    if (_useMockMode) {
+      try {
+        return _mockVehicles.firstWhere((v) => v.id == vehicleId);
+      } catch (_) {
+        return null;
+      }
+    }
+    try {
+      final res = await Supabase.instance.client
+          .from('vehicles')
+          .select()
+          .eq('id', vehicleId)
+          .maybeSingle();
+      if (res != null) {
+        return MavioVehicle.fromJson(res);
+      }
+    } catch (e) {
+      print("Error fetching vehicle: $e");
+    }
+    return null;
+  }
+
+  Future<void> setVehicleSubstitute({
+    required String vehicleId,
+    required String? substituteVehicleId,
+    String? substituteVehicleName,
+  }) async {
+    if (substituteVehicleId == null) {
+      _vehicleSubstitutes.remove(vehicleId);
+    } else {
+      _vehicleSubstitutes[vehicleId] = substituteVehicleId;
+    }
+
+    if (_useMockMode) {
+      final index = _mockVehicles.indexWhere((v) => v.id == vehicleId);
+      if (index != -1) {
+        _mockVehicles[index] = _mockVehicles[index].copyWith(
+          substituteVehicleId: substituteVehicleId,
+          substituteVehicleName: substituteVehicleName,
+          clearSubstitute: substituteVehicleId == null,
+        );
+      }
+      // Update mock profiles
+      for (final pid in _mockProfiles.keys) {
+        if (_mockProfiles[pid]!.assignedVehicleId == vehicleId && _mockProfiles[pid]!.role == 'student') {
+          _mockProfiles[pid] = _mockProfiles[pid]!.copyWith(
+            substituteVehicleId: substituteVehicleId,
+            substituteVehicleName: substituteVehicleName,
+            clearSubstitute: substituteVehicleId == null,
+          );
+        }
+      }
+      if (_currentUserProfile != null && _currentUserProfile!.assignedVehicleId == vehicleId) {
+        _currentUserProfile = _currentUserProfile!.copyWith(
+          substituteVehicleId: substituteVehicleId,
+          substituteVehicleName: substituteVehicleName,
+          clearSubstitute: substituteVehicleId == null,
+        );
+      }
+    } else {
+      final client = Supabase.instance.client;
+
+      // 1. Persist to vehicles table
+      try {
+        await client.from('vehicles').update({
+          'substitute_vehicle_id': substituteVehicleId,
+          'substitute_vehicle_name': substituteVehicleName,
+        }).eq('id', vehicleId);
+      } catch (e) {
+        print("Notice on vehicles substitute columns: $e");
+        // Fallback: try status
+        try {
+          final statusVal = substituteVehicleId != null
+              ? 'SUB:$substituteVehicleId:${substituteVehicleName ?? ''}'
+              : 'OFFLINE';
+          await client.from('vehicles').update({'status': statusVal}).eq('id', vehicleId);
+        } catch (_) {}
+      }
+
+      // 2. Persist to student profiles in Supabase
+      try {
+        await client.from('profiles').update({
+          'substitute_vehicle_id': substituteVehicleId,
+          'substitute_vehicle_name': substituteVehicleName,
+        }).eq('assigned_vehicle_id', vehicleId).eq('role', 'student');
+      } catch (e) {
+        print("Notice on profiles substitute update: $e");
+      }
+
+      if (_currentUserProfile != null && _currentUserProfile!.assignedVehicleId == vehicleId) {
+        _currentUserProfile = _currentUserProfile!.copyWith(
+          substituteVehicleId: substituteVehicleId,
+          substituteVehicleName: substituteVehicleName,
+          clearSubstitute: substituteVehicleId == null,
+        );
+      }
+    }
+
+    // Trigger Push Notification to Students
+    try {
+      final vehicle = await getVehicle(vehicleId);
+      final origName = vehicle?.name ?? 'Assigned Bus';
+      if (substituteVehicleId != null && substituteVehicleName != null) {
+        unawaited(PushNotificationService.notifyBusSubstituteChanged(
+          vehicleId: vehicleId,
+          originalVehicleName: origName,
+          substituteVehicleName: substituteVehicleName,
+        ));
+      } else {
+        unawaited(PushNotificationService.notifyBusSubstituteReverted(
+          vehicleId: vehicleId,
+          originalVehicleName: origName,
+        ));
+      }
+    } catch (e) {
+      print("Error dispatching substitute push notification: $e");
+    }
+  }
+
+  Future<void> revertVehicleSubstitute(String vehicleId) async {
+    await setVehicleSubstitute(vehicleId: vehicleId, substituteVehicleId: null);
+  }
+
+  String? getVehicleSubstitute(String vehicleId) {
+    return _vehicleSubstitutes[vehicleId];
   }
 
   Future<List<MavioTrip>> getDriverTripHistory(String driverId) async {

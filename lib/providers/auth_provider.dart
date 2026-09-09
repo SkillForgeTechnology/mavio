@@ -217,6 +217,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Refresh Profile
+  void refreshProfile() {
+    _currentProfile = _db.currentUserProfile;
+    notifyListeners();
+  }
+
   // Clear Error
   void clearError() {
     _error = null;

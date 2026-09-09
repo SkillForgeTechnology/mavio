@@ -30,6 +30,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
   final TrackingProvider _trackingProvider = TrackingProvider();
   bool _hasNewNotifications = true;
   final Set<String> _clearedNotificationIds = {};
+  bool _hasPromptedStopAlert = false;
 
   @override
   void initState() {
@@ -41,7 +42,37 @@ class _StudentDashboardState extends State<StudentDashboard> {
         await PushNotificationService.syncSubscriptionId(auth.currentProfile!.id);
       }
       PushNotificationService.setupVerificationObserver(context);
+      _checkAndPromptStopLocation();
     });
+  }
+
+  void _checkAndPromptStopLocation() {
+    if (_hasPromptedStopAlert) return;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final profile = auth.currentProfile;
+    if (profile != null && profile.alertLatitude == null) {
+      _hasPromptedStopAlert = true;
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => _StopAlertSetupDialog(
+          profile: profile,
+          onSetNow: () async {
+            Navigator.pop(ctx);
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => StudentStopSelectionPage(profile: profile),
+              ),
+            );
+            if (mounted) {
+              auth.refreshProfile();
+              _trackingProvider.loadStudentDashboard();
+              setState(() {});
+            }
+          },
+        ),
+      );
+    }
   }
 
   @override
@@ -285,7 +316,13 @@ class _HomeTab extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 28),
+              if (profile != null && profile.alertLatitude == null) ...[
+                const SizedBox(height: 18),
+                _MissingStopAlertBanner(profile: profile),
+                const SizedBox(height: 10),
+              ] else ...[
+                const SizedBox(height: 28),
+              ],
 
               // Journey Overview Section
               Row(
@@ -307,6 +344,66 @@ class _HomeTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
+
+              if (tracking.isSubstituteRoute) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFFDBA74), width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA580C).withOpacity(0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEA580C).withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.alt_route_rounded,
+                          color: Color(0xFFEA580C),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Temporary Bus Substitute Active',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFFC2410C),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Your route is temporarily operated by ${vehicle?.name ?? "Substitute Bus"}. Live GPS tracking & alerts are tracking this bus.',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF7C2D12),
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               // Assigned Vehicle Primary Card
               Container(
@@ -352,13 +449,41 @@ class _HomeTab extends StatelessWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      vehicle?.name ?? 'BUS --',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.textPrimary,
-                                      ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          vehicle?.name ?? 'BUS --',
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        if (tracking.isSubstituteRoute) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFFF7ED),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(
+                                                color: const Color(0xFFFDBA74),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              'TEMP SUB',
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFFEA580C),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
@@ -2246,7 +2371,7 @@ class _ProfileTabState extends State<_ProfileTab> with WidgetsBindingObserver {
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'Report bus delays, driver behavior, safety, or route issues. Your profile is strictly anonymous to management.',
+                                'Report bus delays, driver behavior, safety, or route issues directly to helpdesk.',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppColors.textSecondary,
@@ -2258,7 +2383,34 @@ class _ProfileTabState extends State<_ProfileTab> with WidgetsBindingObserver {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF86EFAC), width: 1.2),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.shield_rounded, size: 18, color: Color(0xFF16A34A)),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '100% Anonymous: Your personal information (Name, Roll Number, Phone) is NOT shared with college management or drivers.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF15803D),
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () {
                         if (profile != null) {
@@ -2528,6 +2680,242 @@ class _ProfileTabState extends State<_ProfileTab> with WidgetsBindingObserver {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StopAlertSetupDialog extends StatelessWidget {
+  final MavioProfile profile;
+  final VoidCallback onSetNow;
+
+  const _StopAlertSetupDialog({
+    required this.profile,
+    required this.onSetNow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      elevation: 10,
+      backgroundColor: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Top glowing icon
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primary.withOpacity(0.8),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.add_location_alt_rounded,
+                color: Colors.white,
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Title
+            const Text(
+              'Set Your Bus Pickup Stop',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Subtitle explanation
+            const Text(
+              'Set your daily boarding point on the map. This enables your bus driver to see your stop on their route and automatically alerts you when the bus arrives!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Action Buttons
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onSetNow,
+                icon: const Icon(Icons.map_rounded, size: 18),
+                label: const Text(
+                  'Set Pickup Stop Now',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shadowColor: AppColors.primary.withOpacity(0.4),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Skip for now',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MissingStopAlertBanner extends StatelessWidget {
+  final MavioProfile profile;
+  const _MissingStopAlertBanner({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFFFF7ED),
+            const Color(0xFFFFEDD5).withOpacity(0.9),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFDBA74), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFEA580C).withOpacity(0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.add_location_alt_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pickup Stop Not Set',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFC2410C),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Set your stop on the map to help your driver locate you.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF7C2D12),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final auth = Provider.of<AuthProvider>(context, listen: false);
+                final tracking = Provider.of<TrackingProvider>(context, listen: false);
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => StudentStopSelectionPage(profile: profile),
+                  ),
+                );
+                auth.refreshProfile();
+                tracking.loadStudentDashboard();
+              },
+              icon: const Icon(Icons.map_rounded, size: 18),
+              label: const Text(
+                'Set Pickup Stop Location',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

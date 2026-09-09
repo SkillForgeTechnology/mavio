@@ -4276,7 +4276,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   crossAxisCount: crossAxisCount,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  mainAxisExtent: 110,
+                  mainAxisExtent: 140,
                 ),
                 itemCount: busGroups.length,
                 itemBuilder: (context, index) {
@@ -4360,64 +4360,381 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildBusGroupCard(Map<String, dynamic> group) {
-    final v = group['vehicle'] as MavioVehicle?;
-    final List<MavioProfile> studentsList =
-        group['students'] as List<MavioProfile>;
-    final String title = v != null
-        ? 'Students in ${v.name}'
-        : 'Unassigned Students';
-    final String subtitle = v != null
-        ? 'Driver: ${group['driverName']} • ${studentsList.length} Students'
-        : '${studentsList.length} Students';
+  void _showShiftBusDialog({
+    required BuildContext context,
+    required MavioVehicle? sourceVehicle,
+    required List<MavioProfile> students,
+  }) {
+    if (students.isEmpty) {
+      AppToast.show(context, "No students in this bus group to shift.", isError: true);
+      return;
+    }
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border, width: 0.8),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 10,
-        ),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: v != null ? AppColors.primaryLight : AppColors.surface,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            v != null ? Icons.directions_bus_rounded : Icons.school_rounded,
-            color: v != null ? AppColors.primary : AppColors.textSecondary,
-          ),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(fontSize: 12, height: 1.4),
-        ),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          color: AppColors.textSecondary,
-        ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => BusStudentsScreen(
-                vehicle: v,
-                students: studentsList,
-                allVehicles: _fleet
-                    .map((f) => f['vehicle'] as MavioVehicle)
-                    .toList(),
-                onRefresh: _loadAdminData,
-                onShowStudentDetails: _showStudentDetails,
+    final otherVehicles = _fleet
+        .map((f) => f['vehicle'] as MavioVehicle)
+        .where((v) => sourceVehicle == null || v.id != sourceVehicle.id)
+        .toList();
+
+    if (otherVehicles.isEmpty) {
+      AppToast.show(context, "No other bus available to shift to.", isError: true);
+      return;
+    }
+
+    String? targetVehicleId = otherVehicles.first.id;
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final targetVehicle = otherVehicles.firstWhere((v) => v.id == targetVehicleId);
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF97316).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.swap_horiz_rounded, color: Color(0xFFEA580C), size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Shift / Merge Bus Route", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text("Bulk move all students to another bus", style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFFDBA74)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded, color: Color(0xFFC2410C), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "You are moving all ${students.length} students from ${sourceVehicle?.name ?? 'Unassigned'} to ${targetVehicle.name}. The students' live map will immediately switch to tracking ${targetVehicle.name}.",
+                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF7C2D12), height: 1.35),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text("Select Destination Bus:", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: targetVehicleId,
+                        isExpanded: true,
+                        items: otherVehicles.map((v) {
+                          return DropdownMenuItem<String>(
+                            value: v.id,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.directions_bus_rounded, color: AppColors.primary, size: 20),
+                                const SizedBox(width: 10),
+                                Text("${v.name} (${v.regNumber})", style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: isSubmitting ? null : (val) {
+                          if (val != null) {
+                            setDialogState(() => targetVehicleId = val);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
+                child: const Text("Cancel", style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton.icon(
+                onPressed: isSubmitting ? null : () async {
+                  setDialogState(() => isSubmitting = true);
+                  try {
+                    final profile = Provider.of<AuthProvider>(context, listen: false).currentProfile;
+                    if (profile != null) {
+                      await _db.bulkShiftStudentsBus(
+                        orgId: profile.orgId,
+                        fromVehicleId: sourceVehicle?.id,
+                        toVehicleId: targetVehicleId,
+                      );
+                      if (mounted) {
+                        Navigator.pop(dialogCtx);
+                        AppToast.show(
+                          context,
+                          "Successfully shifted ${students.length} students to ${targetVehicle.name}.",
+                        );
+                        _loadAdminData();
+                      }
+                    }
+                  } catch (e) {
+                    setDialogState(() => isSubmitting = false);
+                    AppToast.show(context, "Failed to shift bus: $e", isError: true);
+                  }
+                },
+                icon: isSubmitting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.check_rounded, size: 18),
+                label: Text(isSubmitting ? "Shifting..." : "Shift All Students", style: const TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildBusGroupCard(Map<String, dynamic> group) {
+    final v = group['vehicle'] as MavioVehicle?;
+    final List<MavioProfile> studentsList = group['students'] as List<MavioProfile>;
+    final String title = v != null ? 'Students in ${v.name}' : 'Unassigned Students';
+    final String driverInfo = v != null ? (group['driverName'] ?? 'No Driver Assigned') : 'No Bus Assigned';
+    final bool hasSub = v != null && (v.substituteVehicleId != null || _db.getVehicleSubstitute(v.id) != null);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: hasSub ? const Color(0xFFFDBA74) : AppColors.borderLight,
+          width: hasSub ? 1.5 : 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: hasSub ? const Color(0xFFEA580C).withOpacity(0.06) : Colors.black.withOpacity(0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => BusStudentsScreen(
+                  vehicle: v,
+                  students: studentsList,
+                  allVehicles: _fleet.map((f) => f['vehicle'] as MavioVehicle).toList(),
+                  onRefresh: _loadAdminData,
+                  onShowStudentDetails: _showStudentDetails,
+                ),
+              ),
+            );
+            _loadAdminData();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: hasSub
+                            ? const Color(0xFFFFF7ED)
+                            : (v != null ? AppColors.primaryLight : const Color(0xFFF1F5F9)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        hasSub
+                            ? Icons.alt_route_rounded
+                            : (v != null ? Icons.directions_bus_rounded : Icons.person_off_rounded),
+                        color: hasSub
+                            ? const Color(0xFFEA580C)
+                            : (v != null ? AppColors.primary : AppColors.textSecondary),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            v?.regNumber ?? 'Unassigned Roster',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (hasSub) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF7ED),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFDBA74)),
+                        ),
+                        child: const Text(
+                          'SHIFTED',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFEA580C),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: studentsList.isNotEmpty
+                            ? AppColors.primary.withOpacity(0.1)
+                            : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${studentsList.length} Students',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: studentsList.isNotEmpty ? AppColors.primary : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.person_outline_rounded, size: 14, color: AppColors.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          driverInfo,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (v != null && v.substituteVehicleId != null) ...[
+                          InkWell(
+                            onTap: () async {
+                              try {
+                                await _db.revertVehicleSubstitute(v.id);
+                                if (mounted) {
+                                  AppToast.show(context, "Reverted ${v.name} to original bus route.");
+                                  _loadAdminData();
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  AppToast.show(context, "Failed to revert: $e", isError: true);
+                                }
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFF86EFAC)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.restore_rounded, size: 13, color: Color(0xFF16A34A)),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    "Revert",
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        const Row(
+                          children: [
+                            Text(
+                              'View Roster',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.primary),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -5681,11 +5998,502 @@ class _BusStudentsScreenState extends State<BusStudentsScreen> {
   final SupabaseService _db = SupabaseService();
   bool _isLoading = false;
   late List<MavioProfile> _currentStudents;
+  String _filterQuery = "";
+  String _filterTab = "all"; // 'all', 'configured', 'missing'
+  final TextEditingController _searchController = TextEditingController();
+  String? _substituteVehicleId;
+  String? _substituteVehicleName;
 
   @override
   void initState() {
     super.initState();
     _currentStudents = List<MavioProfile>.from(widget.students);
+    _substituteVehicleId = widget.vehicle?.substituteVehicleId ??
+        (widget.vehicle != null ? _db.getVehicleSubstitute(widget.vehicle!.id) : null);
+    _substituteVehicleName = widget.vehicle?.substituteVehicleName;
+    _reloadFreshVehicle();
+  }
+
+  @override
+  void didUpdateWidget(covariant BusStudentsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.vehicle?.substituteVehicleId != widget.vehicle?.substituteVehicleId ||
+        oldWidget.vehicle?.status != widget.vehicle?.status) {
+      _substituteVehicleId = widget.vehicle?.substituteVehicleId ??
+          (widget.vehicle != null ? _db.getVehicleSubstitute(widget.vehicle!.id) : null);
+      _substituteVehicleName = widget.vehicle?.substituteVehicleName;
+    }
+  }
+
+  Future<void> _reloadFreshVehicle() async {
+    if (widget.vehicle == null) return;
+    try {
+      final fresh = await _db.getVehicle(widget.vehicle!.id);
+      final assigned = await _db.getAssignedStudentsForVehicle(widget.vehicle!.id);
+      if (mounted) {
+        setState(() {
+          if (fresh != null) {
+            _substituteVehicleId = fresh.substituteVehicleId ?? _db.getVehicleSubstitute(widget.vehicle!.id);
+            _substituteVehicleName = fresh.substituteVehicleName;
+          }
+          if (assigned.isNotEmpty) {
+            _currentStudents = assigned;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // 1-Click Revert Temporary Substitute
+  Future<void> _revertTemporarySubstitute() async {
+    if (widget.vehicle == null) return;
+    setState(() => _isLoading = true);
+    try {
+      await _db.revertVehicleSubstitute(widget.vehicle!.id);
+      if (mounted) {
+        setState(() {
+          _substituteVehicleId = null;
+          _substituteVehicleName = null;
+          _isLoading = false;
+        });
+        AppToast.show(
+          context,
+          "Reverted! All students restored to ${widget.vehicle!.name}.",
+        );
+        widget.onRefresh();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        AppToast.show(context, "Failed to revert substitute: $e", isError: true);
+      }
+    }
+  }
+
+  // Set Temporary Substitute Dialog
+  void _showSetTemporarySubstituteDialog() {
+    if (widget.vehicle == null) {
+      AppToast.show(context, "Unassigned group cannot have a substitute bus.", isError: true);
+      return;
+    }
+
+    final otherVehicles = widget.allVehicles
+        .where((v) => v.id != widget.vehicle!.id)
+        .toList();
+
+    if (otherVehicles.isEmpty) {
+      AppToast.show(context, "No other bus available to set as substitute.", isError: true);
+      return;
+    }
+
+    String targetVehicleId = _substituteVehicleId != null && otherVehicles.any((v) => v.id == _substituteVehicleId)
+        ? _substituteVehicleId!
+        : otherVehicles.first.id;
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final targetVehicle = otherVehicles.firstWhere((v) => v.id == targetVehicleId);
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF97316).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.alt_route_rounded, color: Color(0xFFEA580C), size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Set Temporary Bus", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text("Temporary route shift with 1-click revert", style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFFDBA74)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline_rounded, color: Color(0xFFC2410C), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Students keep their original bus (${widget.vehicle!.name}) in their profile.",
+                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF7C2D12)),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Their app will temporarily track ${targetVehicle.name}'s live GPS and alerts. When the issue is resolved, click 'Revert to Original Bus' in 1 click!",
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF7C2D12), height: 1.3),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text("Select Substitute Bus:", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: targetVehicleId,
+                        isExpanded: true,
+                        items: otherVehicles.map((v) {
+                          return DropdownMenuItem<String>(
+                            value: v.id,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.directions_bus_rounded, color: AppColors.primary, size: 20),
+                                const SizedBox(width: 10),
+                                Text("${v.name} (${v.regNumber})", style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: isSubmitting ? null : (val) {
+                          if (val != null) {
+                            setDialogState(() => targetVehicleId = val);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
+                child: const Text("Cancel", style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton.icon(
+                onPressed: isSubmitting ? null : () async {
+                  setDialogState(() => isSubmitting = true);
+                  try {
+                    await _db.setVehicleSubstitute(
+                      vehicleId: widget.vehicle!.id,
+                      substituteVehicleId: targetVehicleId,
+                      substituteVehicleName: targetVehicle.name,
+                    );
+                    if (mounted) {
+                      Navigator.pop(dialogCtx);
+                      setState(() {
+                        _substituteVehicleId = targetVehicleId;
+                        _substituteVehicleName = targetVehicle.name;
+                      });
+                      AppToast.show(
+                        context,
+                        "Temporary substitute set: Students in ${widget.vehicle!.name} are now tracking ${targetVehicle.name}.",
+                      );
+                      widget.onRefresh();
+                    }
+                  } catch (e) {
+                    setDialogState(() => isSubmitting = false);
+                    AppToast.show(context, "Failed to set substitute: $e", isError: true);
+                  }
+                },
+                icon: isSubmitting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.check_rounded, size: 18),
+                label: Text(isSubmitting ? "Activating..." : "Activate Substitute", style: const TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEA580C),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // Permanent Move Dialog
+  void _showPermanentMoveDialog() {
+    if (_currentStudents.isEmpty) {
+      AppToast.show(context, "No students in this bus group to move.", isError: true);
+      return;
+    }
+
+    final otherVehicles = widget.allVehicles
+        .where((v) => widget.vehicle == null || v.id != widget.vehicle!.id)
+        .toList();
+
+    if (otherVehicles.isEmpty) {
+      AppToast.show(context, "No other bus available to shift to.", isError: true);
+      return;
+    }
+
+    String targetVehicleId = otherVehicles.first.id;
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final targetVehicle = otherVehicles.firstWhere((v) => v.id == targetVehicleId);
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.swap_horiz_rounded, color: AppColors.primary, size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Permanent Bulk Transfer", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text("Permanently updates student database assignments", style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Color(0xFF475569), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "This will permanently reassign ${_currentStudents.length} students from ${widget.vehicle?.name ?? 'Unassigned'} to ${targetVehicle.name}.",
+                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), height: 1.35),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text("Select New Bus Assignment:", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: targetVehicleId,
+                        isExpanded: true,
+                        items: otherVehicles.map((v) {
+                          return DropdownMenuItem<String>(
+                            value: v.id,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.directions_bus_rounded, color: AppColors.primary, size: 20),
+                                const SizedBox(width: 10),
+                                Text("${v.name} (${v.regNumber})", style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: isSubmitting ? null : (val) {
+                          if (val != null) {
+                            setDialogState(() => targetVehicleId = val);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
+                child: const Text("Cancel", style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton.icon(
+                onPressed: isSubmitting ? null : () async {
+                  setDialogState(() => isSubmitting = true);
+                  try {
+                    final profile = Provider.of<AuthProvider>(context, listen: false).currentProfile;
+                    if (profile != null) {
+                      await _db.bulkShiftStudentsBus(
+                        orgId: profile.orgId,
+                        fromVehicleId: widget.vehicle?.id,
+                        toVehicleId: targetVehicleId,
+                      );
+                      if (mounted) {
+                        Navigator.pop(dialogCtx);
+                        AppToast.show(
+                          context,
+                          "Successfully transferred ${_currentStudents.length} students to ${targetVehicle.name}.",
+                        );
+                        widget.onRefresh();
+                        Navigator.of(context).pop();
+                      }
+                    }
+                  } catch (e) {
+                    setDialogState(() => isSubmitting = false);
+                    AppToast.show(context, "Failed to transfer students: $e", isError: true);
+                  }
+                },
+                icon: isSubmitting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.check_rounded, size: 18),
+                label: Text(isSubmitting ? "Transferring..." : "Transfer All Students", style: const TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showSingleStudentReassignDialog(MavioProfile student) {
+    String? selectedVehicleId = student.assignedVehicleId;
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text("Reassign ${student.name}", style: const TextStyle(fontWeight: FontWeight.bold)),
+            content: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Change assigned bus for roll number ${student.rollNumber ?? 'N/A'}:", style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String?>(
+                        value: selectedVehicleId,
+                        isExpanded: true,
+                        hint: const Text("Select Bus"),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text("Unassigned"),
+                          ),
+                          ...widget.allVehicles.map((v) => DropdownMenuItem<String?>(
+                                value: v.id,
+                                child: Text("${v.name} (${v.regNumber})"),
+                              )),
+                        ],
+                        onChanged: isSaving ? null : (val) {
+                          setDialogState(() => selectedVehicleId = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
+                child: const Text("Cancel", style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: isSaving ? null : () async {
+                  setDialogState(() => isSaving = true);
+                  try {
+                    await _db.updateStudentAssignment(student.id, selectedVehicleId);
+                    if (mounted) {
+                      Navigator.pop(dialogCtx);
+                      AppToast.show(context, "Student assignment updated.");
+                      setState(() {
+                        _currentStudents.removeWhere((s) => s.id == student.id);
+                      });
+                      widget.onRefresh();
+                    }
+                  } catch (e) {
+                    setDialogState(() => isSaving = false);
+                    AppToast.show(context, "Failed to update: $e", isError: true);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text("Save"),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -5694,68 +6502,614 @@ class _BusStudentsScreenState extends State<BusStudentsScreen> {
         ? 'Students in ${widget.vehicle!.name}'
         : 'Unassigned Students';
 
+    final withStopCount = _currentStudents.where((s) => s.alertLatitude != null && s.alertLongitude != null).length;
+    final withoutStopCount = _currentStudents.length - withStopCount;
+    final hasSubstitute = _substituteVehicleId != null && _substituteVehicleId!.isNotEmpty;
+
+    final filtered = _currentStudents.where((s) {
+      if (_filterTab == 'configured' && (s.alertLatitude == null || s.alertLongitude == null)) {
+        return false;
+      }
+      if (_filterTab == 'missing' && (s.alertLatitude != null && s.alertLongitude != null)) {
+        return false;
+      }
+      if (_filterQuery.isEmpty) return true;
+      final q = _filterQuery.toLowerCase();
+      return s.name.toLowerCase().contains(q) ||
+          (s.rollNumber?.toLowerCase().contains(q) ?? false) ||
+          s.email.toLowerCase().contains(q);
+    }).toList();
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(
-          titleName,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  titleName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                if (hasSubstitute) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFDBA74)),
+                    ),
+                    child: const Text(
+                      'TEMP SHIFTED',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFEA580C),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            Text(
+              widget.vehicle?.regNumber ?? 'Unassigned Student Pool',
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+            ),
+          ],
         ),
         backgroundColor: Colors.white,
         centerTitle: false,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        actions: [
+          if (hasSubstitute)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _revertTemporarySubstitute,
+                icon: _isLoading
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.restore_rounded, size: 16),
+                label: const Text(
+                  "Revert to Original Bus",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          if (widget.vehicle != null) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              child: OutlinedButton.icon(
+                onPressed: _showPermanentMoveDialog,
+                icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: AppColors.textSecondary),
+                label: const Text(
+                  "Move All",
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.textPrimary),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.border),
+                  backgroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              child: OutlinedButton.icon(
+                onPressed: _showSetTemporarySubstituteDialog,
+                icon: const Icon(Icons.alt_route_rounded, size: 16, color: Color(0xFFEA580C)),
+                label: Text(
+                  hasSubstitute ? "Change Sub Bus" : "Shift Bus",
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFEA580C)),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFFDBA74)),
+                  backgroundColor: const Color(0xFFFFF7ED),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(width: 12),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: AppColors.borderLight, height: 1),
         ),
       ),
-      body: _currentStudents.isEmpty
-          ? const Center(
-              child: Text(
-                'No students assigned to this group.',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _currentStudents.length,
-              itemBuilder: (context, index) {
-                final s = _currentStudents[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: const BorderSide(
-                      color: AppColors.borderLight,
-                      width: 0.8,
-                    ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 700;
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1100),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 3 Summary Metric Cards
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildMetricSummaryCard(
+                                icon: Icons.people_alt_rounded,
+                                iconColor: AppColors.primary,
+                                iconBg: AppColors.primaryLight,
+                                title: "Enrolled Students",
+                                value: "${_currentStudents.length}",
+                                subtitle: "Assigned to ${widget.vehicle?.name ?? 'pool'}",
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _buildMetricSummaryCard(
+                                icon: Icons.location_on_rounded,
+                                iconColor: const Color(0xFF16A34A),
+                                iconBg: const Color(0xFFDCFCE7),
+                                title: "Pickup Stops Set",
+                                value: "$withStopCount / ${_currentStudents.length}",
+                                subtitle: withoutStopCount == 0 ? "All stops configured" : "$withoutStopCount missing stops",
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _buildMetricSummaryCard(
+                                icon: hasSubstitute ? Icons.alt_route_rounded : Icons.check_circle_rounded,
+                                iconColor: hasSubstitute ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                                iconBg: hasSubstitute ? const Color(0xFFFFF7ED) : const Color(0xFFDCFCE7),
+                                title: "Route Live Status",
+                                value: hasSubstitute ? "Temporary Shift" : "Active & Normal",
+                                subtitle: hasSubstitute ? "Tracking ${_substituteVehicleName ?? 'Sub'}" : "Original bus active",
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+
+                        // If Substitute is Active, Show Full-Width Gradient Notice Card
+                        if (hasSubstitute) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFFDBA74), width: 1.2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFEA580C).withOpacity(0.06),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(10),
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFFEA580C),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.alt_route_rounded, color: Colors.white, size: 20),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              "⚡ Temporary Route Active: Routing via ${_substituteVehicleName ?? 'Substitute Bus'}",
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFF9A3412),
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    ElevatedButton.icon(
+                                      onPressed: _isLoading ? null : _revertTemporarySubstitute,
+                                      icon: _isLoading
+                                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                          : const Icon(Icons.restore_rounded, size: 16),
+                                      label: const Text(
+                                        "Revert to Original Bus",
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF16A34A),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        elevation: 0,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  "All ${_currentStudents.length} students assigned to ${widget.vehicle?.name ?? 'this bus'} are live tracking ${_substituteVehicleName ?? 'the substitute bus'} on their dashboard map & push alerts.",
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF7C2D12),
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                        ],
+
+                        // Search and Filter Header Toolbar
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.borderLight),
+                          ),
+                          child: Row(
+                            children: [
+                            Expanded(
+                              flex: 3,
+                              child: TextField(
+                                controller: _searchController,
+                                onChanged: (val) => setState(() => _filterQuery = val.trim()),
+                                decoration: InputDecoration(
+                                  hintText: "Search students by name, roll number, or email...",
+                                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 20),
+                                  suffixIcon: _filterQuery.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(Icons.clear_rounded, size: 18, color: AppColors.textSecondary),
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            setState(() => _filterQuery = "");
+                                          },
+                                        )
+                                      : null,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            _buildFilterTabButton('all', 'All (${_currentStudents.length})'),
+                            const SizedBox(width: 8),
+                            _buildFilterTabButton('configured', '📍 Stop Set ($withStopCount)'),
+                            const SizedBox(width: 8),
+                            _buildFilterTabButton('missing', '⚠️ Stop Missing ($withoutStopCount)'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Student Roster Grid (2-column on desktop)
+                      if (filtered.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: AppColors.borderLight),
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFF1F5F9),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.people_outline_rounded, size: 40, color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                _filterQuery.isNotEmpty ? "No matching students found" : "No students in this group.",
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _filterQuery.isNotEmpty
+                                    ? "Try searching for a different name or roll number."
+                                    : "Students assigned to ${widget.vehicle?.name ?? 'this bus'} will appear here.",
+                                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (isWide)
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 14,
+                            mainAxisSpacing: 14,
+                            mainAxisExtent: 115,
+                          ),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) => _buildStudentCard(filtered[index]),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, index) => _buildStudentCard(filtered[index]),
+                        ),
+                    ],
                   ),
-                  child: ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: AppColors.primaryLight,
-                      child: Icon(
-                        Icons.person_rounded,
-                        color: AppColors.primary,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    ),
+  );
+}
+
+  Widget _buildMetricSummaryCard({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String value,
+    required String subtitle,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterTabButton(String key, String label) {
+    final isSelected = _filterTab == key;
+    return InkWell(
+      onTap: () => setState(() => _filterTab = key),
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            color: isSelected ? Colors.white : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudentCard(MavioProfile student) {
+    final hasStop = student.alertLatitude != null && student.alertLongitude != null;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight, width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: AppColors.primaryLight,
+            child: Text(
+              student.name.isNotEmpty ? student.name[0].toUpperCase() : 'S',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.primary),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        student.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    title: Text(
-                      s.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(s.email),
-                    trailing: const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.textSecondary,
-                    ),
-                    onTap: () => widget.onShowStudentDetails(s),
+                    if (student.rollNumber != null && student.rollNumber!.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.border, width: 0.5),
+                        ),
+                        child: Text(
+                          student.rollNumber!,
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  student.email,
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: (hasStop ? const Color(0xFF16A34A) : const Color(0xFFEA580C)).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                );
-              },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        hasStop ? Icons.location_on_rounded : Icons.location_off_rounded,
+                        size: 11,
+                        color: hasStop ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        hasStop ? 'Stop Configured' : 'Stop Not Set',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          color: hasStop ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary, size: 20),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            onSelected: (action) {
+              if (action == 'reassign') {
+                _showSingleStudentReassignDialog(student);
+              } else if (action == 'details') {
+                widget.onShowStudentDetails(student);
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'reassign',
+                child: Row(
+                  children: [
+                    Icon(Icons.swap_horiz_rounded, size: 18, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Text("Reassign Bus"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'details',
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 18, color: AppColors.textSecondary),
+                    SizedBox(width: 8),
+                    Text("Student Details"),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

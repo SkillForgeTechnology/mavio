@@ -39,24 +39,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _checkSessionAndNavigate() async {
-    if (!kIsWeb) {
-      bool online = false;
-      try {
-        final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 4));
-        if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-          online = true;
-        }
-      } catch (_) {
-        online = false;
-      }
-      
-      if (!online) {
-        if (!mounted) return;
-        _showNoInternetDialog();
-        return;
-      }
-    }
-
     final auth = Provider.of<AuthProvider>(context, listen: false);
     await auth.initialize();
     

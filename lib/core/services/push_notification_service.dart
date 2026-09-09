@@ -260,7 +260,6 @@ class PushNotificationService {
     required String body,
     Map<String, dynamic>? data,
   }) async {
-    if (kIsWeb) return;
     if (appId.isEmpty || restApiKey.isEmpty) {
       print("OneSignal configuration missing appId or restApiKey.");
       return;
@@ -349,15 +348,12 @@ class PushNotificationService {
     required String vehicleName,
     required String tripId,
   }) async {
-    if (kIsWeb) return;
-
     try {
       final students = await SupabaseService().getAssignedStudentsForVehicle(vehicleId);
       final List<String> subIds = [];
       final List<String> userIds = [];
 
       for (var s in students) {
-        // ALWAYS target every assigned student by their profile ID (external_id in OneSignal)
         userIds.add(s.id);
         if (s.onesignalId != null && s.onesignalId!.trim().isNotEmpty) {
           final tokens = s.onesignalId!
@@ -381,6 +377,88 @@ class PushNotificationService {
       }
     } catch (e) {
       print("Error broadcasting trip started push notification: $e");
+    }
+  }
+
+  // Broadcast Temporary Bus Shift Notification to Students
+  static Future<void> notifyBusSubstituteChanged({
+    required String vehicleId,
+    required String originalVehicleName,
+    required String substituteVehicleName,
+  }) async {
+    try {
+      final students = await SupabaseService().getAssignedStudentsForVehicle(vehicleId);
+      final List<String> subIds = [];
+      final List<String> userIds = [];
+
+      for (var s in students) {
+        userIds.add(s.id);
+        if (s.onesignalId != null && s.onesignalId!.trim().isNotEmpty) {
+          final tokens = s.onesignalId!
+              .split(',')
+              .map((t) => t.trim())
+              .where((t) => t.isNotEmpty);
+          subIds.addAll(tokens);
+        }
+      }
+
+      print("OneSignal: Broadcasting bus substitute notice to ${userIds.length} students on $originalVehicleName");
+
+      if (userIds.isNotEmpty || subIds.isNotEmpty) {
+        await sendPushNotification(
+          subscriptionIds: subIds,
+          externalUserIds: userIds,
+          title: "🚌 Temporary Bus Notice ($originalVehicleName)",
+          body: "Your route ($originalVehicleName) is temporarily operating with $substituteVehicleName today. Open Mavio to track $substituteVehicleName live!",
+          data: {
+            'type': 'bus_substitute',
+            'originalVehicleName': originalVehicleName,
+            'substituteVehicleName': substituteVehicleName,
+          },
+        );
+      }
+    } catch (e) {
+      print("Error broadcasting substitute bus push notification: $e");
+    }
+  }
+
+  // Broadcast Bus Revert Notification to Students
+  static Future<void> notifyBusSubstituteReverted({
+    required String vehicleId,
+    required String originalVehicleName,
+  }) async {
+    try {
+      final students = await SupabaseService().getAssignedStudentsForVehicle(vehicleId);
+      final List<String> subIds = [];
+      final List<String> userIds = [];
+
+      for (var s in students) {
+        userIds.add(s.id);
+        if (s.onesignalId != null && s.onesignalId!.trim().isNotEmpty) {
+          final tokens = s.onesignalId!
+              .split(',')
+              .map((t) => t.trim())
+              .where((t) => t.isNotEmpty);
+          subIds.addAll(tokens);
+        }
+      }
+
+      print("OneSignal: Broadcasting bus route restored notice to ${userIds.length} students on $originalVehicleName");
+
+      if (userIds.isNotEmpty || subIds.isNotEmpty) {
+        await sendPushNotification(
+          subscriptionIds: subIds,
+          externalUserIds: userIds,
+          title: "🚌 Bus Route Restored ($originalVehicleName)",
+          body: "Your route has been restored back to $originalVehicleName. You are now tracking your regular bus.",
+          data: {
+            'type': 'bus_reverted',
+            'originalVehicleName': originalVehicleName,
+          },
+        );
+      }
+    } catch (e) {
+      print("Error broadcasting revert bus push notification: $e");
     }
   }
 }
