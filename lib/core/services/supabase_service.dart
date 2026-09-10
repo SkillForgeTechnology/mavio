@@ -1224,17 +1224,9 @@ class SupabaseService {
         final lon = (item['longitude'] as num).toDouble();
         final acc = item['accuracy'] != null ? (item['accuracy'] as num).toDouble() : 10.0;
 
-        // Skip inaccurate points
-        if (acc > 80.0) continue;
-
-        if (validPath.isNotEmpty) {
-          final prev = validPath.last;
-          final dist = Geolocator.distanceBetween(prev['latitude']!, prev['longitude']!, lat, lon);
-          // Skip impossible teleportation glitches (> 500m jump between consecutive points)
-          if (dist > 500.0) {
-            continue;
-          }
-        }
+        // Skip invalid coordinates
+        if (lat == 0.0 && lon == 0.0) continue;
+        if (acc > 120.0) continue;
 
         validPath.add({'latitude': lat, 'longitude': lon});
       }

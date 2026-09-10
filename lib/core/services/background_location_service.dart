@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -172,46 +173,60 @@ void onStart(ServiceInstance service) async {
       }
     }
 
+    DateTime? lastPositionTime;
+
     // Define reusable position handler that uploads GPS and checks student proximity
     Future<void> handlePosition(Position position) async {
       if (tripId == null) return;
 
-      // 1. Filter out inaccurate cell-tower fixes (> 80m accuracy)
-      if (position.accuracy > 80.0) {
+      // 1. Filter out wildly inaccurate cell-tower fixes (> 120m accuracy)
+      if (position.accuracy > 120.0) {
         print("MAVIO GPS: Inaccurate position ignored (${position.accuracy}m accuracy)");
         return;
       }
 
-      // 2. Filter out impossible teleportation jumps (> 500m within 5 seconds)
-      if (lastLat != null && lastLng != null) {
+      final now = DateTime.now();
+
+      // 2. Velocity-based glitch filter: Only reject if speed exceeds 180 km/h in under 6 seconds
+      if (lastLat != null && lastLng != null && lastPositionTime != null) {
+        final elapsedSeconds = now.difference(lastPositionTime!).inSeconds;
         final distMeters = Geolocator.distanceBetween(
           lastLat!,
           lastLng!,
           position.latitude,
           position.longitude,
         );
-        if (distMeters > 500.0) {
-          print("MAVIO GPS: Impossible teleportation jump of ${distMeters.round()}m ignored");
+
+        // Only reject impossible teleportation (< 6s AND > 300m, i.e. > 180 km/h)
+        if (elapsedSeconds < 6 && distMeters > 300.0) {
+          print("MAVIO GPS: Outlier teleportation jump of ${distMeters.round()}m in ${elapsedSeconds}s rejected");
           return;
         }
       }
 
+      lastPositionTime = now;
+
       try {
-        lastSpeed = position.speed * 3.6;
+        lastSpeed = math.max(0.0, position.speed * 3.6);
         lastLat = position.latitude;
         lastLng = position.longitude;
 
         // Push update directly to DB from background isolate
-        await client.from('location_updates').insert({
-          'trip_id': tripId!,
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'speed': lastSpeed, // convert m/s to km/h
-          'heading': position.heading,
-          'accuracy': position.accuracy,
-        });
-
-        uploadCount++;
+        try {
+          await client.from('location_updates').insert({
+            'trip_id': tripId!,
+            'latitude': position.latitude,
+            'longitude': position.longitude,
+            'speed': lastSpeed, // convert m/s to km/h
+            'heading': position.heading,
+            'accuracy': position.accuracy,
+          });
+          uploadCount++;
+        } catch (dbError) {
+          print("MAVIO Background: Temporary network drop during GPS upload: $dbError");
+          // Still increment counter and notify UI so UI never freezes!
+          uploadCount++;
+        }
 
         // 1. Emit live stats to Driver UI on every GPS update
         service.invoke('updateStats', {
