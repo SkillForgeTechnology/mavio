@@ -162,6 +162,21 @@ class TrackingProvider extends ChangeNotifier {
     _locationSub = _db.streamLocationUpdates(tripId).listen((update) {
       _latestLocation = update;
       final newPoint = LatLng(update.latitude, update.longitude);
+
+      // Filter out impossible jumps (> 500m) so map path never draws diagonal straight lines across city
+      if (_tripPath.isNotEmpty) {
+        final prev = _tripPath.last;
+        final dist = const Distance().as(
+          LengthUnit.Meter,
+          prev,
+          newPoint,
+        );
+        if (dist > 500) {
+          notifyListeners();
+          return;
+        }
+      }
+
       if (_tripPath.isEmpty || _tripPath.last != newPoint) {
         _tripPath.add(newPoint);
       }

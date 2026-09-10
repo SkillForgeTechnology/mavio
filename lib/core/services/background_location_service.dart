@@ -176,6 +176,26 @@ void onStart(ServiceInstance service) async {
     Future<void> handlePosition(Position position) async {
       if (tripId == null) return;
 
+      // 1. Filter out inaccurate cell-tower fixes (> 80m accuracy)
+      if (position.accuracy > 80.0) {
+        print("MAVIO GPS: Inaccurate position ignored (${position.accuracy}m accuracy)");
+        return;
+      }
+
+      // 2. Filter out impossible teleportation jumps (> 500m within 5 seconds)
+      if (lastLat != null && lastLng != null) {
+        final distMeters = Geolocator.distanceBetween(
+          lastLat!,
+          lastLng!,
+          position.latitude,
+          position.longitude,
+        );
+        if (distMeters > 500.0) {
+          print("MAVIO GPS: Impossible teleportation jump of ${distMeters.round()}m ignored");
+          return;
+        }
+      }
+
       try {
         lastSpeed = position.speed * 3.6;
         lastLat = position.latitude;
@@ -349,11 +369,8 @@ void onStart(ServiceInstance service) async {
           timeLimit: const Duration(seconds: 3),
         );
         await handlePosition(pos);
-      } catch (_) {
-        final last = await Geolocator.getLastKnownPosition();
-        if (last != null) {
-          await handlePosition(last);
-        }
+      } catch (e) {
+        // Do not use stale getLastKnownPosition; wait for next live fix
       }
     });
   });

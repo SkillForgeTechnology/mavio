@@ -1123,35 +1123,12 @@ class SupabaseService {
       try {
         final client = Supabase.instance.client;
 
-        // Calculate total distance traveled from all location_updates
-        double totalDistanceKm = 0.0;
-        try {
-          final points = await client
-              .from('location_updates')
-              .select('latitude, longitude')
-              .eq('trip_id', tripId)
-              .order('created_at', ascending: true);
-
-          if (points is List && points.length > 1) {
-            double totalMeters = 0.0;
-            for (int i = 0; i < points.length - 1; i++) {
-              final lat1 = (points[i]['latitude'] as num).toDouble();
-              final lon1 = (points[i]['longitude'] as num).toDouble();
-              final lat2 = (points[i + 1]['latitude'] as num).toDouble();
-              final lon2 = (points[i + 1]['longitude'] as num).toDouble();
-              totalMeters += Geolocator.distanceBetween(lat1, lon1, lat2, lon2);
-            }
-            totalDistanceKm = double.parse((totalMeters / 1000.0).toStringAsFixed(2));
-          }
-        } catch (_) {}
-
-        // Set trip to completed with total distance
+        // Set trip to completed
         await client
             .from('trips')
             .update({
               'status': 'COMPLETED',
               'ended_at': DateTime.now().toUtc().toIso8601String(),
-              'total_distance_km': totalDistanceKm,
             })
             .eq('id', tripId);
 
@@ -1235,15 +1212,34 @@ class SupabaseService {
     try {
       final response = await Supabase.instance.client
           .from('location_updates')
-          .select('latitude, longitude')
+          .select('latitude, longitude, accuracy')
           .eq('trip_id', tripId)
           .order('created_at', ascending: true);
       
       final list = response as List;
-      return list.map((item) => {
-        'latitude': (item['latitude'] as num).toDouble(),
-        'longitude': (item['longitude'] as num).toDouble(),
-      }).toList();
+      final List<Map<String, double>> validPath = [];
+
+      for (var item in list) {
+        final lat = (item['latitude'] as num).toDouble();
+        final lon = (item['longitude'] as num).toDouble();
+        final acc = item['accuracy'] != null ? (item['accuracy'] as num).toDouble() : 10.0;
+
+        // Skip inaccurate points
+        if (acc > 80.0) continue;
+
+        if (validPath.isNotEmpty) {
+          final prev = validPath.last;
+          final dist = Geolocator.distanceBetween(prev['latitude']!, prev['longitude']!, lat, lon);
+          // Skip impossible teleportation glitches (> 500m jump between consecutive points)
+          if (dist > 500.0) {
+            continue;
+          }
+        }
+
+        validPath.add({'latitude': lat, 'longitude': lon});
+      }
+
+      return validPath;
     } catch (e) {
       print("Error fetching trip coordinates: $e");
       return [];
