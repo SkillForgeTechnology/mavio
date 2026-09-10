@@ -174,6 +174,7 @@ void onStart(ServiceInstance service) async {
     }
 
     DateTime? lastPositionTime;
+    final List<Map<String, dynamic>> offlineGpsQueue = [];
 
     // Define reusable position handler that uploads GPS and checks student proximity
     Future<void> handlePosition(Position position) async {
@@ -211,20 +212,35 @@ void onStart(ServiceInstance service) async {
         lastLat = position.latitude;
         lastLng = position.longitude;
 
-        // Push update directly to DB from background isolate
+        final currentPoint = {
+          'trip_id': tripId!,
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'speed': lastSpeed, // convert m/s to km/h
+          'heading': position.heading,
+          'accuracy': position.accuracy,
+          'created_at': now.toUtc().toIso8601String(),
+        };
+
+        // Push update directly to DB from background isolate with offline queue recovery
         try {
-          await client.from('location_updates').insert({
-            'trip_id': tripId!,
-            'latitude': position.latitude,
-            'longitude': position.longitude,
-            'speed': lastSpeed, // convert m/s to km/h
-            'heading': position.heading,
-            'accuracy': position.accuracy,
-          });
-          uploadCount++;
+          if (offlineGpsQueue.isNotEmpty) {
+            offlineGpsQueue.add(currentPoint);
+            final batch = List<Map<String, dynamic>>.from(offlineGpsQueue);
+            await client.from('location_updates').insert(batch);
+            uploadCount += batch.length;
+            offlineGpsQueue.clear();
+            print("MAVIO Background: Flushed ${batch.length} queued offline points in chronological order!");
+          } else {
+            await client.from('location_updates').insert(currentPoint);
+            uploadCount++;
+          }
         } catch (dbError) {
-          print("MAVIO Background: Temporary network drop during GPS upload: $dbError");
-          // Still increment counter and notify UI so UI never freezes!
+          print("MAVIO Background: Network offline/unstable ($dbError). Queuing point in local cache (Total queued: ${offlineGpsQueue.length + 1})");
+          // Keep in offline cache (capped at 500 points = ~25 minutes of zero-network buffer)
+          if (offlineGpsQueue.length < 500) {
+            offlineGpsQueue.add(currentPoint);
+          }
           uploadCount++;
         }
 
