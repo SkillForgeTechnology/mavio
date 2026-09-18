@@ -9,6 +9,7 @@ class MavioOrganization {
   final String? subscriptionStatus; // 'active' | 'inactive' | 'free_trial'
   final int? maxVehicles;
   final int? maxDrivers;
+  final double speedLimitKmh;
   final String? createdAt;
 
   MavioOrganization({
@@ -20,12 +21,20 @@ class MavioOrganization {
     this.address,
     this.logoUrl,
     this.subscriptionStatus = 'free_trial',
-    this.maxVehicles = 10,
+    this.maxVehicles = 25,
     this.maxDrivers = 10,
+    this.speedLimitKmh = 60.0,
     this.createdAt,
   });
 
+  int get effectiveMaxVehicles {
+    if (subscriptionStatus == 'free_trial') return 25;
+    return maxVehicles ?? 25;
+  }
+
   factory MavioOrganization.fromJson(Map<String, dynamic> json) {
+    final status = json['subscription_status'] as String? ?? 'free_trial';
+    final spdLim = (json['speed_limit_kmh'] as num?)?.toDouble() ?? 60.0;
     return MavioOrganization(
       id: json['id'] as String,
       code: json['code'] as String,
@@ -34,9 +43,10 @@ class MavioOrganization {
       phone: json['phone'] as String?,
       address: json['address'] as String?,
       logoUrl: json['logo_url'] as String?,
-      subscriptionStatus: json['subscription_status'] as String? ?? 'free_trial',
-      maxVehicles: json['max_vehicles'] as int? ?? 10,
+      subscriptionStatus: status,
+      maxVehicles: json['max_vehicles'] as int? ?? (status == 'free_trial' ? 25 : 25),
       maxDrivers: json['max_drivers'] as int? ?? 10,
+      speedLimitKmh: spdLim,
       createdAt: json['created_at'] as String?,
     );
   }
@@ -133,7 +143,7 @@ class MavioProfile {
       assignedVehicleId: json['assigned_vehicle_id'] as String?,
       phone: json['phone'] as String?,
       rollNumber: json['roll_number'] as String?,
-      dob: json['dob'] as String?,
+      dob: json['login_pin'] as String? ?? json['dob'] as String?,
       pin: json['login_pin'] as String? ?? json['pin'] as String? ?? json['dob'] as String?,
       alertLatitude: json['alert_latitude'] != null ? (json['alert_latitude'] as num).toDouble() : null,
       alertLongitude: json['alert_longitude'] != null ? (json['alert_longitude'] as num).toDouble() : null,
@@ -275,6 +285,7 @@ class MavioTrip {
   final DateTime? endedAt;
   final String orgId;
   final double totalDistanceKm;
+  final double maxSpeedKmh;
 
   MavioTrip({
     required this.id,
@@ -285,18 +296,12 @@ class MavioTrip {
     this.endedAt,
     required this.orgId,
     this.totalDistanceKm = 0.0,
+    this.maxSpeedKmh = 0.0,
   });
 
   factory MavioTrip.fromJson(Map<String, dynamic> json) {
-    double dist = (json['total_distance_km'] as num?)?.toDouble() ?? 0.0;
-    if (dist <= 0 && json['ended_at'] != null) {
-      final start = DateTime.parse(json['started_at'] as String);
-      final end = DateTime.parse(json['ended_at'] as String);
-      final durationMinutes = end.difference(start).inMinutes;
-      if (durationMinutes > 0) {
-        dist = (durationMinutes * 0.46);
-      }
-    }
+    final double dist = (json['total_distance_km'] as num?)?.toDouble() ?? 0.0;
+    final double maxSpd = (json['max_speed_kmh'] as num?)?.toDouble() ?? 0.0;
     return MavioTrip(
       id: json['id'] as String,
       vehicleId: json['vehicle_id'] as String,
@@ -306,6 +311,7 @@ class MavioTrip {
       endedAt: json['ended_at'] != null ? DateTime.parse(json['ended_at'] as String).toLocal() : null,
       orgId: json['org_id'] as String,
       totalDistanceKm: dist,
+      maxSpeedKmh: maxSpd,
     );
   }
 }

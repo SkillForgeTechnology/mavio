@@ -68,6 +68,31 @@ class _AdminDashboardState extends State<AdminDashboard> {
   StreamSubscription<MavioLocationUpdate>? _liveLocationSub;
   LatLng? _mockBusLocation;
 
+  // Trip History state fields
+  MavioVehicle? _selectedTripVehicle;
+  String _selectedTripMonth = 'All Months';
+  List<MavioTrip> _selectedVehicleTrips = [];
+  bool _isLoadingVehicleTrips = false;
+  String _tripVehicleSearchQuery = "";
+
+  Future<void> _fetchTripsForVehicle(MavioVehicle v) async {
+    setState(() {
+      _selectedTripVehicle = v;
+      _isLoadingVehicleTrips = true;
+    });
+    try {
+      final trips = await _db.getVehicleTripHistory(v.id);
+      if (mounted) {
+        setState(() {
+          _selectedVehicleTrips = trips;
+          _isLoadingVehicleTrips = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingVehicleTrips = false);
+    }
+  }
+
   void _showSnackbar(String message, Color backgroundColor) {
     if (!mounted) return;
     final isErr = backgroundColor == AppColors.error ||
@@ -282,7 +307,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 if (!formKey.currentState!.validate()) return;
                 final messenger = ScaffoldMessenger.of(context);
                 final org = _db.currentOrganization;
-                final limit = org?.maxVehicles ?? 15;
+                final limit = org?.effectiveMaxVehicles ?? 25;
                 if (_totalBuses >= limit) {
                   Navigator.pop(context);
                   _showLimitExceededDialog(limit);
@@ -326,7 +351,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       return a.createdAt!.compareTo(b.createdAt!);
     });
     final index = allVehicles.indexWhere((x) => x.id == v.id);
-    final limit = org?.maxVehicles ?? 15;
+    final limit = org?.effectiveMaxVehicles ?? 25;
     final isDeactivated = index != -1 && index >= limit;
 
     showDialog(
@@ -1001,9 +1026,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         TextFormField(
                           controller: emailController,
                           keyboardType: TextInputType.emailAddress,
+                          enableSuggestions: false,
+                          autocorrect: false,
                           decoration: const InputDecoration(
                             labelText: 'Email Address (Optional)',
-                            hintText: 'Auto-generated if empty',
+                            hintText: 'Auto-generated from mobile if empty',
                             prefixIcon: Icon(
                               Icons.email_outlined,
                               color: AppColors.primary,
@@ -1458,8 +1485,52 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                       child: Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text(dateLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                                          Text(durationLabel, style: TextStyle(fontSize: 13, color: trip.status == 'ACTIVE' ? AppColors.success : AppColors.textPrimary)),
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(dateLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                '${trip.totalDistanceKm.toStringAsFixed(1)} km | $durationLabel',
+                                                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                              ),
+                                            ],
+                                          ),
+                                          Builder(
+                                            builder: (context) {
+                                              double limit = 60.0;
+                                              try {
+                                                final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                                                if (authProvider.verifiedOrg?.speedLimitKmh != null) {
+                                                  limit = authProvider.verifiedOrg!.speedLimitKmh;
+                                                }
+                                              } catch (_) {}
+                                              final bool isOverspeed = trip.maxSpeedKmh > limit;
+                                              final color = isOverspeed ? AppColors.error : Colors.orangeAccent;
+
+                                              return Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: color.withOpacity(0.12),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      isOverspeed ? Icons.warning_amber_rounded : Icons.speed_rounded,
+                                                      size: 14,
+                                                      color: color,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '${isOverspeed ? "⚠️ Over " : "Max "}${trip.maxSpeedKmh.toStringAsFixed(1)} km/h',
+                                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
                                         ],
                                       ),
                                     );
@@ -2558,7 +2629,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildDashboardTab(String collegeName) {
     final bool isWeb = MediaQuery.of(context).size.width > 900;
     final org = _db.currentOrganization;
-    final maxVehiclesLimit = org?.maxVehicles ?? 15;
+    final maxVehiclesLimit = org?.effectiveMaxVehicles ?? 25;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -3605,7 +3676,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   // =========================================================================
   Widget _buildManagementTab() {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: PreferredSize(
@@ -3623,6 +3694,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               Tab(text: 'Vehicles'),
               Tab(text: 'Drivers'),
               Tab(text: 'Students'),
+              Tab(text: 'Trip History'),
             ],
           ),
         ),
@@ -3631,6 +3703,555 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _buildVehiclesList(),
             _buildDriversList(),
             _buildStudentsList(),
+            _buildTripHistoryTab(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<MavioVehicle> _filteredTripVehicles(List<MavioVehicle> allVehicles) {
+    if (_tripVehicleSearchQuery.isEmpty) return allVehicles;
+    final q = _tripVehicleSearchQuery.toLowerCase();
+    return allVehicles.where((v) {
+      return v.name.toLowerCase().contains(q) || v.regNumber.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  Widget _buildTripHistoryTab() {
+    final allVehicles = _fleet
+        .map((item) => item['vehicle'] as MavioVehicle)
+        .toList();
+
+    if (allVehicles.isNotEmpty && _selectedTripVehicle == null) {
+      _selectedTripVehicle = allVehicles.first;
+      _fetchTripsForVehicle(allVehicles.first);
+    }
+
+    final isWide = MediaQuery.of(context).size.width > 800;
+
+    if (isWide) {
+      final filteredVehicles = _filteredTripVehicles(allVehicles);
+
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Left Master Panel: Bus List (320px)
+          SizedBox(
+            width: 320,
+            child: Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: AppColors.border),
+              ),
+              elevation: 0,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.directions_bus_rounded, color: AppColors.primary, size: 20),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Select Vehicle',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${allVehicles.length} Buses',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search bus or reg no...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textSecondary),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      onChanged: (val) {
+                        setState(() => _tripVehicleSearchQuery = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: filteredVehicles.isEmpty
+                          ? const Center(child: Text('No vehicles found', style: TextStyle(color: AppColors.textSecondary)))
+                          : ListView.builder(
+                              itemCount: filteredVehicles.length,
+                              itemBuilder: (ctx, idx) {
+                                final v = filteredVehicles[idx];
+                                final isSelected = _selectedTripVehicle?.id == v.id;
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? AppColors.primary.withOpacity(0.08) : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected ? AppColors.primary : AppColors.borderLight,
+                                      width: isSelected ? 1.5 : 1.0,
+                                    ),
+                                  ),
+                                  child: ListTile(
+                                    dense: true,
+                                    onTap: () => _fetchTripsForVehicle(v),
+                                    leading: CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: isSelected ? AppColors.primary : AppColors.surface,
+                                      child: Icon(
+                                        Icons.directions_bus_rounded,
+                                        size: 18,
+                                        color: isSelected ? Colors.white : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      v.name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      v.regNumber,
+                                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                    ),
+                                    trailing: Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: isSelected ? AppColors.primary : Colors.grey[400],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Right Detail Panel: Trip Details & History
+          Expanded(
+            child: _buildVehicleTripDetailsContent(),
+          ),
+        ],
+      );
+    } else {
+      // Mobile Responsive View
+      if (_selectedTripVehicle == null) {
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: allVehicles.length,
+          itemBuilder: (ctx, idx) {
+            final v = allVehicles[idx];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: AppColors.border),
+              ),
+              child: ListTile(
+                onTap: () => _fetchTripsForVehicle(v),
+                leading: const CircleAvatar(child: Icon(Icons.directions_bus_rounded)),
+                title: Text(v.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(v.regNumber),
+                trailing: const Icon(Icons.chevron_right_rounded),
+              ),
+            );
+          },
+        );
+      } else {
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Colors.white,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    onPressed: () => setState(() => _selectedTripVehicle = null),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _selectedTripVehicle!.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '(${_selectedTripVehicle!.regNumber})',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: _buildVehicleTripDetailsContent()),
+          ],
+        );
+      }
+    }
+  }
+
+  Widget _buildVehicleTripDetailsContent() {
+    if (_selectedTripVehicle == null) {
+      return Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.border)),
+        elevation: 0,
+        child: const Center(
+          child: Text('Select a vehicle on the left to view trip details', style: TextStyle(color: AppColors.textSecondary)),
+        ),
+      );
+    }
+
+    if (_isLoadingVehicleTrips) {
+      return Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.border)),
+        elevation: 0,
+        child: const Center(
+          child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary)),
+        ),
+      );
+    }
+
+    final orgSpeedLimit = _db.currentOrganization?.speedLimitKmh ?? 60.0;
+
+    // Available Month Options (e.g. "Sep 2026", "Aug 2026")
+    final monthSet = <String>{};
+    for (var t in _selectedVehicleTrips) {
+      final monthStr = intl.DateFormat('MMM yyyy').format(t.startedAt);
+      monthSet.add(monthStr);
+    }
+    final availableMonths = ['All Months', ...monthSet];
+
+    // Filter trips by selected month
+    final filteredTrips = _selectedVehicleTrips.where((t) {
+      if (_selectedTripMonth == 'All Months') return true;
+      final mStr = intl.DateFormat('MMM yyyy').format(t.startedAt);
+      return mStr == _selectedTripMonth;
+    }).toList();
+
+    // Summary Statistics
+    final totalTrips = filteredTrips.length;
+    final totalKm = filteredTrips.fold(0.0, (sum, t) => sum + t.totalDistanceKm);
+    double maxSpeedInMonth = 0.0;
+    for (var t in filteredTrips) {
+      if (t.maxSpeedKmh > maxSpeedInMonth) maxSpeedInMonth = t.maxSpeedKmh;
+    }
+    final isMonthOverspeed = maxSpeedInMonth > orgSpeedLimit;
+
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Bar: Bus Title & Month Selector
+            Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_selectedTripVehicle!.name} - Complete Trip History',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Registration: ${_selectedTripVehicle!.regNumber}',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                // Month Picker Dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: availableMonths.contains(_selectedTripMonth) ? _selectedTripMonth : 'All Months',
+                      icon: const Icon(Icons.calendar_month_rounded, color: AppColors.primary, size: 18),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _selectedTripMonth = val);
+                      },
+                      items: availableMonths.map((m) {
+                        return DropdownMenuItem<String>(
+                          value: m,
+                          child: Text(m),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Monthly Summary Cards
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.borderLight),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Total Trips', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                        const SizedBox(height: 4),
+                        Text('$totalTrips', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.borderLight),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Distance Traveled', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                        const SizedBox(height: 4),
+                        Text('${totalKm.toStringAsFixed(1)} km', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isMonthOverspeed ? const Color(0xFFFFF5F5) : AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isMonthOverspeed ? Colors.redAccent.withOpacity(0.3) : AppColors.borderLight),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text('Highest Max Speed', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                            if (isMonthOverspeed) ...[
+                              const SizedBox(width: 4),
+                              const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.redAccent),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${maxSpeedInMonth.toStringAsFixed(0)} km/h',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isMonthOverspeed ? Colors.redAccent : AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Trip Cards Timeline
+            const Text(
+              'Trip Logs Timeline',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 10),
+
+            Expanded(
+              child: filteredTrips.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.history_rounded, size: 48, color: Colors.grey[300]),
+                          const SizedBox(height: 8),
+                          Text('No trip logs found for $_selectedTripMonth', style: const TextStyle(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: filteredTrips.length,
+                      itemBuilder: (ctx, idx) {
+                        final trip = filteredTrips[idx];
+                        final dateStr = intl.DateFormat('EEE, MMM dd, yyyy').format(trip.startedAt);
+                        final startTimeStr = intl.DateFormat('hh:mm a').format(trip.startedAt);
+                        final endTimeStr = trip.endedAt != null ? intl.DateFormat('hh:mm a').format(trip.endedAt!) : 'In Progress';
+                        final isOverspeed = trip.maxSpeedKmh > orgSpeedLimit;
+
+                        // Find driver name
+                        String driverName = "Driver";
+                        final dItem = _drivers.where((d) => d.id == trip.driverId).firstOrNull;
+                        if (dItem != null) driverName = dItem.name;
+
+                        int durationMins = 0;
+                        if (trip.endedAt != null) {
+                          durationMins = trip.endedAt!.difference(trip.startedAt).inMinutes;
+                        }
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: BorderSide(
+                              color: isOverspeed ? Colors.redAccent.withOpacity(0.3) : AppColors.borderLight,
+                              width: isOverspeed ? 1.2 : 0.8,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.event_note_rounded, size: 18, color: AppColors.primary),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      dateStr,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: trip.status == 'ACTIVE' ? Colors.green[50] : Colors.grey[100],
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        trip.status,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: trip.status == 'ACTIVE' ? Colors.green[800] : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    if (isOverspeed)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red[50],
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.warning_amber_rounded, size: 12, color: Colors.redAccent),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Overspeed (${trip.maxSpeedKmh.toStringAsFixed(0)} km/h)',
+                                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const Divider(height: 20),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.person_outline_rounded, size: 16, color: AppColors.textSecondary),
+                                          const SizedBox(width: 6),
+                                          const Text('Driver: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                          Text(driverName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.access_time_rounded, size: 16, color: AppColors.textSecondary),
+                                          const SizedBox(width: 6),
+                                          Text('$startTimeStr - $endTimeStr ${durationMins > 0 ? "($durationMins mins)" : ""}', style: const TextStyle(fontSize: 12, color: AppColors.textPrimary)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.route_rounded, size: 16, color: AppColors.textSecondary),
+                                          const SizedBox(width: 6),
+                                          const Text('Distance: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                          Text('${trip.totalDistanceKm.toStringAsFixed(2)} km', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.speed_rounded, size: 16, color: AppColors.textSecondary),
+                                          const SizedBox(width: 6),
+                                          const Text('Max Speed: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                          Text(
+                                            '${trip.maxSpeedKmh.toStringAsFixed(1)} km/h',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: isOverspeed ? Colors.redAccent : AppColors.textPrimary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
           ],
         ),
       ),
@@ -3887,7 +4508,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       return a.createdAt!.compareTo(b.createdAt!);
     });
     final index = allVehicles.indexWhere((x) => x.id == v.id);
-    final limit = _db.currentOrganization?.maxVehicles ?? 15;
+    final limit = _db.currentOrganization?.effectiveMaxVehicles ?? 25;
     final isDeactivated = index != -1 && index >= limit;
 
     return Card(
@@ -3949,6 +4570,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  size: 20,
+                  color: Colors.redAccent,
+                ),
+                tooltip: 'Delete Bus',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => _confirmDeleteVehicle(v),
+              ),
+              const SizedBox(width: 12),
               const Icon(
                 Icons.qr_code_rounded,
                 size: 20,
@@ -5030,6 +5663,7 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
   late final TextEditingController _emailCtrl;
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _addressCtrl;
+  late final TextEditingController _speedLimitCtrl;
   
   final _oldPasswordCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -5051,6 +5685,7 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
     _emailCtrl = TextEditingController(text: widget.org?.email ?? '');
     _phoneCtrl = TextEditingController(text: widget.org?.phone ?? '');
     _addressCtrl = TextEditingController(text: widget.org?.address ?? '');
+    _speedLimitCtrl = TextEditingController(text: (widget.org?.speedLimitKmh ?? 60.0).toStringAsFixed(0));
   }
 
   @override
@@ -5060,6 +5695,7 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
+    _speedLimitCtrl.dispose();
     _oldPasswordCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
@@ -5072,11 +5708,13 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSavingProfile = true);
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final spdVal = double.tryParse(_speedLimitCtrl.text.trim()) ?? 60.0;
     final success = await auth.updateOrganizationDetails(
       name: _nameCtrl.text.trim(),
       code: _codeCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
       address: _addressCtrl.text.trim(),
+      speedLimitKmh: spdVal,
     );
     if (mounted) {
       setState(() {
@@ -5340,6 +5978,33 @@ class _OrganizationProfileViewState extends State<_OrganizationProfileView> {
                               ),
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _speedLimitCtrl,
+                          readOnly: !_isEditingProfile,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Organization Fleet Speed Limit (km/h)',
+                            helperText: 'Global maximum speed threshold for all buses in your institution.',
+                            prefixIcon: const Icon(Icons.speed_rounded, color: Colors.orangeAccent),
+                            suffixText: 'km/h',
+                            fillColor: _isEditingProfile ? Colors.white : const Color(0xFFF8F9FA),
+                            filled: true,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: _isEditingProfile ? AppColors.primary.withOpacity(0.6) : AppColors.border,
+                                width: _isEditingProfile ? 1.5 : 1,
+                              ),
+                            ),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Speed limit is required';
+                            final num? val = num.tryParse(v.trim());
+                            if (val == null || val <= 0 || val > 150) return 'Enter a valid speed limit (e.g. 60)';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 28),
 

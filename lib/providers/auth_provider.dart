@@ -150,6 +150,7 @@ class AuthProvider extends ChangeNotifier {
     required String code,
     String? phone,
     String? address,
+    double? speedLimitKmh,
   }) async {
     final org = verifiedOrg;
     if (org == null) return false;
@@ -168,6 +169,7 @@ class AuthProvider extends ChangeNotifier {
         subscriptionStatus: org.subscriptionStatus,
         maxVehicles: org.maxVehicles,
         maxDrivers: org.maxDrivers,
+        speedLimitKmh: speedLimitKmh ?? org.speedLimitKmh,
         createdAt: org.createdAt,
       );
       if (updated != null) {

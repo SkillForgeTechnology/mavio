@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/theme/theme.dart';
 import '../../core/utils/toast_utils.dart';
 import '../../models/models.dart';
+import '../../providers/auth_provider.dart';
+import '../../widgets/mavio_3d_bus_marker.dart';
 
 class StudentStopGroup {
   final int stopIndex;
@@ -51,6 +55,7 @@ class _DriverLiveNavigationScreenState extends State<DriverLiveNavigationScreen>
   final MapController _mapController = MapController();
 
   StreamSubscription<Position>? _positionStream;
+  StreamSubscription? _bgStatsSub;
   LatLng? _currentBusLocation;
   double _currentSpeedKmH = 0.0;
   double _currentHeading = 0.0;
@@ -58,6 +63,7 @@ class _DriverLiveNavigationScreenState extends State<DriverLiveNavigationScreen>
   bool _isEndingTrip = false;
   bool _autoCenter = true;
 
+  List<LatLng> _tripPath = [];
   List<StudentStopGroup> _stops = [];
   StudentStopGroup? _selectedStop;
   StudentStopGroup? _nextUpcomingStop;
@@ -68,14 +74,28 @@ class _DriverLiveNavigationScreenState extends State<DriverLiveNavigationScreen>
   void initState() {
     super.initState();
     _fetchAssignedStudents();
+    _fetchInitialTripPath();
     _initLiveGpsTracking();
   }
 
   @override
   void dispose() {
     _positionStream?.cancel();
+    _bgStatsSub?.cancel();
     _etaTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _fetchInitialTripPath() async {
+    if (widget.activeTrip == null) return;
+    try {
+      final coords = await _db.getTripPathCoordinates(widget.activeTrip!.id);
+      if (coords.isNotEmpty && mounted) {
+        setState(() {
+          _tripPath = coords.map((c) => LatLng(c['latitude']!, c['longitude']!)).toList();
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchAssignedStudents() async {
@@ -140,26 +160,62 @@ class _DriverLiveNavigationScreenState extends State<DriverLiveNavigationScreen>
     try {
       final lastPos = await Geolocator.getLastKnownPosition();
       if (lastPos != null && mounted) {
+        final initialPoint = LatLng(lastPos.latitude, lastPos.longitude);
         setState(() {
-          _currentBusLocation = LatLng(lastPos.latitude, lastPos.longitude);
+          _currentBusLocation = initialPoint;
           _currentSpeedKmH = math.max(0, lastPos.speed * 3.6);
           _currentHeading = lastPos.heading;
+          if (_tripPath.isEmpty) {
+            _tripPath.add(initialPoint);
+          }
           _updateNextUpcomingStop();
         });
       }
 
       const locationSettings = LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 3,
+        distanceFilter: 0, // ⚡ 0 meters distance filter for continuous 1Hz real-time updates (like Google Maps)
       );
+
+      Position? lastGpsPos;
+      DateTime? lastGpsTime;
 
       _positionStream = Geolocator.getPositionStream(locationSettings: locationSettings)
           .listen((Position pos) {
         if (!mounted) return;
+        final now = DateTime.now();
+        final newPoint = LatLng(pos.latitude, pos.longitude);
+
+        final rawGpsSpeed = math.max(0.0, pos.speed * 3.6);
+        double deltaSpeed = 0.0;
+
+        if (lastGpsPos != null && lastGpsTime != null) {
+          final dtSeconds = now.difference(lastGpsTime!).inMilliseconds / 1000.0;
+          if (dtSeconds > 0.3 && dtSeconds < 8.0) {
+            final distM = Geolocator.distanceBetween(
+              lastGpsPos!.latitude,
+              lastGpsPos!.longitude,
+              pos.latitude,
+              pos.longitude,
+            );
+            deltaSpeed = (distM / dtSeconds) * 3.6;
+          }
+        }
+
+        lastGpsPos = pos;
+        lastGpsTime = now;
+
+        // Instantaneous hybrid speed (take max of raw Doppler GPS speed and physical delta movement speed)
+        double realTimeSpeed = math.max(rawGpsSpeed, deltaSpeed);
+        if (realTimeSpeed < 1.0) realTimeSpeed = 0.0;
+
         setState(() {
-          _currentBusLocation = LatLng(pos.latitude, pos.longitude);
-          _currentSpeedKmH = math.max(0, pos.speed * 3.6);
+          _currentBusLocation = newPoint;
+          _currentSpeedKmH = realTimeSpeed;
           _currentHeading = pos.heading;
+          if (_tripPath.isEmpty || _tripPath.last != newPoint) {
+            _tripPath.add(newPoint);
+          }
           _updateNextUpcomingStop();
         });
 
@@ -167,6 +223,31 @@ class _DriverLiveNavigationScreenState extends State<DriverLiveNavigationScreen>
           _mapController.move(_currentBusLocation!, _mapController.camera.zoom);
         }
       });
+
+      // Also listen to background service updates for continuous sync
+      try {
+        final bgService = FlutterBackgroundService();
+        _bgStatsSub = bgService.on('updateStats').listen((event) {
+          if (event != null && mounted) {
+            final lat = event['latitude'] as double?;
+            final lng = event['longitude'] as double?;
+            final spd = event['speed'] as double?;
+            if (lat != null && lng != null) {
+              final newPos = LatLng(lat, lng);
+              setState(() {
+                _currentBusLocation = newPos;
+                if (spd != null && _currentSpeedKmH == 0) {
+                  _currentSpeedKmH = spd;
+                }
+                if (_tripPath.isEmpty || _tripPath.last != newPos) {
+                  _tripPath.add(newPos);
+                }
+                _updateNextUpcomingStop();
+              });
+            }
+          }
+        });
+      } catch (_) {}
     } catch (_) {}
   }
 
@@ -177,14 +258,19 @@ class _DriverLiveNavigationScreenState extends State<DriverLiveNavigationScreen>
     double minDistance = double.infinity;
 
     for (final stop in _stops) {
-      if (stop.isVisited) continue;
       final dist = _calculateDistance(
         _currentBusLocation!.latitude,
         _currentBusLocation!.longitude,
         stop.position.latitude,
         stop.position.longitude,
       );
-      if (dist < minDistance) {
+
+      // Automatically mark stop as visited when bus comes within 60 meters
+      if (dist <= 60.0) {
+        stop.isVisited = true;
+      }
+
+      if (!stop.isVisited && dist < minDistance) {
         minDistance = dist;
         closest = stop;
       }
@@ -694,10 +780,12 @@ class _DriverLiveNavigationScreenState extends State<DriverLiveNavigationScreen>
                 maxZoom: 20,
               ),
 
-              // Student Stop Markers & Live Bus Marker
+
+
+              // Student Stop Markers & Live Bus Marker Layer
               MarkerLayer(
                 markers: [
-                  // Stop Markers
+                  // 1. Student Pickup Stop Markers
                   ..._stops.map((stop) {
                     final isSelected = _selectedStop == stop;
                     return Marker(
@@ -764,50 +852,19 @@ class _DriverLiveNavigationScreenState extends State<DriverLiveNavigationScreen>
                     );
                   }),
 
-                  // Bus Live Location Marker
+                  // 2. 3D Animated Glowing Bus Marker with real heading & speed badge
                   if (_currentBusLocation != null)
                     Marker(
                       point: _currentBusLocation!,
-                      width: 52,
-                      height: 52,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Radar Pulse Ring
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.primary.withOpacity(0.2),
-                            ),
-                          ),
-                          // Bus Icon Circle
-                          Transform.rotate(
-                            angle: (_currentHeading * math.pi / 180),
-                            child: Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2.5),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.directions_bus_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ],
+                      width: 120,
+                      height: 120,
+                      alignment: Alignment.center,
+                      child: Mavio3DBusMarker(
+                        busName: widget.vehicle.name,
+                        speedKmH: _currentSpeedKmH,
+                        headingDegrees: _currentHeading,
+                        isLive: true,
+                        showBadge: true,
                       ),
                     ),
                 ],
@@ -901,43 +958,107 @@ class _DriverLiveNavigationScreenState extends State<DriverLiveNavigationScreen>
                     ),
                     const SizedBox(width: 10),
 
-                    // Speedometer Badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    // Speedometer Badge with Overspeed Detection
+                    Builder(
+                      builder: (context) {
+                        double limit = 60.0;
+                        try {
+                          final auth = Provider.of<AuthProvider>(context, listen: false);
+                          if (auth.verifiedOrg?.speedLimitKmh != null) {
+                            limit = auth.verifiedOrg!.speedLimitKmh;
+                          }
+                        } catch (_) {}
+                        final bool isOverspeeding = _currentSpeedKmH > limit;
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isOverspeeding ? AppColors.error : Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isOverspeeding ? AppColors.error : Colors.black).withOpacity(isOverspeeding ? 0.35 : 0.08),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isOverspeeding)
+                                    const Padding(
+                                      padding: EdgeInsets.only(right: 3),
+                                      child: Icon(Icons.warning_amber_rounded, color: Colors.white, size: 14),
+                                    ),
+                                  Text(
+                                    _currentSpeedKmH.toStringAsFixed(0),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: isOverspeeding ? Colors.white : AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                'km/h',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: isOverspeeding ? Colors.white.withOpacity(0.9) : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+
+                // Overspeed Warning Banner
+                Builder(
+                  builder: (context) {
+                    double limit = 60.0;
+                    try {
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      if (auth.verifiedOrg?.speedLimitKmh != null) {
+                        limit = auth.verifiedOrg!.speedLimitKmh;
+                      }
+                    } catch (_) {}
+                    if (_currentSpeedKmH <= limit) return const SizedBox.shrink();
+
+                    return Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
+                            color: AppColors.error.withOpacity(0.4),
                             blurRadius: 10,
                             offset: const Offset(0, 3),
                           ),
                         ],
                       ),
-                      child: Column(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          const Icon(Icons.warning_rounded, color: Colors.white, size: 18),
+                          const SizedBox(width: 8),
                           Text(
-                            _currentSpeedKmH.toStringAsFixed(0),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const Text(
-                            'km/h',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textSecondary,
-                            ),
+                            'SLOW DOWN! Speed Limit Exceeded (${_currentSpeedKmH.toStringAsFixed(0)} km/h / Limit: ${limit.toStringAsFixed(0)} km/h)',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ],
             ),

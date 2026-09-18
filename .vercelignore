@@ -1,0 +1,15 @@
+.dart_tool
+.git
+.idea
+android
+ios
+windows
+macos
+linux
+build/app
+build/ios
+build/outputs
+node_modules
+*.aab
+*.apk
+*.ipa

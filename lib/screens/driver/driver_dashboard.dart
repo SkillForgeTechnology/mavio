@@ -27,11 +27,13 @@ class DriverDashboard extends StatefulWidget {
   State<DriverDashboard> createState() => _DriverDashboardState();
 }
 
-class _DriverDashboardState extends State<DriverDashboard> {
+class _DriverDashboardState extends State<DriverDashboard> with SingleTickerProviderStateMixin {
   final SupabaseService _db = SupabaseService();
   
   int _currentIndex = 0;
-  bool _isLoading = false;
+  bool _isLoading = true;
+  String _loadingStepText = "Connecting to fleet data...";
+  late AnimationController _shimmerController;
   MavioVehicle? _assignedVehicle;
   MavioVehicle? _defaultVehicle;
   bool _isTemporaryAssigned = false;
@@ -46,6 +48,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   StreamSubscription<Position>? _gpsSubscription;
   StreamSubscription? _backgroundSubscription;
   double _currentSpeed = 0.0;
+  double _liveTripDistanceKm = 0.0;
   int _pingsSent = 0;
   int _tripSeconds = 0;
   Timer? _tripDurationTimer;
@@ -57,6 +60,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
   @override
   void initState() {
     super.initState();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+
     _loadDriverDetails();
     _checkGpsStatus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -66,6 +74,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
   @override
   void dispose() {
+    _shimmerController.dispose();
     _cleanupLocalTrackingUI();
     super.dispose();
   }
@@ -73,55 +82,70 @@ class _DriverDashboardState extends State<DriverDashboard> {
   Future<void> _loadDriverDetails() async {
     setState(() {
       _isLoading = true;
+      _loadingStepText = "Connecting to fleet data...";
     });
 
     final profile = Provider.of<AuthProvider>(context, listen: false).currentProfile;
     if (profile != null) {
-      // 1. Fetch default assigned vehicle
-      MavioVehicle? defaultV;
-      if (profile.assignedVehicleId != null) {
-        defaultV = await _db.getVehicle(profile.assignedVehicleId!);
+      try {
+        setState(() {
+          _loadingStepText = "Syncing vehicle & active trips...";
+        });
+
+        // Parallel fetch for vehicle, active trip, and history
+        final results = await Future.wait([
+          profile.assignedVehicleId != null
+              ? _db.getVehicle(profile.assignedVehicleId!)
+              : Future<MavioVehicle?>.value(null),
+          _db.getActiveTripForDriver(profile.id),
+          _db.getDriverTripHistory(profile.id),
+        ]);
+
+        final defaultV = results[0] as MavioVehicle?;
+        final activeTrip = results[1] as MavioTrip?;
+        final history = results[2] as List<MavioTrip>;
+
+        MavioVehicle? activeV;
+        bool isTemp = false;
+
+        if (activeTrip != null) {
+          if (defaultV != null && activeTrip.vehicleId == defaultV.id) {
+            activeV = defaultV;
+            isTemp = false;
+          } else {
+            activeV = await _db.getVehicle(activeTrip.vehicleId);
+            isTemp = (defaultV == null || activeV?.id != defaultV.id);
+          }
+        } else {
+          activeV = _assignedVehicle ?? defaultV;
+          isTemp = (defaultV == null || activeV?.id != defaultV.id);
+        }
+
+        if (mounted) {
+          setState(() {
+            _defaultVehicle = defaultV;
+            _assignedVehicle = activeV;
+            _isTemporaryAssigned = isTemp;
+            _activeTrip = activeTrip;
+            _isTripActive = activeTrip != null;
+            _tripHistory = history;
+            _calculateMonthlyTotal();
+          });
+        }
+
+        if (_isTripActive && _activeTrip != null) {
+          _startTracking(_activeTrip!.id);
+        }
+      } catch (e) {
+        debugPrint("Error loading driver details: $e");
       }
-
-      // 2. Check if driver currently has an ACTIVE trip across ANY vehicle (scanned or default)
-      final activeTrip = await _db.getActiveTripForDriver(profile.id);
-
-      MavioVehicle? activeV;
-      bool isTemp = false;
-
-      if (activeTrip != null) {
-        // Driver is currently in an active trip! Fetch that specific vehicle
-        activeV = await _db.getVehicle(activeTrip.vehicleId);
-        isTemp = (defaultV == null || activeV?.id != defaultV.id);
-      } else {
-        // If driver had scanned a shift vehicle before starting trip, retain it; otherwise use default
-        activeV = _assignedVehicle ?? defaultV;
-        isTemp = (defaultV == null || activeV?.id != defaultV.id);
-      }
-
-      setState(() {
-        _defaultVehicle = defaultV;
-        _assignedVehicle = activeV;
-        _isTemporaryAssigned = isTemp;
-        _activeTrip = activeTrip;
-        _isTripActive = activeTrip != null;
-      });
-
-      if (_isTripActive && _activeTrip != null) {
-        _startTracking(_activeTrip!.id);
-      }
-
-      // Fetch Driver History
-      final history = await _db.getDriverTripHistory(profile.id);
-      setState(() {
-        _tripHistory = history;
-        _calculateMonthlyTotal();
-      });
     }
 
-    setState(() {
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _calculateMonthlyTotal() {
@@ -133,6 +157,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
         if (trip.startedAt.month == now.month && trip.startedAt.year == now.year) {
           totalSeconds += trip.endedAt!.difference(trip.startedAt).inSeconds;
           totalKm += trip.totalDistanceKm;
+        }
+      } else if (trip.status == 'ACTIVE') {
+        if (trip.startedAt.month == now.month && trip.startedAt.year == now.year) {
+          totalSeconds += _tripSeconds;
+          totalKm += _liveTripDistanceKm;
         }
       }
     }
@@ -503,6 +532,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
       setState(() {
         _activeTrip = trip;
         _isTripActive = true;
+        _liveTripDistanceKm = 0.0;
+        // Instantly add active trip to history list at the top
+        _tripHistory.removeWhere((t) => t.id == trip.id);
+        _tripHistory.insert(0, trip);
+        _calculateMonthlyTotal();
       });
 
       await _startTracking(trip.id);
@@ -526,18 +560,39 @@ class _DriverDashboardState extends State<DriverDashboard> {
   Future<void> _endActiveTrip() async {
     if (_activeTrip == null || _assignedVehicle == null) return;
 
+    final endingTripId = _activeTrip!.id;
+    final finalDistance = _liveTripDistanceKm;
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await _db.endTrip(_activeTrip!.id, _assignedVehicle!.id);
+      await _db.endTrip(endingTripId, _assignedVehicle!.id, liveDistanceKm: finalDistance);
       _stopTracking();
-      await _loadDriverDetails();
+
       setState(() {
+        // Immediately mark trip as completed in history list
+        final idx = _tripHistory.indexWhere((t) => t.id == endingTripId);
+        if (idx != -1) {
+          final old = _tripHistory[idx];
+          _tripHistory[idx] = MavioTrip(
+            id: old.id,
+            vehicleId: old.vehicleId,
+            driverId: old.driverId,
+            status: 'COMPLETED',
+            startedAt: old.startedAt,
+            endedAt: DateTime.now(),
+            orgId: old.orgId,
+            totalDistanceKm: finalDistance > 0 ? finalDistance : old.totalDistanceKm,
+          );
+        }
         _activeTrip = null;
         _isTripActive = false;
+        _liveTripDistanceKm = 0.0;
+        _calculateMonthlyTotal();
       });
+
       _showSnackbar("Trip completed successfully.", AppColors.primary);
     } catch (e) {
       _showSnackbar(e.toString(), AppColors.error);
@@ -869,6 +924,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
             if (uploads != null && uploads >= _pingsSent) {
               _pingsSent = uploads;
             }
+            final liveDist = (event?['distanceKm'] as num?)?.toDouble();
+            if (liveDist != null && liveDist >= _liveTripDistanceKm) {
+              _liveTripDistanceKm = liveDist;
+              _calculateMonthlyTotal();
+            }
           });
         }
       });
@@ -1040,11 +1100,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
         ),
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              ),
-            )
+          ? _buildDriverHomeSkeletonLoader()
           : RefreshIndicator(
               onRefresh: _loadDriverDetails,
               color: AppColors.primary,
@@ -1416,6 +1472,191 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
+  // ================= DRIVER HOME BEAUTIFUL SKELETON LOADER =================
+  Widget _buildShimmerBox({required double height, double? width, double borderRadius = 12}) {
+    return AnimatedBuilder(
+      animation: _shimmerController,
+      builder: (context, child) {
+        return Container(
+          height: height,
+          width: width,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(borderRadius),
+            gradient: LinearGradient(
+              begin: Alignment(-1.0 + _shimmerController.value * 2.0, -0.3),
+              end: Alignment(1.0 + _shimmerController.value * 2.0, 0.3),
+              colors: const [
+                Color(0xFFE2E8F0),
+                Color(0xFFF8FAFC),
+                Color(0xFFCBD5E1),
+                Color(0xFFE2E8F0),
+              ],
+              stops: const [0.0, 0.35, 0.65, 1.0],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDriverHomeSkeletonLoader() {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Dynamic Loading Status Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withOpacity(0.18),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 1.5),
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Loading Driver Console',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            _loadingStepText,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.75),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: const LinearProgressIndicator(
+                    minHeight: 4,
+                    backgroundColor: Color(0xFF334155),
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Greeting Row Skeleton
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildShimmerBox(height: 14, width: 50, borderRadius: 6),
+                  const SizedBox(height: 8),
+                  _buildShimmerBox(height: 24, width: 160, borderRadius: 8),
+                ],
+              ),
+              _buildShimmerBox(height: 28, width: 90, borderRadius: 12),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Assigned Bus Card Skeleton
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                _buildShimmerBox(height: 56, width: 56, borderRadius: 14),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildShimmerBox(height: 18, width: double.infinity, borderRadius: 6),
+                      const SizedBox(height: 8),
+                      _buildShimmerBox(height: 14, width: 130, borderRadius: 6),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Scan QR Button Skeleton
+          _buildShimmerBox(height: 46, width: double.infinity, borderRadius: 14),
+          const SizedBox(height: 20),
+
+          // Status Indicators Row Skeleton (3 boxes)
+          Row(
+            children: [
+              Expanded(child: _buildShimmerBox(height: 72, borderRadius: 16)),
+              const SizedBox(width: 10),
+              Expanded(child: _buildShimmerBox(height: 72, borderRadius: 16)),
+              const SizedBox(width: 10),
+              Expanded(child: _buildShimmerBox(height: 72, borderRadius: 16)),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Start Trip Button Skeleton
+          _buildShimmerBox(height: 62, width: double.infinity, borderRadius: 18),
+        ],
+      ),
+    );
+  }
+
   // ================= TAB 1: LIVE MAP =================
   Widget _buildLiveMapTab() {
     if (_assignedVehicle == null) {
@@ -1667,11 +1908,16 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     final timeStr = intl.DateFormat('hh:mm a').format(trip.startedAt);
                     
                     String durationStr = "In Progress";
+                    double displayDistKm = trip.totalDistanceKm;
+
                     if (trip.status == 'COMPLETED' && trip.endedAt != null) {
                       final duration = trip.endedAt!.difference(trip.startedAt);
                       final hours = duration.inHours;
                       final mins = duration.inMinutes % 60;
                       durationStr = hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
+                    } else if (trip.status == 'ACTIVE') {
+                      durationStr = "${_formatDuration(_tripSeconds)} (Live)";
+                      displayDistKm = _liveTripDistanceKm > 0 ? _liveTripDistanceKm : trip.totalDistanceKm;
                     }
 
                     return Container(
@@ -1756,14 +2002,14 @@ class _DriverDashboardState extends State<DriverDashboard> {
                               Row(
                                 children: [
                                   const Icon(Icons.timer_outlined, size: 16, color: AppColors.textSecondary),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    "Duration: ",
-                                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                    "Dur: ",
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                   ),
                                   Text(
                                     durationStr,
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                                   ),
                                 ],
                               ),
@@ -1771,16 +2017,53 @@ class _DriverDashboardState extends State<DriverDashboard> {
                               Row(
                                 children: [
                                   const Icon(Icons.straighten_rounded, size: 16, color: AppColors.primary),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    "Distance: ",
-                                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                    "Dist: ",
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                   ),
                                   Text(
-                                    "${trip.totalDistanceKm.toStringAsFixed(1)} km",
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                    "${displayDistKm.toStringAsFixed(1)} km",
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
                                   ),
                                 ],
+                              ),
+                              // Max Speed KM/H
+                              Builder(
+                                builder: (context) {
+                                  double limit = 60.0;
+                                  try {
+                                    final auth = Provider.of<AuthProvider>(context, listen: false);
+                                    if (auth.verifiedOrg?.speedLimitKmh != null) {
+                                      limit = auth.verifiedOrg!.speedLimitKmh;
+                                    }
+                                  } catch (_) {}
+                                  final bool isOverspeed = trip.maxSpeedKmh > limit;
+                                  final badgeColor = isOverspeed ? AppColors.error : Colors.orangeAccent;
+
+                                  return Row(
+                                    children: [
+                                      Icon(
+                                        isOverspeed ? Icons.warning_amber_rounded : Icons.speed_rounded,
+                                        size: 16,
+                                        color: badgeColor,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "Max: ",
+                                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                      ),
+                                      Text(
+                                        "${trip.maxSpeedKmh.toStringAsFixed(1)} km/h",
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: badgeColor,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
                             ],
                           ),

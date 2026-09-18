@@ -150,6 +150,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       _hasNewNotifications = false;
                     }
                   });
+                  if (index == 1) {
+                    tracking.syncTripPath();
+                  }
                 },
                 items: [
                   const BottomNavigationBarItem(
@@ -1138,6 +1141,7 @@ class _MapTabState extends State<_MapTab> with TickerProviderStateMixin {
       _trackingProvider?.removeListener(_onTrackingUpdate);
       _trackingProvider = newProvider;
       _trackingProvider?.addListener(_onTrackingUpdate);
+      newProvider.syncTripPath();
 
       // Centering once map layouts complete
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1214,6 +1218,22 @@ class _MapTabState extends State<_MapTab> with TickerProviderStateMixin {
       newPos.latitude,
       newPos.longitude,
     );
+
+    // If distance jumped > 100 meters (e.g. app resume, refresh, or reconnect),
+    // snap immediately to current live driver location so the icon doesn't glide across the city from trip start!
+    if (distMeters > 100.0) {
+      _prevPos = newPos;
+      _targetPos = newPos;
+      _prevHeading = loc.heading;
+      _targetHeading = loc.heading;
+      _prevSpeed = effectiveSpeed;
+      _targetSpeed = effectiveSpeed;
+      _posAnimController.value = 1.0;
+      if (_isAutoCenterEnabled) {
+        _centerOnBus(loc);
+      }
+      return;
+    }
 
     // Micro-jitter suppression: if stationary and moved < 2.5m, ignore jitter
     if (effectiveSpeed == 0.0 && distMeters < 2.5) {
@@ -1440,19 +1460,7 @@ class _MapTabState extends State<_MapTab> with TickerProviderStateMixin {
                 keepBuffer: 3,
               ),
 
-              // Glowing Route Path Line
-              if (isLive && tracking.tripPath.isNotEmpty)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: tracking.tripPath,
-                      strokeWidth: 4.5,
-                      color: AppColors.primary,
-                      borderColor: AppColors.primary.withOpacity(0.3),
-                      borderStrokeWidth: 4.0,
-                    ),
-                  ],
-                ),
+
 
               // Pinned Student Alert Stop Circle Layer
               if (profile?.alertLatitude != null && profile?.alertLongitude != null)

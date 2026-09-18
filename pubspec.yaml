@@ -1,7 +1,7 @@
 name: mavio
 description: "A new Flutter project."
 publish_to: 'none'
-version: 2.8.3+17
+version: 3.2.0+23
 
 environment:
   sdk: ^3.12.2
@@ -23,6 +23,7 @@ dependencies:
   url_launcher: ^6.3.0
   video_player: 2.8.2
   onesignal_flutter: ^5.2.4
+  shared_preferences: ^2.3.2
   http: ^1.2.0
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.4.0

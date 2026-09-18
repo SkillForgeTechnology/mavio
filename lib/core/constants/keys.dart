@@ -1,3 +1,12 @@
+/// MAVIO API Keys Configuration
+///
+/// All secrets are loaded from build-time environment variables via
+/// `--dart-define` or `--dart-define-from-file=.env`.
+///
+/// Build command example:
+/// ```
+/// flutter run --dart-define-from-file=.env
+/// ```
 class SupabaseKeys {
   static const String url = String.fromEnvironment(
     'SUPABASE_URL',
@@ -17,15 +26,10 @@ class OneSignalKeys {
     defaultValue: '2633169a-2c5f-4856-bfd3-12361105dc17',
   );
 
-  static String get restApiKey {
-    const fromEnv = String.fromEnvironment('ONESIGNAL_REST_API_KEY');
-    if (fromEnv.isNotEmpty) return fromEnv;
-    // Fallback key reconstructed safely if not defined at build time
-    return [
-      'os_v2_app',
-      'eyzrngrml5efnp6tci3bcbo4c4cuypd5it7u5jm4jl4e46pttgtmbflh6nokg7fxo2e5u4vmlqv3slijm4zrfgm4vqeawkrjkncbisi'
-    ].join('_');
-  }
+  static const String restApiKey = String.fromEnvironment(
+    'ONESIGNAL_REST_API_KEY',
+    defaultValue: '',
+  );
+
+  static bool get isConfigured => appId.isNotEmpty && restApiKey.isNotEmpty;
 }
-
-

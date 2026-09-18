@@ -9,6 +9,7 @@ import 'package:flutter_background_service_android/flutter_background_service_an
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/keys.dart';
 
@@ -36,7 +37,6 @@ void onStart(ServiceInstance service) async {
   final client = Supabase.instance.client;
   StreamSubscription<Position>? gpsSub;
   Timer? periodicTicker;
-  DateTime lastUploadTime = DateTime.fromMillisecondsSinceEpoch(0);
   String? tripId;
   String? vehicleId;
   String? vehicleName;
@@ -44,6 +44,13 @@ void onStart(ServiceInstance service) async {
   double lastSpeed = 0.0;
   double? lastLat;
   double? lastLng;
+  double liveTripDistanceKm = 0.0;
+  double liveTripMaxSpeedKmH = 0.0;
+  DateTime? lastPositionTime;
+  DateTime? lastSentTime;
+  double? refLat;
+  double? refLng;
+  final List<Map<String, dynamic>> offlineGpsQueue = [];
   final List<_StudentProximityTarget> studentTargets = [];
 
   if (service is AndroidServiceInstance) {
@@ -55,10 +62,45 @@ void onStart(ServiceInstance service) async {
     });
   }
 
+  Future<void> saveOfflineQueueToDisk() async {
+    try {
+      if (tripId == null) return;
+      final prefs = await SharedPreferences.getInstance();
+      final rawJson = jsonEncode(offlineGpsQueue);
+      await prefs.setString('mavio_trip_backup_$tripId', rawJson);
+    } catch (_) {}
+  }
+
+  Future<void> loadOfflineQueueFromDisk() async {
+    try {
+      if (tripId == null) return;
+      final prefs = await SharedPreferences.getInstance();
+      final rawJson = prefs.getString('mavio_trip_backup_$tripId');
+      if (rawJson != null && rawJson.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(rawJson);
+        for (var item in list) {
+          if (item is Map) {
+            offlineGpsQueue.add(Map<String, dynamic>.from(item));
+          }
+        }
+        print("MAVIO Background: Restored ${offlineGpsQueue.length} unsynced points from local device backup!");
+      }
+    } catch (_) {}
+  }
+
+  Future<void> clearOfflineQueueFromDisk() async {
+    try {
+      if (tripId == null) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('mavio_trip_backup_$tripId');
+    } catch (_) {}
+  }
+
   service.on('getStats').listen((event) {
     service.invoke('updateStats', {
       'speed': lastSpeed,
       'uploads': uploadCount,
+      'distanceKm': double.parse(liveTripDistanceKm.toStringAsFixed(2)),
       'latitude': lastLat,
       'longitude': lastLng,
       'isTracking': tripId != null && (gpsSub != null || periodicTicker != null),
@@ -66,14 +108,23 @@ void onStart(ServiceInstance service) async {
     });
   });
 
-  service.on('stopService').listen((event) {
+  service.on('stopService').listen((event) async {
     gpsSub?.cancel();
     gpsSub = null;
     periodicTicker?.cancel();
     periodicTicker = null;
+    if (offlineGpsQueue.isNotEmpty && tripId != null) {
+      try {
+        final batch = List<Map<String, dynamic>>.from(offlineGpsQueue);
+        await client.from('location_updates').insert(batch);
+        offlineGpsQueue.clear();
+      } catch (_) {}
+    }
+    await clearOfflineQueueFromDisk();
     studentTargets.clear();
     tripId = null;
     uploadCount = 0;
+    liveTripDistanceKm = 0.0;
     service.stopSelf();
   });
 
@@ -87,6 +138,7 @@ void onStart(ServiceInstance service) async {
       service.invoke('updateStats', {
         'speed': lastSpeed,
         'uploads': uploadCount,
+        'distanceKm': double.parse(liveTripDistanceKm.toStringAsFixed(2)),
         'latitude': lastLat,
         'longitude': lastLng,
         'isTracking': true,
@@ -100,6 +152,29 @@ void onStart(ServiceInstance service) async {
     tripId = incomingTripId;
     vehicleId = event?['vehicleId'] as String?;
     vehicleName = event?['vehicleName'] as String?;
+    uploadCount = 0;
+    liveTripDistanceKm = 0.0; // ⚡ RESET accumulated distance for new trip!
+    liveTripMaxSpeedKmH = 0.0;
+    lastSpeed = 0.0;
+    lastLat = null;
+    lastLng = null;
+    refLat = null;
+    refLng = null;
+    lastPositionTime = null;
+    lastSentTime = null;
+
+    // Load any unsynced points from local flight-recorder backup
+    await loadOfflineQueueFromDisk();
+    if (offlineGpsQueue.isNotEmpty) {
+      try {
+        final batch = List<Map<String, dynamic>>.from(offlineGpsQueue);
+        await client.from('location_updates').insert(batch);
+        uploadCount += batch.length;
+        offlineGpsQueue.clear();
+        await clearOfflineQueueFromDisk();
+        print("MAVIO Background: Flushed ${batch.length} restored points on trip startup!");
+      } catch (_) {}
+    }
 
     // If initial count is passed from database/UI, start from that count
     final initialUploads = event?['initialUploads'] as int?;
@@ -173,9 +248,6 @@ void onStart(ServiceInstance service) async {
       }
     }
 
-    DateTime? lastPositionTime;
-    final List<Map<String, dynamic>> offlineGpsQueue = [];
-
     // Define reusable position handler that uploads GPS and checks student proximity
     Future<void> handlePosition(Position position) async {
       if (tripId == null) return;
@@ -188,24 +260,60 @@ void onStart(ServiceInstance service) async {
 
       final now = DateTime.now();
 
-      // 2. Velocity-based glitch filter: Only reject if speed exceeds 180 km/h in under 6 seconds
+      // Initialize reference point for distance calculation
+      refLat ??= position.latitude;
+      refLng ??= position.longitude;
+
+      double distMeters = 0.0;
+      double calculatedSpeedKmH = 0.0;
+
       if (lastLat != null && lastLng != null && lastPositionTime != null) {
-        final elapsedSeconds = now.difference(lastPositionTime!).inSeconds;
-        final distMeters = Geolocator.distanceBetween(
-          lastLat!,
-          lastLng!,
+        final elapsedSeconds = math.max(1, now.difference(lastPositionTime!).inSeconds);
+        
+        // Calculate distance from reference point
+        distMeters = Geolocator.distanceBetween(
+          refLat!,
+          refLng!,
           position.latitude,
           position.longitude,
         );
 
-        // Only reject impossible teleportation (< 6s AND > 300m, i.e. > 180 km/h)
-        if (elapsedSeconds < 6 && distMeters > 300.0) {
-          print("MAVIO GPS: Outlier teleportation jump of ${distMeters.round()}m in ${elapsedSeconds}s rejected");
-          return;
+        // Accurately accumulate physical movement >= 3.0m without artificial distance capping
+        if (distMeters >= 3.0) {
+          liveTripDistanceKm += (distMeters / 1000.0);
+          calculatedSpeedKmH = (distMeters / elapsedSeconds) * 3.6;
+          // Advance reference point only when movement is recorded
+          refLat = position.latitude;
+          refLng = position.longitude;
         }
       }
 
+      // Real-time responsive Speed Calculation (Google Maps hybrid delta & Doppler method)
+      final rawSpeedKmH = math.max(0.0, position.speed * 3.6);
+      double effectiveSpeed = math.max(rawSpeedKmH, calculatedSpeedKmH);
+      if (effectiveSpeed < 1.0) effectiveSpeed = 0.0;
+
+      lastSpeed = effectiveSpeed;
+
+      // Ensure location updates are sent/uploaded at 6-second intervals
+      if (lastSentTime != null && now.difference(lastSentTime!).inSeconds < 6) {
+        lastLat = position.latitude;
+        lastLng = position.longitude;
+
+        service.invoke('updateStats', {
+          'speed': double.parse(lastSpeed.toStringAsFixed(1)),
+          'uploads': uploadCount,
+          'distanceKm': double.parse(liveTripDistanceKm.toStringAsFixed(2)),
+          'latitude': lastLat,
+          'longitude': lastLng,
+          'isTracking': true,
+          'tripId': tripId,
+        });
+        return;
+      }
+
       lastPositionTime = now;
+      lastSentTime = now;
 
       try {
         lastSpeed = math.max(0.0, position.speed * 3.6);
@@ -222,7 +330,7 @@ void onStart(ServiceInstance service) async {
           'created_at': now.toUtc().toIso8601String(),
         };
 
-        // Push update directly to DB from background isolate with offline queue recovery
+        // Push update directly to DB from background isolate with persistent store & forward
         try {
           if (offlineGpsQueue.isNotEmpty) {
             offlineGpsQueue.add(currentPoint);
@@ -230,16 +338,17 @@ void onStart(ServiceInstance service) async {
             await client.from('location_updates').insert(batch);
             uploadCount += batch.length;
             offlineGpsQueue.clear();
+            await clearOfflineQueueFromDisk();
             print("MAVIO Background: Flushed ${batch.length} queued offline points in chronological order!");
           } else {
             await client.from('location_updates').insert(currentPoint);
             uploadCount++;
           }
         } catch (dbError) {
-          print("MAVIO Background: Network offline/unstable ($dbError). Queuing point in local cache (Total queued: ${offlineGpsQueue.length + 1})");
-          // Keep in offline cache (capped at 500 points = ~25 minutes of zero-network buffer)
+          print("MAVIO Background: Network offline/unstable ($dbError). Queuing point in local phone storage (Total queued: ${offlineGpsQueue.length + 1})");
           if (offlineGpsQueue.length < 500) {
             offlineGpsQueue.add(currentPoint);
+            await saveOfflineQueueToDisk();
           }
           uploadCount++;
         }
@@ -248,11 +357,21 @@ void onStart(ServiceInstance service) async {
         service.invoke('updateStats', {
           'speed': lastSpeed,
           'uploads': uploadCount,
+          'distanceKm': double.parse(liveTripDistanceKm.toStringAsFixed(2)),
           'latitude': lastLat,
           'longitude': lastLng,
           'isTracking': true,
           'tripId': tripId,
         });
+
+        // Periodically sync live accumulated distance to trips table in Supabase (every ~5 fixes)
+        if (uploadCount % 5 == 0 && tripId != null) {
+          try {
+            await client.from('trips').update({
+              'total_distance_km': double.parse(liveTripDistanceKm.toStringAsFixed(2)),
+            }).eq('id', tripId!);
+          } catch (_) {}
+        }
 
         // 2. Periodically refresh student targets from Supabase if authenticated (every ~30s / 10 updates)
         if (uploadCount % 10 == 0 && vehicleId != null && vehicleId!.isNotEmpty) {
@@ -367,14 +486,14 @@ void onStart(ServiceInstance service) async {
       print("MAVIO Background: Initial position capture warning: $e");
     }
 
-    // 2. Start geolocator stream inside background thread using Google Fused Location
+    // 2. Start geolocator stream inside background thread using Google Fused Location (6s interval)
     final locationSettings = AndroidSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 0, // capture all updates
-      intervalDuration: const Duration(seconds: 3), // 3s telemetry interval
-      forceLocationManager: false, // ⚡ Use Google Play Services Fused Location for instant fixes indoors/outdoors
+      distanceFilter: 3, // capture meaningful movement updates
+      intervalDuration: const Duration(seconds: 6), // ⚡ 6-second live location interval
+      forceLocationManager: false, // ⚡ Use Google Play Services Fused Location for non-blocking updates
       foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationText: "MAVIO is tracking your bus location in the background for active student routing.",
+        notificationText: "MAVIO is tracking your bus location in the background every 6 seconds.",
         notificationTitle: "MAVIO Smart Transit Active",
         enableWakeLock: true,
       ),
@@ -387,21 +506,21 @@ void onStart(ServiceInstance service) async {
       },
     );
 
-    // 3. Continuous 3-second periodic ticker to guarantee pings keep incrementing (1, 2, 3...) even when stationary
+    // 3. Lightweight 6-second ticker to check connection health without flooding Android Location Provider
     periodicTicker?.cancel();
-    periodicTicker = Timer.periodic(const Duration(seconds: 3), (_) async {
+    periodicTicker = Timer.periodic(const Duration(seconds: 6), (_) async {
       if (tripId == null) {
         periodicTicker?.cancel();
         return;
       }
-      try {
-        final pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 3),
-        );
-        await handlePosition(pos);
-      } catch (e) {
-        // Do not use stale getLastKnownPosition; wait for next live fix
+      // Only fetch last known position if no GPS stream fix has been received for over 12 seconds
+      if (lastPositionTime == null || DateTime.now().difference(lastPositionTime!).inSeconds >= 12) {
+        try {
+          final pos = await Geolocator.getLastKnownPosition();
+          if (pos != null) {
+            await handlePosition(pos);
+          }
+        } catch (_) {}
       }
     });
   });

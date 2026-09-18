@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/keys.dart';
 import '../../models/models.dart';
 import 'push_notification_service.dart';
+import 'osrm_service.dart';
+import 'package:latlong2/latlong.dart';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -29,7 +31,7 @@ class SupabaseService {
       createdAt: '2026-08-18T10:00:00Z',
     ),
     'XYZ456': MavioOrganization(
-      id: 'org-stanford-uuid-123456',
+      id: '12345678-1234-5678-abcd-123456789012',
       code: 'XYZ456',
       name: 'Stanford University Route Hub',
       email: 'transit-admin@stanford.edu',
@@ -41,7 +43,7 @@ class SupabaseService {
       createdAt: '2026-08-10T08:30:00Z',
     ),
     'MITS99': MavioOrganization(
-      id: 'org-mit-uuid-789012',
+      id: '78901234-7890-5678-abcd-789012345678',
       code: 'MITS99',
       name: 'Massachusetts Institute of Tech',
       email: 'contact-transit@mit.edu',
@@ -53,7 +55,7 @@ class SupabaseService {
       createdAt: '2026-07-28T09:15:00Z',
     ),
     'SF101': MavioOrganization(
-      id: 'org-skillforge-uuid-555555',
+      id: '55555555-5555-5555-5555-555555555555',
       code: 'SF101',
       name: 'SkillForge Technical Academy',
       email: 'support@skillforgetechnology.app',
@@ -243,14 +245,30 @@ class SupabaseService {
       return null;
     } else {
       try {
-        final response = await Supabase.instance.client
-            .from('organizations')
-            .select()
-            .eq('code', cleanCode)
-            .maybeSingle();
+        Map<String, dynamic>? responseData;
+        try {
+          final rpcRes = await Supabase.instance.client
+              .rpc('lookup_org_by_code', params: {'org_code': cleanCode});
+          if (rpcRes != null && rpcRes is List && rpcRes.isNotEmpty) {
+            responseData = Map<String, dynamic>.from(rpcRes.first as Map);
+          }
+        } catch (_) {
+          // RPC might not exist yet if migration hasn't been run
+        }
 
-        if (response != null) {
-          _currentOrganization = MavioOrganization.fromJson(response);
+        if (responseData == null) {
+          final tableRes = await Supabase.instance.client
+              .from('organizations')
+              .select()
+              .ilike('code', cleanCode)
+              .maybeSingle();
+          if (tableRes != null) {
+            responseData = tableRes;
+          }
+        }
+
+        if (responseData != null) {
+          _currentOrganization = MavioOrganization.fromJson(responseData);
           return _currentOrganization;
         }
       } catch (e) {
@@ -262,10 +280,8 @@ class SupabaseService {
 
   // Fetch all organizations (for super-admin)
   Future<List<MavioOrganization>> fetchOrganizations() async {
-    // Run periodic database storage cleanup silently (60 days old trips pruning)
-    runPeriodicCleanup().catchError((e) {
-      print("Error in cleanup: $e");
-    });
+    // NOTE: Periodic cleanup has been moved to a server-side pg_cron job.
+    // See supabase/cleanup_rules.sql for the scheduled job.
 
     if (_useMockMode) {
       return _mockOrgs.values.toList();
@@ -299,16 +315,25 @@ class SupabaseService {
     }
   }
 
+  // TODO(security): CRITICAL — Migrate _ensureAdminSession to a Supabase Edge Function.
+  // This method uses hardcoded admin credentials to perform privileged operations
+  // (org creation, user management). The correct approach is:
+  //   1. Create a Supabase Edge Function with the service_role key (server-side only).
+  //   2. Call that Edge Function from the client via HTTP with the user's JWT.
+  //   3. The Edge Function validates the JWT + management role, then performs
+  //      the privileged operation using the admin client.
+  // Until then, this is a security risk if the app is decompiled.
   Future<void> _ensureAdminSession() async {
     final client = Supabase.instance.client;
     if (client.auth.currentSession == null) {
       try {
+        // FIXME: Remove hardcoded credentials — use Edge Function instead
         await client.auth.signInWithPassword(
           email: 'admin@mavio.com',
           password: 'password',
         );
       } catch (e) {
-        print("Error ensuring admin session: $e");
+        debugPrint("Error ensuring admin session: $e");
       }
     }
   }
@@ -328,7 +353,7 @@ class SupabaseService {
   }) async {
     final cleanCode = code.trim().toUpperCase();
     final status = subscriptionStatus ?? 'free_trial';
-    final limitVehicles = maxVehicles ?? (status == 'free_trial' ? 15 : (status == 'active' ? 25 : 10));
+    final limitVehicles = maxVehicles ?? (status == 'free_trial' ? 25 : 25);
     final limitDrivers = maxDrivers ?? 10;
 
     if (_useMockMode) {
@@ -473,9 +498,11 @@ class SupabaseService {
     String? subscriptionStatus,
     int? maxVehicles,
     int? maxDrivers,
+    double? speedLimitKmh,
     String? createdAt,
   }) async {
     final cleanCode = code.trim().toUpperCase();
+    final double spdLimit = speedLimitKmh ?? 60.0;
     if (_useMockMode) {
       final updatedOrg = MavioOrganization(
         id: id,
@@ -488,6 +515,7 @@ class SupabaseService {
         subscriptionStatus: subscriptionStatus,
         maxVehicles: maxVehicles,
         maxDrivers: maxDrivers,
+        speedLimitKmh: spdLimit,
         createdAt: createdAt,
       );
       // Clean up old key if code changed
@@ -512,6 +540,7 @@ class SupabaseService {
               'subscription_status': subscriptionStatus,
               'max_vehicles': maxVehicles,
               'max_drivers': maxDrivers,
+              'speed_limit_kmh': spdLimit,
             })
             .eq('id', id)
             .select()
@@ -636,7 +665,7 @@ class SupabaseService {
   Future<MavioProfile?> login(String email, String password, String role) async {
     String authEmail = email.trim();
 
-    // Special handling for Driver Mobile Number login
+    // Special handling for Driver Mobile Number / Student Roll login
     if (role == 'driver') {
       final cleanDigits = authEmail.replaceAll(RegExp(r'[^\d]'), '');
       if (!authEmail.contains('@') && cleanDigits.isNotEmpty) {
@@ -645,6 +674,27 @@ class SupabaseService {
     } else if (role == 'student') {
       if (!authEmail.contains('@') && authEmail.isNotEmpty) {
         authEmail = '$authEmail@mavio.student';
+      }
+    }
+
+    // Try resolving exact registered auth email from public.profiles via RPC if available
+    if ((role == 'driver' || role == 'student') && !_useMockMode) {
+      try {
+        final lookupRes = await Supabase.instance.client.rpc(
+          'lookup_auth_email_for_login',
+          params: {
+            'identifier': email.trim(),
+            'target_role': role,
+          },
+        );
+        if (lookupRes != null && lookupRes is List && lookupRes.isNotEmpty) {
+          final foundEmail = lookupRes.first['auth_email']?.toString();
+          if (foundEmail != null && foundEmail.trim().isNotEmpty) {
+            authEmail = foundEmail.trim();
+          }
+        }
+      } catch (e) {
+        print("Note: lookup_auth_email_for_login fallback: $e");
       }
     }
 
@@ -849,30 +899,44 @@ class SupabaseService {
       try {
         final client = Supabase.instance.client;
         
-        // Fetch fresh profile details
-        final freshProfileRes = await client
+        // 1. Parallelize profile and vehicle/trip resolution
+        final assignedId = _currentUserProfile!.assignedVehicleId;
+        
+        Future<dynamic> profileFuture = client
             .from('profiles')
             .select()
             .eq('id', _currentUserProfile!.id)
             .single();
-        _currentUserProfile = MavioProfile.fromJson(freshProfileRes);
+
+        Future<dynamic>? vehicleFuture;
+        if (assignedId != null && assignedId.isNotEmpty) {
+          vehicleFuture = client
+              .from('vehicles')
+              .select()
+              .eq('id', assignedId)
+              .maybeSingle();
+        }
+
+        final results = await Future.wait([
+          profileFuture,
+          if (vehicleFuture != null) vehicleFuture,
+        ]);
+
+        if (results.isNotEmpty && results[0] != null) {
+          _currentUserProfile = MavioProfile.fromJson(results[0]);
+        }
 
         MavioVehicle? vehicle;
         MavioVehicle? originalVehicle;
         bool isSubstituteRoute = false;
 
-        if (_currentUserProfile!.assignedVehicleId != null) {
-          final assignedId = _currentUserProfile!.assignedVehicleId!;
-          final res = await client
-              .from('vehicles')
-              .select()
-              .eq('id', assignedId)
-              .single();
-          originalVehicle = MavioVehicle.fromJson(res);
+        if (vehicleFuture != null && results.length > 1 && results[1] != null) {
+          originalVehicle = MavioVehicle.fromJson(results[1]);
 
           final subId = _currentUserProfile!.substituteVehicleId ??
               originalVehicle.substituteVehicleId ??
               _vehicleSubstitutes[assignedId];
+
           if (subId != null && subId.isNotEmpty && subId != assignedId) {
             try {
               final subRes = await client
@@ -894,20 +958,8 @@ class SupabaseService {
         String driverName = "Not Assigned";
         String driverEmail = "";
         String driverPhone = "";
-        if (vehicle != null) {
-          // Fetch the driver assigned to this vehicle from profiles
-          final driverRes = await client
-              .from('profiles')
-              .select()
-              .eq('assigned_vehicle_id', vehicle.id)
-              .eq('role', 'driver')
-              .maybeSingle();
-          if (driverRes != null) {
-            driverName = driverRes['name'] as String? ?? "Not Assigned";
-            driverEmail = driverRes['email'] as String? ?? "";
-            driverPhone = driverRes['phone'] as String? ?? "";
-          }
 
+        if (vehicle != null) {
           final tripRes = await client
               .from('trips')
               .select('*, profiles:driver_id(name, email, phone)')
@@ -919,9 +971,29 @@ class SupabaseService {
             activeTrip = MavioTrip.fromJson(tripRes);
             final profData = tripRes['profiles'];
             if (profData != null) {
-              driverName = profData['name'] as String? ?? driverName;
-              driverEmail = profData['email'] as String? ?? driverEmail;
-              driverPhone = profData['phone'] as String? ?? driverPhone;
+              driverName = profData['name'] as String? ?? "Driver";
+              driverEmail = profData['email'] as String? ?? "";
+              driverPhone = profData['phone'] as String? ?? "";
+            }
+          }
+
+          // Fallback: If no active trip or driver name unassigned, fetch driver assigned to this vehicle
+          if (driverName == "Not Assigned" || driverName.isEmpty) {
+            try {
+              final driverRes = await client
+                  .from('profiles')
+                  .select('name, email, phone')
+                  .eq('role', 'driver')
+                  .eq('assigned_vehicle_id', vehicle.id)
+                  .maybeSingle();
+
+              if (driverRes != null) {
+                driverName = driverRes['name'] as String? ?? "Driver";
+                driverEmail = driverRes['email'] as String? ?? "";
+                driverPhone = driverRes['phone'] as String? ?? "";
+              }
+            } catch (err) {
+              print("Error fetching assigned driver profile for student dashboard: $err");
             }
           }
         }
@@ -938,7 +1010,9 @@ class SupabaseService {
         };
       } catch (e) {
         print("Error fetching student data: $e");
-        rethrow;
+        return {
+          'profile': _currentUserProfile,
+        };
       }
     }
   }
@@ -1089,8 +1163,22 @@ class SupabaseService {
     }
   }
 
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const r = 6371000; // Earth radius in meters
+    final phi1 = lat1 * pi / 180;
+    final phi2 = lat2 * pi / 180;
+    final deltaPhi = (lat2 - lat1) * pi / 180;
+    final deltaLambda = (lon2 - lon1) * pi / 180;
+
+    final a = sin(deltaPhi / 2) * sin(deltaPhi / 2) +
+        cos(phi1) * cos(phi2) * sin(deltaLambda / 2) * sin(deltaLambda / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return r * c;
+  }
+
   // 6. Driver: End Trip
-  Future<void> endTrip(String tripId, String vehicleId) async {
+  Future<void> endTrip(String tripId, String vehicleId, {double? liveDistanceKm}) async {
+    final liveDist = liveDistanceKm ?? 0.0;
     if (_useMockMode) {
       final tripIndex = _mockTrips.indexWhere((t) => t.id == tripId);
       if (tripIndex != -1) {
@@ -1099,11 +1187,11 @@ class SupabaseService {
           id: t.id,
           vehicleId: t.vehicleId,
           driverId: t.driverId,
-
           status: 'COMPLETED',
           startedAt: t.startedAt,
           endedAt: DateTime.now(),
           orgId: t.orgId,
+          totalDistanceKm: liveDist > 0 ? liveDist : t.totalDistanceKm,
         );
       }
 
@@ -1117,26 +1205,146 @@ class SupabaseService {
           regNumber: v.regNumber,
           status: 'OFFLINE',
           orgId: v.orgId,
+          totalDistanceKm: v.totalDistanceKm + (liveDist > 0 ? liveDist : 0.0),
         );
       }
     } else {
       try {
         final client = Supabase.instance.client;
 
-        // Set trip to completed
-        await client
-            .from('trips')
-            .update({
-              'status': 'COMPLETED',
-              'ended_at': DateTime.now().toUtc().toIso8601String(),
-            })
-            .eq('id', tripId);
+        // Calculate exact real GPS road distance from location_updates or phone live distance
+        double calculatedDistKm = liveDist;
+        try {
+          final updates = await client
+              .from('location_updates')
+              .select('latitude, longitude, speed')
+              .eq('trip_id', tripId)
+              .order('created_at', ascending: true);
 
-        // Update vehicle status to OFFLINE
-        await client
-            .from('vehicles')
-            .update({'status': 'OFFLINE'})
-            .eq('id', vehicleId);
+          if (updates is List && updates.length > 1) {
+            final rawPts = <LatLng>[];
+            for (var u in updates) {
+              final lat = (u['latitude'] as num).toDouble();
+              final lon = (u['longitude'] as num).toDouble();
+              rawPts.add(LatLng(lat, lon));
+            }
+
+            // 1. Try OSRM Road Matching for 100% exact road snapped distance
+            final osrmResult = await OsrmService.matchTripPath(rawPts);
+            if (osrmResult != null && osrmResult.distanceKm > 0) {
+              calculatedDistKm = osrmResult.distanceKm;
+              print("MAVIO OSRM: 100% Road Snapped Distance calculated: ${osrmResult.distanceKm.toStringAsFixed(2)} km");
+            }
+
+            // 2. If OSRM match was lower or sparse (e.g. Fake GPS / long jumps), try OSRM Route between start & end
+            if (rawPts.length >= 2) {
+              final routeEta = await OsrmService.getRouteEta(
+                origin: rawPts.first,
+                destination: rawPts.last,
+              );
+              if (routeEta != null) {
+                final routeKm = routeEta['distanceKm'] as double? ?? 0.0;
+                if (routeKm > calculatedDistKm) {
+                  calculatedDistKm = routeKm;
+                  print("MAVIO OSRM: Road Route Distance between start & end: ${calculatedDistKm.toStringAsFixed(2)} km");
+                }
+              }
+            }
+
+            // 3. Fallback to Haversine point-to-point sum without 1km point cap
+            double dbDist = 0.0;
+            for (int i = 0; i < rawPts.length - 1; i++) {
+              final dMeters = _calculateDistance(
+                rawPts[i].latitude,
+                rawPts[i].longitude,
+                rawPts[i + 1].latitude,
+                rawPts[i + 1].longitude,
+              );
+              if (dMeters >= 3.0) {
+                dbDist += (dMeters / 1000.0);
+              }
+            }
+            if (dbDist > calculatedDistKm) {
+              calculatedDistKm = dbDist;
+            }
+          }
+        } catch (calcErr) {
+          print("Error calculating real GPS distance for trip $tripId: $calcErr");
+        }
+
+        // If location_updates didn't have enough points, check if trips already has total_distance_km recorded live
+        if (calculatedDistKm <= 0) {
+          try {
+            final tData = await client.from('trips').select('total_distance_km').eq('id', tripId).maybeSingle();
+            final dbDist = (tData?['total_distance_km'] as num?)?.toDouble() ?? 0.0;
+            if (dbDist > 0) calculatedDistKm = dbDist;
+          } catch (_) {}
+        }
+
+        if (calculatedDistKm <= 0 && liveDist > 0) {
+          calculatedDistKm = liveDist;
+        }
+
+        final roundedDist = double.parse(calculatedDistKm.toStringAsFixed(2));
+
+        // Set trip to completed with exact GPS distance (with fallback if column is not in DB)
+        try {
+          await client
+              .from('trips')
+              .update({
+                'status': 'COMPLETED',
+                'ended_at': DateTime.now().toUtc().toIso8601String(),
+                'total_distance_km': roundedDist,
+              })
+              .eq('id', tripId);
+        } catch (updateErr) {
+          print("Notice updating total_distance_km on trips table: $updateErr. Falling back to status & ended_at update.");
+          await client
+              .from('trips')
+              .update({
+                'status': 'COMPLETED',
+                'ended_at': DateTime.now().toUtc().toIso8601String(),
+              })
+              .eq('id', tripId);
+        }
+
+        // Update vehicle status to OFFLINE and update vehicle odometer with real GPS distance
+        if (roundedDist > 0) {
+          try {
+            final vData = await client
+                .from('vehicles')
+                .select('total_distance_km')
+                .eq('id', vehicleId)
+                .maybeSingle();
+            final currentVTotal = (vData?['total_distance_km'] as num?)?.toDouble() ?? 0.0;
+            final newVTotal = double.parse((currentVTotal + roundedDist).toStringAsFixed(2));
+            await client
+                .from('vehicles')
+                .update({
+                  'status': 'OFFLINE',
+                  'total_distance_km': newVTotal,
+                })
+                .eq('id', vehicleId);
+          } catch (_) {
+            await client
+                .from('vehicles')
+                .update({'status': 'OFFLINE'})
+                .eq('id', vehicleId);
+          }
+        } else {
+          await client
+              .from('vehicles')
+              .update({'status': 'OFFLINE'})
+              .eq('id', vehicleId);
+        }
+
+        // Clear all location_updates path points for this completed trip from Supabase to keep storage clean
+        try {
+          await client.from('location_updates').delete().eq('trip_id', tripId);
+          print("MAVIO: Cleared location_updates path points for completed trip $tripId to optimize Supabase database");
+        } catch (delErr) {
+          print("Notice on clearing location_updates: $delErr");
+        }
       } catch (e) {
         print("Error ending trip: $e");
         rethrow;
@@ -1144,29 +1352,184 @@ class SupabaseService {
     }
   }
 
-  // 7. Stream Location Updates for Student View (polling-based for database flexibility)
+  // 7. Stream Location Updates for Student View (Instant Supabase Realtime WebSocket + Fallback Stream)
   Stream<MavioLocationUpdate> streamLocationUpdates(String tripId) {
     if (_useMockMode) {
       return _mockLocationStreamController.stream.where((event) => event.tripId == tripId);
-    } else {
-      // Fetch location updates every 3 seconds to guarantee updates work even without Supabase Realtime enabled
-      return Stream.periodic(const Duration(seconds: 3))
-          .asyncMap((_) => getLatestLocationUpdate(tripId))
-          .where((update) => update != null)
-          .cast<MavioLocationUpdate>();
     }
+
+    late StreamController<MavioLocationUpdate> controller;
+    RealtimeChannel? channel;
+    Timer? pollingTimer;
+    DateTime? lastSeenTime;
+    final Set<String> seenIds = {};
+
+    void pushUpdate(MavioLocationUpdate update) {
+      if (update.id.isNotEmpty && seenIds.contains(update.id)) return;
+      if (update.id.isNotEmpty) seenIds.add(update.id);
+      if (lastSeenTime == null || update.createdAt.isAfter(lastSeenTime!)) {
+        lastSeenTime = update.createdAt;
+      }
+      if (!controller.isClosed) {
+        controller.add(update);
+      }
+    }
+
+    controller = StreamController<MavioLocationUpdate>.broadcast(
+      onListen: () {
+        // 1. Initial fetch of latest point
+        getLatestLocationUpdate(tripId).then((latest) {
+          if (latest != null) pushUpdate(latest);
+        }).catchError((_) {});
+
+        // 2. Subscribe to Supabase Realtime PostgreSQL Changes (sub-100ms WebSocket push)
+        try {
+          channel = Supabase.instance.client
+              .channel('realtime:location_updates:$tripId')
+              .onPostgresChanges(
+                event: PostgresChangeEvent.insert,
+                schema: 'public',
+                table: 'location_updates',
+                filter: PostgresChangeFilter(
+                  type: PostgresChangeFilterType.eq,
+                  column: 'trip_id',
+                  value: tripId,
+                ),
+                callback: (payload) {
+                  try {
+                    final newRecord = payload.newRecord;
+                    if (newRecord.isNotEmpty) {
+                      final update = MavioLocationUpdate.fromJson(newRecord);
+                      pushUpdate(update);
+                    }
+                  } catch (e) {
+                    print("Error parsing realtime location update: $e");
+                  }
+                },
+              )
+              .subscribe();
+        } catch (e) {
+          print("Error subscribing to realtime location channel: $e");
+        }
+
+        // 3. Fallback 1.5s poller to guarantee zero lost coordinates on network drops
+        pollingTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) async {
+          try {
+            final updates = await getNewLocationUpdates(tripId, since: lastSeenTime);
+            for (final u in updates) {
+              pushUpdate(u);
+            }
+          } catch (_) {}
+        });
+      },
+      onCancel: () {
+        pollingTimer?.cancel();
+        if (channel != null) {
+          try {
+            Supabase.instance.client.removeChannel(channel!);
+          } catch (_) {}
+        }
+      },
+    );
+
+    return controller.stream;
   }
 
-  // Stream All Location Updates for Admin Map view (polling-based for database flexibility)
+  // Stream All Location Updates for Admin Map view (Realtime WebSocket + fast poller)
   Stream<MavioLocationUpdate> streamAllLocationUpdates() {
     if (_useMockMode) {
       return _mockLocationStreamController.stream;
-    } else {
-      // Fetch latest locations of all trips every 3 seconds
-      return Stream.periodic(const Duration(seconds: 3))
-          .asyncMap((_) => getLatestLocationsOfAllTrips())
-          .expand((updates) => updates)
-          .cast<MavioLocationUpdate>();
+    }
+
+    late StreamController<MavioLocationUpdate> controller;
+    RealtimeChannel? channel;
+    Timer? pollingTimer;
+    final Set<String> seenIds = {};
+
+    void pushUpdate(MavioLocationUpdate update) {
+      if (update.id.isNotEmpty && seenIds.contains(update.id)) return;
+      if (update.id.isNotEmpty) seenIds.add(update.id);
+      if (!controller.isClosed) {
+        controller.add(update);
+      }
+    }
+
+    controller = StreamController<MavioLocationUpdate>.broadcast(
+      onListen: () {
+        // Initial fetch
+        getLatestLocationsOfAllTrips().then((list) {
+          for (final u in list) {
+            pushUpdate(u);
+          }
+        }).catchError((_) {});
+
+        try {
+          channel = Supabase.instance.client
+              .channel('realtime:all_location_updates')
+              .onPostgresChanges(
+                event: PostgresChangeEvent.insert,
+                schema: 'public',
+                table: 'location_updates',
+                callback: (payload) {
+                  try {
+                    final newRecord = payload.newRecord;
+                    if (newRecord.isNotEmpty) {
+                      final update = MavioLocationUpdate.fromJson(newRecord);
+                      pushUpdate(update);
+                    }
+                  } catch (e) {
+                    print("Error parsing admin realtime location update: $e");
+                  }
+                },
+              )
+              .subscribe();
+        } catch (e) {
+          print("Error subscribing to admin realtime channel: $e");
+        }
+
+        pollingTimer = Timer.periodic(const Duration(milliseconds: 2000), (_) async {
+          try {
+            final latestList = await getLatestLocationsOfAllTrips();
+            for (final u in latestList) {
+              pushUpdate(u);
+            }
+          } catch (_) {}
+        });
+      },
+      onCancel: () {
+        pollingTimer?.cancel();
+        if (channel != null) {
+          try {
+            Supabase.instance.client.removeChannel(channel!);
+          } catch (_) {}
+        }
+      },
+    );
+
+    return controller.stream;
+  }
+
+  // Helper: Get all new location updates for a trip since a given timestamp in chronological order
+  Future<List<MavioLocationUpdate>> getNewLocationUpdates(String tripId, {DateTime? since}) async {
+    if (_useMockMode) return [];
+    try {
+      var query = Supabase.instance.client
+          .from('location_updates')
+          .select()
+          .eq('trip_id', tripId);
+
+      if (since != null) {
+        query = query.gt('created_at', since.toUtc().toIso8601String());
+        final response = await query.order('created_at', ascending: true).limit(50);
+        return (response as List).map((u) => MavioLocationUpdate.fromJson(u)).toList();
+      } else {
+        // When since is null, fetch ONLY the single latest point, avoiding historic start locations!
+        final response = await query.order('created_at', ascending: false).limit(1);
+        return (response as List).map((u) => MavioLocationUpdate.fromJson(u)).toList();
+      }
+    } catch (e) {
+      print("Error getting new location updates: $e");
+      return [];
     }
   }
 
@@ -1210,13 +1573,15 @@ class SupabaseService {
   Future<List<Map<String, double>>> getTripPathCoordinates(String tripId) async {
     if (_useMockMode) return [];
     try {
+      // Fetch the last 250 points in reverse chronological order for instant load times
       final response = await Supabase.instance.client
           .from('location_updates')
           .select('latitude, longitude, accuracy')
           .eq('trip_id', tripId)
-          .order('created_at', ascending: true);
+          .order('created_at', ascending: false)
+          .limit(250);
       
-      final list = response as List;
+      final list = (response as List).reversed.toList();
       final List<Map<String, double>> validPath = [];
 
       for (var item in list) {
@@ -1567,14 +1932,14 @@ class SupabaseService {
       try {
         final query = Supabase.instance.client
             .from('profiles')
-            .select('dob')
+            .select('login_pin')
             .eq('role', 'driver');
         final res = await query;
         if (res is List) {
           for (var row in res) {
-            final dob = row['dob']?.toString();
-            if (dob != null && dob.isNotEmpty) {
-              existingPins.add(dob);
+            final pin = row['login_pin']?.toString();
+            if (pin != null && pin.isNotEmpty) {
+              existingPins.add(pin);
             }
           }
         }
@@ -1609,7 +1974,11 @@ class SupabaseService {
             : await generateUniqueDriverPin(orgId: orgId);
 
     final cleanPhone = phone?.replaceAll(RegExp(r'[^\d]'), '') ?? '';
-    final finalEmail = email.trim().isNotEmpty
+    final adminEmail = _currentUserProfile?.email.toLowerCase().trim() ?? '';
+    final inputEmail = email.trim().toLowerCase();
+
+    // Guard against browser auto-completing the logged-in admin's own email address
+    final finalEmail = (inputEmail.isNotEmpty && inputEmail != adminEmail)
         ? email.trim()
         : (cleanPhone.isNotEmpty ? '$cleanPhone@mavio.driver' : 'driver_${DateTime.now().millisecondsSinceEpoch}@mavio.driver');
 
@@ -1629,16 +1998,15 @@ class SupabaseService {
         dob: driverPin,
       );
     } else {
+      final tempClient = SupabaseClient(
+        SupabaseKeys.url,
+        SupabaseKeys.anonKey,
+        authOptions: const AuthClientOptions(
+          authFlowType: AuthFlowType.implicit,
+          pkceAsyncStorage: _NoStorage(),
+        ),
+      );
       try {
-        final tempClient = SupabaseClient(
-          SupabaseKeys.url,
-          SupabaseKeys.anonKey,
-          authOptions: const AuthClientOptions(
-            authFlowType: AuthFlowType.implicit,
-            pkceAsyncStorage: _NoStorage(),
-          ),
-        );
-        
         final authRes = await tempClient.auth.signUp(
           email: finalEmail,
           password: finalPassword,
@@ -1659,12 +2027,59 @@ class SupabaseService {
             'org_id': orgId,
             'assigned_vehicle_id': assignedVehicleId,
             'phone': phone,
-            'dob': driverPin,
+            'login_pin': driverPin,
           });
         } else {
           throw Exception("Auth signUp failed to return user ID.");
         }
       } catch (e) {
+        if (e is AuthException && (e.code == 'user_already_exists' || e.message.contains('already registered'))) {
+          final client = Supabase.instance.client;
+
+          // 1. Check if profile already exists in public.profiles
+          try {
+            final existing = await client
+                .from('profiles')
+                .select('name, phone, role')
+                .or('email.eq.$finalEmail${cleanPhone.isNotEmpty ? ',phone.eq.$cleanPhone' : ''}')
+                .maybeSingle();
+
+            if (existing != null) {
+              final existingName = existing['name'] ?? 'another user';
+              final existingPhone = existing['phone'] ?? finalEmail;
+              throw Exception("A driver or user named '$existingName' ($existingPhone) already exists in your fleet. Please use a unique mobile number.");
+            }
+          } catch (profileErr) {
+            if (profileErr is Exception && profileErr.toString().contains("already exists")) {
+              rethrow;
+            }
+          }
+
+          // 2. If NO profile exists in public.profiles (orphaned auth account in auth.users), adopt/recover it!
+          try {
+            final signInRes = await tempClient.auth.signInWithPassword(
+              email: finalEmail,
+              password: finalPassword,
+            );
+            final orphanedId = signInRes.user?.id;
+            if (orphanedId != null) {
+              await client.from('profiles').insert({
+                'id': orphanedId,
+                'email': finalEmail,
+                'name': name,
+                'role': 'driver',
+                'org_id': orgId,
+                'assigned_vehicle_id': assignedVehicleId,
+                'phone': phone,
+                'login_pin': driverPin,
+              });
+              return; // Successfully recovered orphaned auth user and created profile!
+            }
+          } catch (_) {}
+
+          String detail = cleanPhone.isNotEmpty ? "phone number '$cleanPhone'" : "email '$finalEmail'";
+          throw Exception("The $detail is already registered in Supabase Auth. Please enter a different, unique mobile number.");
+        }
         print("Error inserting driver profile: $e");
         rethrow;
       }
@@ -1686,20 +2101,33 @@ class SupabaseService {
         dob: dob,
       );
     } else {
+      final orgId = _currentUserProfile!.orgId;
+      final tempClient = SupabaseClient(
+        SupabaseKeys.url,
+        SupabaseKeys.anonKey,
+        authOptions: const AuthClientOptions(
+          authFlowType: AuthFlowType.implicit,
+          pkceAsyncStorage: _NoStorage(),
+        ),
+      );
+
+      final cleanRoll = rollNumber?.trim() ?? '';
+      final cleanPhone = phone?.replaceAll(RegExp(r'[^\d]'), '') ?? '';
+      final adminEmail = _currentUserProfile?.email.toLowerCase().trim() ?? '';
+      final inputEmail = email.trim().toLowerCase();
+
+      final finalStudentEmail = (inputEmail.isNotEmpty && inputEmail != adminEmail && inputEmail.contains('@'))
+          ? email.trim()
+          : (cleanRoll.isNotEmpty
+              ? '${cleanRoll.toLowerCase()}@mavio.student'
+              : (cleanPhone.isNotEmpty ? '$cleanPhone@mavio.student' : 'student_${DateTime.now().millisecondsSinceEpoch}@mavio.student'));
+
+      final studentPassword = (dob != null && dob.trim().isNotEmpty) ? dob.trim() : 'mavio123';
+
       try {
-        final orgId = _currentUserProfile!.orgId;
-        final tempClient = SupabaseClient(
-          SupabaseKeys.url,
-          SupabaseKeys.anonKey,
-          authOptions: const AuthClientOptions(
-            authFlowType: AuthFlowType.implicit,
-            pkceAsyncStorage: _NoStorage(),
-          ),
-        );
-        
         final authRes = await tempClient.auth.signUp(
-          email: email.trim(),
-          password: dob ?? 'mavio123',
+          email: finalStudentEmail,
+          password: studentPassword,
           data: {
             'role': 'student',
             'org_id': orgId,
@@ -1711,19 +2139,66 @@ class SupabaseService {
           final client = Supabase.instance.client;
           await client.from('profiles').insert({
             'id': userId,
-            'email': email.trim(),
+            'email': finalStudentEmail,
             'name': name,
             'role': 'student',
             'org_id': orgId,
             'assigned_vehicle_id': assignedVehicleId,
             'phone': phone,
             'roll_number': rollNumber,
-            'dob': dob,
+            'login_pin': dob,
           });
         } else {
           throw Exception("Auth signUp failed to return user ID.");
         }
       } catch (e) {
+        if (e is AuthException && (e.code == 'user_already_exists' || e.message.contains('already registered'))) {
+          final client = Supabase.instance.client;
+
+          // 1. Check if profile already exists in public.profiles
+          try {
+            final existing = await client
+                .from('profiles')
+                .select('name, roll_number, email')
+                .or('email.eq.$finalStudentEmail${cleanRoll.isNotEmpty ? ',roll_number.eq.$cleanRoll' : ''}')
+                .maybeSingle();
+
+            if (existing != null) {
+              final existingName = existing['name'] ?? 'another student';
+              final existingRoll = existing['roll_number'] ?? cleanRoll;
+              throw Exception("A student named '$existingName' (Roll: $existingRoll) is already registered in your Students list.");
+            }
+          } catch (profileErr) {
+            if (profileErr is Exception && profileErr.toString().contains("already registered")) {
+              rethrow;
+            }
+          }
+
+          // 2. If NO profile exists in public.profiles (orphaned auth account in auth.users), adopt/recover it!
+          try {
+            final signInRes = await tempClient.auth.signInWithPassword(
+              email: finalStudentEmail,
+              password: studentPassword,
+            );
+            final orphanedId = signInRes.user?.id;
+            if (orphanedId != null) {
+              await client.from('profiles').insert({
+                'id': orphanedId,
+                'email': finalStudentEmail,
+                'name': name,
+                'role': 'student',
+                'org_id': orgId,
+                'assigned_vehicle_id': assignedVehicleId,
+                'phone': phone,
+                'roll_number': rollNumber,
+                'login_pin': dob,
+              });
+              return; // Successfully recovered orphaned student auth account!
+            }
+          } catch (_) {}
+
+          throw Exception("Student email/roll '$finalStudentEmail' is already registered in Supabase Auth. Please use a unique Roll Number or Email.");
+        }
         print("Error inserting student profile: $e");
         rethrow;
       }
@@ -1947,10 +2422,33 @@ class SupabaseService {
             .from('trips')
             .select()
             .eq('driver_id', driverId)
-            .order('started_at', ascending: false);
-        return (response as List).map((t) => MavioTrip.fromJson(t)).toList();
+            .order('started_at', ascending: false)
+            .limit(25);
+        final list = (response as List).map((t) => MavioTrip.fromJson(t)).toList();
+        return list;
       } catch (e) {
         print("Error fetching driver trip history: $e");
+        return [];
+      }
+    }
+  }
+
+  Future<List<MavioTrip>> getVehicleTripHistory(String vehicleId) async {
+    if (_useMockMode) {
+      return _mockTrips.where((t) => t.vehicleId == vehicleId).toList();
+    } else {
+      try {
+        final client = Supabase.instance.client;
+        final response = await client
+            .from('trips')
+            .select()
+            .eq('vehicle_id', vehicleId)
+            .order('started_at', ascending: false)
+            .limit(100);
+        final list = (response as List).map((t) => MavioTrip.fromJson(t)).toList();
+        return list;
+      } catch (e) {
+        print("Error fetching vehicle trip history: $e");
         return [];
       }
     }
@@ -1982,7 +2480,7 @@ class SupabaseService {
     } else {
       await Supabase.instance.client
           .from('profiles')
-          .update({'dob': newPin})
+          .update({'login_pin': newPin})
           .eq('id', driverId);
 
       try {
@@ -2016,7 +2514,7 @@ class SupabaseService {
       'assigned_vehicle_id': assignedVehicleId,
     };
     if (pin != null && pin.isNotEmpty) {
-      updateData['dob'] = pin;
+      updateData['login_pin'] = pin;
     }
 
     if (_useMockMode) {
@@ -2082,7 +2580,7 @@ class SupabaseService {
         'email': email,
         'phone': phone,
         'roll_number': rollNumber,
-        'dob': dob,
+        'login_pin': dob,
         'assigned_vehicle_id': assignedVehicleId,
       }).eq('id', id);
 

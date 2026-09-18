@@ -241,7 +241,7 @@ class _MavioBulkImportScreenState extends State<MavioBulkImportScreen> {
     try {
       if (widget.importType == 'vehicle') {
         final org = widget.db.currentOrganization;
-        final limit = org?.maxVehicles ?? 15;
+        final limit = org?.effectiveMaxVehicles ?? 25;
         if ((widget.fleet.length + _parsedRows.length) > limit) {
           setState(() => _isLoading = false);
           _showLimitExceededDialog(limit);
